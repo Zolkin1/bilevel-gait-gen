@@ -6,5 +6,11 @@ project(bilevel-gait-gen
 
 # TODO: add find packages
 
+set(SIMULATION ON CACHE BOOL "Configure if the simulator is in use.")
+
+if(SIMULATION)
+    add_subdirectory(simulation)
+endif ()
+
 add_subdirectory(apps)
 
