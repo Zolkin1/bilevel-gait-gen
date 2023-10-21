@@ -1,4 +1,11 @@
 
 add_executable(demo demo.cpp)
 
-target_link_libraries(demo simulator)
+# simulator
+if(SIMULATION)
+    target_link_libraries(demo simulator)
+endif ()
+
+# yaml-cpp
+find_package(yaml-cpp REQUIRED)
+target_link_libraries(demo yaml-cpp::yaml-cpp)

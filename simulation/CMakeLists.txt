@@ -15,8 +15,28 @@ target_include_directories(mujoco INTERFACE ${MUJOCO_DIR}/include/mujoco)
 set_property(TARGET mujoco PROPERTY IMPORTED_LOCATION ${MUJOCO_DIR}/lib/libmujoco.so)
 
 # Create the simulator library
-set(SIM_HEADER_LIST "include/simulator.h")
 
-add_library(simulator simulator.cpp ${SIM_HEADER_LIST})
+set(SIM_HEADER_LIST "include/simulator.h"
+                    "include/simulation_robot.h"
+                    "include/controller.h")
+
+add_library(simulator simulator.cpp
+                      simulation_robot.cpp
+                      controller.cpp
+                      ${SIM_HEADER_LIST})
+
 target_include_directories(simulator PUBLIC include)
 target_link_libraries(simulator PUBLIC mujoco)
+
+# GLFW
+find_package(glfw3 REQUIRED)
+target_link_libraries(simulator PUBLIC glfw)
+
+# Eigen
+find_package(Eigen3 REQUIRED)
+target_link_libraries(simulator PUBLIC Eigen3::Eigen)
+
+# yaml-cpp
+find_package(yaml-cpp REQUIRED)
+target_link_libraries(simulator PRIVATE yaml-cpp::yaml-cpp)
+
