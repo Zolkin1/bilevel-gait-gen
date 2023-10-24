@@ -4,6 +4,9 @@ project(bilevel-gait-gen
     VERSION 0.1
     LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to use")
+
+
 # TODO: add find packages
 
 set(SIMULATION ON CACHE BOOL "Configure if the simulator is in use.")

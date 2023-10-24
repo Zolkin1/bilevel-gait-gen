@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
     robot->SetInitialCondition(init_config, init_vel);
 
     // Everything in the robot needs to be setup by here because it is consumed by the simulator
-    simulator::Simulator sim(robot, 1.0/500.0);
+    simulator::Simulator sim(robot, true, 1.0/500.0);
 
     sim.SetupSimulator();
 
