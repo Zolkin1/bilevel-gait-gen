@@ -23,8 +23,8 @@
 
     <asset>
         <texture type="skybox" builtin="gradient" rgb1=".3 .5 .7" rgb2="0 0 0" width="32" height="512"/>
-        <texture name="body" type="cube" builtin="flat" width="128" height="128" rgb1="0.8 0.6 0.4" rgb2="0.8 0.6 0.4" markrgb="1 1 1" random="0.01"/>
-        <material name="body" texture="body" texuniform="true" rgba="0.8 0.6 .4 1"/>
+        <texture name="body" type="cube" builtin="flat" width="128" height="128" rgb1="1 0.5 .2" rgb2="1 0.5 .2" markrgb="1 1 1" random="0.01"/>
+        <material name="body" texture="body" texuniform="true" rgba="1 0.5 .2 1"/>
         <texture name="trunk" type="cube" builtin="flat" width="128" height="128" rgb1=".2 .2 .2" rgb2=".2 .2 .2" markrgb="1 1 1" random="0.01"/>
         <material name="trunk" texture="trunk" rgba=".2 .2 .2 1"/>
         <texture name="plane" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>

@@ -18,11 +18,21 @@ set_property(TARGET mujoco PROPERTY IMPORTED_LOCATION ${MUJOCO_DIR}/lib/libmujoc
 
 set(SIM_HEADER_LIST "include/simulator.h"
                     "include/simulation_robot.h"
-                    "include/controller.h")
+                    "include/controller.h"
+                    "include/glfw_adapter.h"
+                    "include/array_safety.h"
+                    "include/glfw_corevideo.h"
+                    "include/glfw_dispatch.h"
+                    "include/platform_ui_adapter.h"
+                    "include/simulate.h")
 
 add_library(simulator simulator.cpp
                       simulation_robot.cpp
                       controller.cpp
+                    glfw_adapter.cc
+                    glfw_dispatch.cc
+                    platform_ui_adapter.cc
+                    simulate.cc
                       ${SIM_HEADER_LIST})
 
 target_include_directories(simulator PUBLIC include)
