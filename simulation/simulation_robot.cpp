@@ -27,8 +27,15 @@ namespace simulator {
         return initial_vel_;
     }
 
-    void SimulationRobot::GetControlAction(const mjModel *model, mjData *data) {
+    const Controller* SimulationRobot::GetController() const {
+        return low_level_controller_.get();
+    }
 
+    void SimulationRobot::GetControlAction(const mjModel* model, mjtNum* cntrl) {
+        std::vector<mjtNum> control = low_level_controller_->ComputeControlAction(model);
+        for (int i = 0; i < model->nu; i++) {
+            cntrl[i] = control.at(i);
+        }
     }
 
 } // simulator

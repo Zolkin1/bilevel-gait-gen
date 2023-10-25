@@ -32,9 +32,16 @@ namespace simulator {
         Eigen::VectorXd GetVelocities() const;
 
         /**
+         * Get the low level controller
+         * @return a const pointer to the controller
+         */
+        const Controller* GetController() const;
+
+        /**
          * Interface with Mujoco to provide the current control action.
          */
-        void GetControlAction(const mjModel* model, mjData* data);
+        void GetControlAction(const mjModel* model, mjtNum* control);
+
     private:
         std::string robot_xml_path_;
         std::unique_ptr<Controller> low_level_controller_;

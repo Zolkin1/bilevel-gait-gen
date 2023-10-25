@@ -96,6 +96,8 @@ namespace simulator {
         std::chrono::time_point<mujoco::Simulate::Clock> syncCPU;
         mjtNum syncSim = 0;
 
+        mjtNum last_control_time = data_->time;
+
         // run until asked to exit
         while (!sim->exitrequest.load()) {
             // sleep for 1 ms or yield, to let main thread run
@@ -138,13 +140,18 @@ namespace simulator {
                             syncSim = data_->time;
                             sim->speed_changed = false;
 
+                            // Get control input - if the time is less than the last time, a reset happened, so apply a control
+                            if (data_->time - last_control_time >= robot->GetController()->GetRate() ||
+                                data_->time < last_control_time) {
+
+                                robot->GetControlAction(model_, data_->ctrl);
+
+                                last_control_time = data_->time;
+                            }
                             // run single step, let next iteration deal with timing
                             mj_step(model_, data_);
                             stepped = true;
-                        }
-
-                            // in-sync: step until ahead of cpu
-                        else {
+                        } else { // in-sync: step until ahead of cpu
                             bool measured = false;
                             mjtNum prevSim = data_->time;
 
@@ -160,6 +167,14 @@ namespace simulator {
                                     measured = true;
                                 }
 
+                                // Get control input - if the time is less than the last time, a reset happened, so apply a control
+                                if (data_->time - last_control_time >= robot->GetController()->GetRate() ||
+                                    data_->time < last_control_time) {
+
+                                    robot->GetControlAction(model_, data_->ctrl);
+
+                                    last_control_time = data_->time;
+                                }
                                 // call mj_step
                                 mj_step(model_, data_);
                                 stepped = true;

@@ -12,10 +12,11 @@
 #include <string>
 #include <Eigen/Core>
 
-#include "yaml-cpp/yaml.h"
-
+#include "config_parser.h"
 #include "simulator.h"
 #include "simulation_robot.h"
+#include "pd_grav_comp.h"
+
 
 int main(int argc, char* argv[]) {
     // Load in the config
@@ -26,31 +27,25 @@ int main(int argc, char* argv[]) {
 
     // Needs the absolute path for now
     std::string config_file(argv[1]);
-    YAML::Node config = YAML::LoadFile(config_file);
+    mpc::utils::ConfigParser config = mpc::utils::ConfigParser(config_file);
 
     // Make the low level controller
-    std::unique_ptr<simulator::Controller> controller = std::make_unique<simulator::Controller>();
+    std::unique_ptr<simulator::Controller> controller =
+            std::make_unique<simulator::PDGravComp>(config.ParseNumber("control_rate"),
+                                                    config.ParseEigenVector("standing_config"));
 
     // Make the robot for simulation
-    std::string robot_file = config["robot_xml"].as<std::string>();
+    auto robot_file = config.ParseString("robot_xml");
     std::unique_ptr<simulator::SimulationRobot> robot = std::make_unique<simulator::SimulationRobot>(robot_file, controller);
 
     // Set the robot's initial condition
-    // TODO: parse better and check the quaternion is normalized
-    std::vector<double> temp_config = config["init_config"].as<std::vector<double>>();
-    std::vector<double> temp_vel = config["init_vel"].as<std::vector<double>>();
-    Eigen::VectorXd init_config(temp_config.size());
-    Eigen::VectorXd init_vel(temp_vel.size());
-    for (int i = 0; i < temp_config.size(); i++) {
-        init_config(i) = temp_config.at(i);
-    }
-
-    for (int i = 0; i < temp_vel.size(); i++) {
-        init_vel(i) = temp_vel.at(i);
-    }
-
-
+    // TODO: check the quaternion is normalized
+    Eigen::VectorXd init_config = config.ParseEigenVector("init_config");
+    Eigen::VectorXd init_vel = config.ParseEigenVector("init_vel");
     robot->SetInitialCondition(init_config, init_vel);
+
+    // Get the standing configuration
+    Eigen::VectorXd standing_config = config.ParseEigenVector("standing_config");
 
     // Everything in the robot needs to be setup by here because it is consumed by the simulator
     simulator::Simulator sim(robot);

@@ -3,13 +3,26 @@
 # XML file location
 robot_xml: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/xml/a1.xml"
 
+## ----------------------- Configurations ----------------------- ##
 # initial joint config
 # xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
-init_config: [0., 0., 0.4, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+init_config: [0., 0., 0.375, 0., 0., 0., 0.,
+              0., 0.2, -0.91,   # front
+              0., 0.2, -0.91,   # front
+              0., 0.4, -0.91,   # rear
+              0., 0.4, -0.91]   # rear
 
 # initial joint velocity
 # xv, yv, zv, angle rates, v0, ..., v11
 init_vel: [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
 
+standing_config: [0., 0., 0.375, 0., 0., 0., 0.,
+                  0., 0.2, -0.91,
+                  0., 0.2, -0.91,
+                  0., 0.4, -0.91,
+                  0., 0.4, -0.91]
+
+## ----------------------- Low Level Controller ----------------------- ##
+control_rate: 400   # Hz
 
 

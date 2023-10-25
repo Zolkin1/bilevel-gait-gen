@@ -18,6 +18,7 @@ set_property(TARGET mujoco PROPERTY IMPORTED_LOCATION ${MUJOCO_DIR}/lib/libmujoc
 
 set(SIM_HEADER_LIST "include/simulator.h"
                     "include/simulation_robot.h"
+                    "include/pd_grav_comp.h"
                     "include/controller.h"
                     "include/glfw_adapter.h"
                     "include/array_safety.h"
@@ -29,6 +30,7 @@ set(SIM_HEADER_LIST "include/simulator.h"
 add_library(simulator simulator.cpp
                       simulation_robot.cpp
                       controller.cpp
+                    pd_grav_comp.cpp
                     glfw_adapter.cc
                     glfw_dispatch.cc
                     platform_ui_adapter.cc

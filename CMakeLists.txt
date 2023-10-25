@@ -15,5 +15,7 @@ if(SIMULATION)
     add_subdirectory(simulation)
 endif ()
 
+add_subdirectory(src)
+
 add_subdirectory(apps)
 
