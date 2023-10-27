@@ -3,26 +3,42 @@
 # XML file location
 robot_xml: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/xml/a1.xml"
 
+robot_urdf: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/urdf/a1.urdf"
+
+collision_frames: ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]    # for pinocchio
+collision_bodies: [4, 7, 10, 13]  # for mujoco
+# these need to match ^
+
 ## ----------------------- Configurations ----------------------- ##
 # initial joint config
 # xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
-init_config: [0., 0., 0.375, 0., 0., 0., 0.,
-              0., 0.2, -0.91,   # front
-              0., 0.2, -0.91,   # front
-              0., 0.4, -0.91,   # rear
-              0., 0.4, -0.91]   # rear
+init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
+              -0.02, 0.144, -0.976,     # front right
+              0.02, 0.143, -0.977,      # front left
+              -0.08, 0.45, -1.03,       # rear right
+              0.08, 0.45, -1.03]        # rear left
 
 # initial joint velocity
 # xv, yv, zv, angle rates, v0, ..., v11
-init_vel: [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+init_vel: [0., 0., 0., 0., 0., 0.,
+           0., 0., 0.,
+           0., 0., 0.,
+           0., 0., 0.,
+           0., 0., 0.]
 
 standing_config: [0., 0., 0.375, 0., 0., 0., 0.,
-                  0., 0.2, -0.91,
-                  0., 0.2, -0.91,
-                  0., 0.4, -0.91,
-                  0., 0.4, -0.91]
+                  -0.22, 0.2, -0.91,
+                  0.22, 0.2, -0.91,
+                  -0.0788, 0.4, -0.91,
+                  0.0798, 0.4, -0.91]
+
+standing_vel: [0., 0., 0., 0., 0., 0.,
+               0., 0., 0.,
+               0., 0., 0.,
+               0., 0., 0.,
+               0., 0., 0.]
 
 ## ----------------------- Low Level Controller ----------------------- ##
-control_rate: 400   # Hz
+control_rate: 400  # Hz
 
 

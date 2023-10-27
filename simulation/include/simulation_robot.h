@@ -25,22 +25,23 @@ namespace simulator {
 
         void SetInitialCondition(const Eigen::VectorXd& initial_condition, const Eigen::VectorXd& initial_vel);
 
-        std::string GetRobotXMLFile() const;
+        [[nodiscard]] std::string GetRobotXMLFile() const;
 
-        Eigen::VectorXd GetConfig() const;
+        [[nodiscard]] Eigen::VectorXd GetInitConfig() const;
 
-        Eigen::VectorXd GetVelocities() const;
+        [[nodiscard]] Eigen::VectorXd GetInitVelocities() const;
 
         /**
          * Get the low level controller
          * @return a const pointer to the controller
          */
-        const Controller* GetController() const;
+        [[nodiscard]] const Controller* GetController() const;
 
         /**
          * Interface with Mujoco to provide the current control action.
+         * Puts the controls into the control vector provided.
          */
-        void GetControlAction(const mjModel* model, mjtNum* control);
+        void GetControlAction(const mjModel* model, const mjData* data, mjtNum* control);
 
     private:
         std::string robot_xml_path_;

@@ -5,6 +5,10 @@ set(MUJOCO_VERSION "mujoco-3.0.0" CACHE STRING "mujoco version")
 set(MUJOCO_DIR "/home/$ENV{USER}/${MUJOCO_VERSION}" CACHE PATH "Path to Mujoco dir")
 message(STATUS "mujoco directory: ${MUJOCO_DIR}")
 
+# TODO: Fix this
+set(PINOCCHIO_DIR "/home/$ENV{USER}/repos/pinocchio" CACHE PATH "Path to pinocchio")
+set(CMAKE_MODULE_PATH "${PINOCCHIO_DIR}/cmake/find-external/CppAD")
+
 # Setup the Mujoco library
 find_library(MUJOCO_LIB mujoco REQUIRED HINTS ${MUJOCO_DIR}/lib)
 
@@ -51,4 +55,8 @@ target_link_libraries(simulator PUBLIC Eigen3::Eigen)
 # yaml-cpp
 find_package(yaml-cpp REQUIRED)
 target_link_libraries(simulator PRIVATE yaml-cpp::yaml-cpp)
+
+# pinocchio
+find_package(pinocchio)
+target_link_libraries(simulator PRIVATE pinocchio)
 

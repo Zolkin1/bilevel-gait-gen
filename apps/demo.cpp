@@ -32,7 +32,14 @@ int main(int argc, char* argv[]) {
     // Make the low level controller
     std::unique_ptr<simulator::Controller> controller =
             std::make_unique<simulator::PDGravComp>(config.ParseNumber("control_rate"),
-                                                    config.ParseEigenVector("standing_config"));
+                                                    config.ParseString("robot_urdf"),
+                                                    config.ParseEigenVector("standing_config"),
+                                                    config.ParseEigenVector("standing_vel"));   // number of inputs
+
+    controller->DefineContacts(config.ParseStringVector("collision_frames"),
+                                    config.ParseIntVector("collision_bodies"));
+
+    controller->PrintConfigNames();
 
     // Make the robot for simulation
     auto robot_file = config.ParseString("robot_xml");

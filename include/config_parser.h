@@ -20,6 +20,10 @@ namespace mpc::utils {
 
         std::string ParseString(const std::string& element);
 
+        std::vector<std::string> ParseStringVector(const std::string& element);
+
+        std::vector<int> ParseIntVector(const std::string& element);
+
     private:
         std::string file_name_;
 

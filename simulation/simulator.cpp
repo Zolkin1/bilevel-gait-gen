@@ -48,7 +48,7 @@ namespace simulator {
         data_ = mj_makeData(model_);
 
         // Set state to current initial condition
-        this->SetState(robot_->GetConfig(), robot_->GetVelocities());
+        this->SetState(robot_->GetInitConfig(), robot_->GetInitVelocities());
 
         //TODO: Set the control callback function (not the mujoco one)
 
@@ -144,7 +144,7 @@ namespace simulator {
                             if (data_->time - last_control_time >= robot->GetController()->GetRate() ||
                                 data_->time < last_control_time) {
 
-                                robot->GetControlAction(model_, data_->ctrl);
+                                robot->GetControlAction(model_, data_, data_->ctrl);
 
                                 last_control_time = data_->time;
                             }
@@ -171,7 +171,7 @@ namespace simulator {
                                 if (data_->time - last_control_time >= robot->GetController()->GetRate() ||
                                     data_->time < last_control_time) {
 
-                                    robot->GetControlAction(model_, data_->ctrl);
+                                    robot->GetControlAction(model_, data_, data_->ctrl);
 
                                     last_control_time = data_->time;
                                 }
