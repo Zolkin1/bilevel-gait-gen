@@ -39,7 +39,7 @@ namespace simulator {
                 if (pin_model_.frames.at(j).name == frames.at(i)) {
                     contact_frames_.push_back(j);
                     mujoco_bodies_.push_back(mujoco_bodies.at(i));
-                    in_contact_.push_back(true);
+                    in_contact_.push_back(false);
                 }
             }
         }
@@ -125,7 +125,7 @@ namespace simulator {
     }
 
     // TODO: Make this not hard coded
-    Eigen::VectorXd Controller::ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints) const {
+    Eigen::VectorXd Controller::ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints) {
         Eigen::VectorXd mujoco_joints(joints.size());
         for (int i = 0; i < 3; i++) {
             mujoco_joints(i) = joints(i+3);

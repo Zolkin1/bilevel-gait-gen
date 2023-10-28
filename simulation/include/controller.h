@@ -38,7 +38,7 @@ namespace simulator {
     protected:
         Eigen::VectorXd ConvertMujocoConfigToPinocchio(const mjData* data) const;
         Eigen::VectorXd ConvertMujocoVelToPinocchio(const mjData* data) const;
-        Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints) const;
+        static Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints);
 
 
         void UpdateContacts(const mjModel* model, const mjData* data);

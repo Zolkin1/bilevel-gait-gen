@@ -46,6 +46,8 @@ namespace simulator {
         const Eigen::VectorXd q = ConvertMujocoConfigToPinocchio(data);
         const Eigen::VectorXd v = ConvertMujocoVelToPinocchio(data);
 
+//        std::cout << "q: " << q << std::endl;
+
         // Update the forward kinematics
         pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
 
@@ -89,11 +91,14 @@ namespace simulator {
         int j = 0;
         for (int i = 0; i < contact_frames_.size(); i++) {
             if (in_contact_.at(i)) {
-                pinocchio::getFrameJacobian(pin_model_, *pin_data_, contact_frames_.at(i), pinocchio::LOCAL_WORLD_ALIGNED, J);
+                int frame_id = pin_model_.getFrameId(pin_model_.frames.at(contact_frames_.at(i)).name, pin_model_.frames.at(contact_frames_.at(i)).type);
+
+                pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J);
+//                std::cout << "J: " << J << std::endl;
                 Jc.block(j*CONSTRAINT_PER_FOOT, 0, 3, J.cols()) = J.topLeftCorner(3, pin_model_.nv);
                 j++;
+                J = Eigen::MatrixXd::Zero(J.rows(), J.cols());
             }
-            std::cout << std::endl;
         }
 
         // Su = [0 I]
@@ -103,17 +108,40 @@ namespace simulator {
         tempIdentity = Eigen::MatrixXd::Identity(Su.rows(), Su.rows());
         Su << tempZero, tempIdentity;
 
+//        std::cout << "Su: " << Su << std::endl;
+
         // Q = QR(J_C)
         Eigen::HouseholderQR<Eigen::MatrixXd> qr(Jc.transpose());
         Eigen::MatrixXd Q = qr.householderQ();
 
+//        std::cout << "Q: " << Q << std::endl;
+
+//        std::cout << "in contact: " << std::endl;
+//        for (int i = 0; i < in_contact_.size(); i++) {
+//            std::cout << in_contact_.at(i) << std::endl;
+//        }
 
         // tau = pinv(Su*Q^T*S^T)*Su*Q^T*(M*qddot + h)
         Eigen::MatrixXd temp = Su*Q.transpose()*S.transpose();
-        // TODO: Take in non-zero acceleration
-        Eigen::VectorXd des_qddot = Eigen::VectorXd::Zero(pin_model_.nv);       // For now it is zero desired acceleration
+        //std::cout << "Su*Q^T*S^T: " << temp << std::endl;
 
-        feedforward_ = temp.colPivHouseholderQr().solve(Su*Q.transpose()*(pin_data_->M*des_qddot + C*v + g));
+        // TODO: Take in non-zero acceleration
+        Eigen::VectorXd des_qddot = Eigen::VectorXd::Zero(pin_model_.nv);       // For now, it is zero desired acceleration
+        //std::cout << "Su*Q: " << Su*Q.transpose() << std::endl;
+
+        //std::cout << "g" << g << std::endl;
+
+        //std::cout << "Jc*v " << Jc*v << std::endl;
+
+        //std::cout << "M: " << pin_data_->M << std::endl;
+
+        //std::cout << "inverse: " << temp.inverse() << std::endl;
+
+//        std::cout << "b: " << Su*Q.transpose()*g << std::endl;
+
+        feedforward_ = temp.fullPivHouseholderQr().solve(Su*Q.transpose()*(g)); //pin_data_->M*des_qddot + C*v + g
+
+//        std::cout << "ff: " << feedforward_ << std::endl;
 
         feedforward_ = ConvertPinocchioJointToMujoco(feedforward_);
 
