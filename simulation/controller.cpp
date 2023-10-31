@@ -10,7 +10,7 @@
 #include "controller.h"
 
 namespace simulator {
-    Controller::Controller(double control_rate, std::string robot_urdf) : rate_(1.0/control_rate),
+    Controller::Controller(double control_rate, std::string robot_urdf, const std::string& foot_type) : rate_(1.0/control_rate),
     robot_urdf_(std::move(robot_urdf)) {
         // create the pinocchio model - always a free flyer
         pinocchio::urdf::buildModel(robot_urdf_, pinocchio::JointModelFreeFlyer(), pin_model_, false);
@@ -24,6 +24,14 @@ namespace simulator {
 
         // Assuming every joint (except the floating base) is actuated
         num_inputs_ = pin_model_.nq - FLOATING_BASE_OFFSET;
+
+        if (foot_type == "FLAT_FEET") {
+            CONSTRAINT_PER_FOOT = CONSTRAINT_PER_FLAT_FOOT;
+        } else if (foot_type == "POINT_FEET") {
+            CONSTRAINT_PER_FOOT = CONSTRAINT_PER_POINT_FOOT;
+        } else {
+            std::cerr << "Foot type not found. Using point feet." << std::endl;
+        }
     }
 
     void Controller::DefineContacts(const std::vector<std::string>& frames, const std::vector<int>& mujoco_bodies) {
@@ -82,8 +90,8 @@ namespace simulator {
 
 
         // Joints
-        for (int i = 0; i < pin_model_.nv - FLOATING_VEL_OFFSET; i++) {
-            q(mujoco_to_pinocchio_joint_map_.at(i+1) - 2 + FLOATING_BASE_OFFSET) = data->qpos[i + FLOATING_BASE_OFFSET];
+        for (int i = 0; i < mujoco_joint_keys_.size(); i++) {
+            q(mujoco_to_pinocchio_joint_map_.at(mujoco_joint_keys_.at(i)) - 2 + FLOATING_BASE_OFFSET) = data->qpos[i + FLOATING_BASE_OFFSET];
         }
 
 
@@ -99,8 +107,8 @@ namespace simulator {
         }
 
         // Joint velocities
-        for (int i = 0; i < pin_model_.nv - FLOATING_VEL_OFFSET; i++) {
-            v(mujoco_to_pinocchio_joint_map_.at(i+1) - 2 + FLOATING_VEL_OFFSET) = data->qvel[i + FLOATING_VEL_OFFSET];
+        for (int i = 0; i < mujoco_joint_keys_.size(); i++) {
+            v(mujoco_to_pinocchio_joint_map_.at(mujoco_joint_keys_.at(i)) - 2 + FLOATING_VEL_OFFSET) = data->qvel[i + FLOATING_VEL_OFFSET];
         }
 
         return v;
@@ -135,6 +143,7 @@ namespace simulator {
             for (int j = 0; j < pin_model_.njoints; j++) {
                 if (model->names + model->name_jntadr[i] == pin_model_.names.at(j)) {
                     mujoco_to_pinocchio_joint_map_.insert(std::pair<int, int>(i,j));
+                    mujoco_joint_keys_.push_back(i);
                 }
             }
         }

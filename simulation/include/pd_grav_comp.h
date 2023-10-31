@@ -10,7 +10,8 @@
 namespace simulator {
     class PDGravComp : public Controller {
     public:
-        PDGravComp(double control_freq, std::string robot_urdf, Eigen::VectorXd config_set_point, Eigen::VectorXd vel_set_point);
+        PDGravComp(double control_freq, std::string robot_urdf, const std::string& foot_type,
+                   Eigen::VectorXd config_set_point, Eigen::VectorXd vel_set_point);
 
         /**
          * Computes the control action given the curren state and the set points.

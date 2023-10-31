@@ -17,9 +17,9 @@
 
 
 namespace simulator {
-    PDGravComp::PDGravComp(double control_freq, std::string robot_urdf, Eigen::VectorXd config_set_point,
+    PDGravComp::PDGravComp(double control_freq, std::string robot_urdf, const std::string& foot_type, Eigen::VectorXd config_set_point,
                            Eigen::VectorXd vel_set_point):
-    Controller(control_freq, std::move(robot_urdf)), config_set_point_(std::move(config_set_point)),
+    Controller(control_freq, std::move(robot_urdf), foot_type), config_set_point_(std::move(config_set_point)),
     vel_set_point_(std::move(vel_set_point)){
         feedforward_ = Eigen::VectorXd::Zero(num_inputs_);
     }
@@ -92,8 +92,8 @@ namespace simulator {
                 int frame_id = pin_model_.getFrameId(pin_model_.frames.at(contact_frames_.at(i)).name, pin_model_.frames.at(contact_frames_.at(i)).type);
 
                 pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J);
-//                std::cout << "J: " << J << std::endl;
-                Jc.block(j*CONSTRAINT_PER_FOOT, 0, 3, J.cols()) = J.topLeftCorner(3, pin_model_.nv);
+                Jc.block(j * CONSTRAINT_PER_FOOT, 0, CONSTRAINT_PER_FOOT, J.cols()) =
+                        J.topLeftCorner(CONSTRAINT_PER_FOOT, pin_model_.nv);
                 j++;
                 J = Eigen::MatrixXd::Zero(J.rows(), J.cols());
             }

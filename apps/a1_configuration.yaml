@@ -9,6 +9,7 @@ collision_frames: ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]    # for pinocchi
 collision_bodies: [4, 7, 10, 13]  # for mujoco
 # these need to match ^
 
+foot_type: "POINT_FEET"
 
 
 ## ----------------------- Configurations ----------------------- ##

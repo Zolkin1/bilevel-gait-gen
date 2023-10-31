@@ -1,0 +1,48 @@
+# Configurations for the robot
+
+# XML file location
+robot_xml: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/adam/adam.xml"
+# note that the with feet model does not work right now and there are discrepencies between the URDF and the XML for that one.
+
+robot_urdf: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/adam/adam.urdf"
+
+collision_frames: ["left_foot", "right_foot"]    # for pinocchio
+collision_bodies: [5, 9]  # for mujoco
+# these need to match ^
+
+foot_type: "POINT_FEET"   # other option: FLAT_FOOT
+
+## ----------------------- Configurations ----------------------- ##
+# initial joint config
+# xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
+init_config: [0., 0., 0.6844, 1., 0, 0, 0,
+              0., 0., -0.4, 0.7,
+              0., 0., -0.4, 0.7,
+              0., 0., 0.,
+              0., 0., 0.]
+
+# initial joint velocity
+# xv, yv, zv, angle rates, v0, ..., v11
+init_vel: [0., 0., 0., 0., 0, 0,
+           0., 0., 0., 0.,
+           0., 0., 0., 0.,
+           0., 0., 0.,
+           0., 0., 0.]
+
+standing_config: [0., 0., 0.6844, 1., 0, 0, 0,
+                  0., 0., -0.4, 0.7,
+                  0., 0., -0.4, 0.7,
+                  0., 0., 0.,
+                  0., 0., 0.]
+
+
+standing_vel: [0., 0., 0., 0., 0, 0,
+                0., 0., 0., 0.,
+                0., 0., 0., 0.,
+                0., 0., 0.,
+                0., 0., 0.]
+
+## ----------------------- Low Level Controller ----------------------- ##
+control_rate: 400  # Hz
+
+

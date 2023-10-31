@@ -17,7 +17,7 @@ namespace simulator {
      */
     class Controller {
     public:
-        Controller(double control_freq, std::string robot_urdf);
+        Controller(double control_freq, std::string robot_urdf, const std::string& foot_type);
 
         /**
          * Specifies which joints we should expect to be in contact with the world.
@@ -51,7 +51,10 @@ namespace simulator {
 
         static constexpr int FLOATING_BASE_OFFSET = 7;
         static constexpr int FLOATING_VEL_OFFSET = 6;
-        static constexpr int CONSTRAINT_PER_FOOT = 3;   // in point feet
+        static constexpr int CONSTRAINT_PER_POINT_FOOT = 3;
+        static constexpr int CONSTRAINT_PER_FLAT_FOOT = 6;
+
+       int CONSTRAINT_PER_FOOT;
 
         double rate_;
         int num_inputs_;
@@ -63,11 +66,10 @@ namespace simulator {
 
         std::vector<int> contact_frames_;       // frames potentially in contact
         std::vector<int> mujoco_bodies_;
-        // TODO: Need a way to adjust this
         std::vector<bool> in_contact_;          // if each frame is in contact
 
         std::map<int, int> mujoco_to_pinocchio_joint_map_;
-
+        std::vector<int> mujoco_joint_keys_;
     private:
     };
 } // simulator

@@ -33,6 +33,7 @@ int main(int argc, char* argv[]) {
     std::unique_ptr<simulator::Controller> controller =
             std::make_unique<simulator::PDGravComp>(config.ParseNumber("control_rate"),
                                                     config.ParseString("robot_urdf"),
+                                                    config.ParseString("foot_type"),
                                                     config.ParseEigenVector("standing_config"),
                                                     config.ParseEigenVector("standing_vel"));   // number of inputs
 
