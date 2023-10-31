@@ -1,0 +1,11 @@
+/snap/clion/250/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/snap/clion/250/bin/ninja/linux/x64/ninja -G Ninja -S /home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen -B /home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/cmake-build-test
+-- mujoco directory: /home/zach/mujoco-3.0.0
+-- pinocchio FOUND. pinocchio at /usr/local/lib/libpinocchio.so
+-- boost_filesystem FOUND. boost_filesystem at /usr/lib/x86_64-linux-gnu/libboost_filesystem.so
+-- boost_serialization FOUND. boost_serialization at /usr/lib/x86_64-linux-gnu/libboost_serialization.so
+-- boost_system FOUND. boost_system at /usr/lib/x86_64-linux-gnu/libboost_system.so
+-- Default C++ standard: 201703
+-- C++ standard sufficient: Minimal required 11, currently defined: 17
+-- Configuring done (0.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/cmake-build-test
