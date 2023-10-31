@@ -65,18 +65,10 @@ namespace simulator {
         }
     }
 
-    // TODO: Make this not hard coded
     Eigen::VectorXd Controller::ConvertMujocoConfigToPinocchio(const mjData* data) const {
         Eigen::VectorXd q = Eigen::VectorXd::Zero(pin_model_.nq);
 
-        // re-organize joints
-        for (int i = 0; i < 3; i++) {
-            q(i+7) = data->qpos[i+10];
-            q(i+10) = data->qpos[i+7];
-            q(i+13) = data->qpos[i+16];
-            q(i+16) = data->qpos[i+13];
-        }
-
+        // Floating base config
         // floating base position
         for (int i = 0; i < 3; i++) {
             q(i) = data->qpos[i];
@@ -89,22 +81,26 @@ namespace simulator {
         q(5) = data->qpos[6];
 
 
+        // Joints
+        for (int i = 0; i < pin_model_.nv - FLOATING_VEL_OFFSET; i++) {
+            q(mujoco_to_pinocchio_joint_map_.at(i+1) - 2 + FLOATING_BASE_OFFSET) = data->qpos[i + FLOATING_BASE_OFFSET];
+        }
+
+
         return q;
     }
 
-    // TODO: Make this not hard coded
     Eigen::VectorXd Controller::ConvertMujocoVelToPinocchio(const mjData* data) const {
         Eigen::VectorXd v = Eigen::VectorXd::Zero(pin_model_.nv);
 
-        for (int i = 0; i < 3; i++) {
-            v(i+6) = data->qvel[i+9];
-            v(i+9) = data->qvel[i+6];
-            v(i+12) = data->qvel[i+15];
-            v(i+15) = data->qvel[i+12];
+        // Floating base velocities
+        for (int i = 0; i < FLOATING_VEL_OFFSET; i++) {
+            v(i) = data->qvel[i];
         }
 
-        for (int i = 0; i < 6; i++) {
-            v(i) = data->qvel[i];
+        // Joint velocities
+        for (int i = 0; i < pin_model_.nv - FLOATING_VEL_OFFSET; i++) {
+            v(mujoco_to_pinocchio_joint_map_.at(i+1) - 2 + FLOATING_VEL_OFFSET) = data->qvel[i + FLOATING_VEL_OFFSET];
         }
 
         return v;
@@ -124,16 +120,23 @@ namespace simulator {
         }
     }
 
-    // TODO: Make this not hard coded
     Eigen::VectorXd Controller::ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints) {
         Eigen::VectorXd mujoco_joints(joints.size());
-        for (int i = 0; i < 3; i++) {
-            mujoco_joints(i) = joints(i+3);
-            mujoco_joints(i+3) = joints(i);
-            mujoco_joints(i+6) = joints(i+9);
-            mujoco_joints(i+9) = joints(i+6);
+
+        for (int i = 0; i < joints.size(); i++) {
+            mujoco_joints(i) = joints(mujoco_to_pinocchio_joint_map_.at(i+1) - 2); // -2 removes the two extra pinocchio joints
         }
 
         return mujoco_joints;
+    }
+
+    void Controller::CreateJointMap(const mjModel* model) {
+        for (int i = 0; i < model->njnt; i++) {
+            for (int j = 0; j < pin_model_.njoints; j++) {
+                if (model->names + model->name_jntadr[i] == pin_model_.names.at(j)) {
+                    mujoco_to_pinocchio_joint_map_.insert(std::pair<int, int>(i,j));
+                }
+            }
+        }
     }
 } // simulator

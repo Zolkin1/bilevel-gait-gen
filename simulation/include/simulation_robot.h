@@ -43,6 +43,7 @@ namespace simulator {
          */
         void GetControlAction(const mjModel* model, const mjData* data, mjtNum* control);
 
+        void CreateJointMap(const mjModel* model);
     private:
         std::string robot_xml_path_;
         std::unique_ptr<Controller> low_level_controller_;

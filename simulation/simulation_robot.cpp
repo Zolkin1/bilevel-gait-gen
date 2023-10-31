@@ -47,4 +47,8 @@ namespace simulator {
         }
     }
 
+    void SimulationRobot::CreateJointMap(const mjModel* model) {
+        low_level_controller_->CreateJointMap(model);
+    }
+
 } // simulator

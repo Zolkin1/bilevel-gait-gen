@@ -35,11 +35,17 @@ namespace simulator {
         */
         virtual std::vector<mjtNum> ComputeControlAction(const mjModel* model, const mjData* data) = 0;
 
+
+        /**
+         * Creates the mapping of the joints from mujoco to pinocchio.
+         * Note: Assumes the joints have the same names in both the URDF and the XML.
+         */
+        void CreateJointMap(const mjModel* model);
+
     protected:
         Eigen::VectorXd ConvertMujocoConfigToPinocchio(const mjData* data) const;
         Eigen::VectorXd ConvertMujocoVelToPinocchio(const mjData* data) const;
-        static Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints);
-
+        Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints);
 
         void UpdateContacts(const mjModel* model, const mjData* data);
 
@@ -59,6 +65,8 @@ namespace simulator {
         std::vector<int> mujoco_bodies_;
         // TODO: Need a way to adjust this
         std::vector<bool> in_contact_;          // if each frame is in contact
+
+        std::map<int, int> mujoco_to_pinocchio_joint_map_;
 
     private:
     };
