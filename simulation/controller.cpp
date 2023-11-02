@@ -34,6 +34,8 @@ namespace simulator {
         }
     }
 
+    void Controller::InitSolver(const mjData* data) {}
+
     void Controller::DefineContacts(const std::vector<std::string>& frames, const std::vector<int>& mujoco_bodies) {
         if (frames.size() != mujoco_bodies.size()) {
             std::cerr << "Number of pinocchio contact frames and number of mujoco contact bodies do not match!"
@@ -73,6 +75,17 @@ namespace simulator {
         }
     }
 
+    int Controller::GetNumContacts() const {
+        int num_contacts = 0;
+        for (const bool contact : in_contact_) {
+            if (contact) {
+                num_contacts++;
+            }
+        }
+
+        return num_contacts;
+    }
+
     Eigen::VectorXd Controller::ConvertMujocoConfigToPinocchio(const mjData* data) const {
         Eigen::VectorXd q = Eigen::VectorXd::Zero(pin_model_.nq);
 
@@ -82,7 +95,7 @@ namespace simulator {
             q(i) = data->qpos[i];
         }
 
-        // floating base quaternion, note pinocchio uses (x,y,z,w) and mujoco uses (w,x,y,z)
+        // floating base quaternion, note pinocchio uses (x,y,z,w_) and mujoco uses (w_,x,y,z)
         q(6) = data->qpos[3];
         q(3) = data->qpos[4];
         q(4) = data->qpos[5];

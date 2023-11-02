@@ -50,6 +50,9 @@ namespace simulator {
         // Set state to current initial condition
         this->SetState(robot_->GetInitConfig(), robot_->GetInitVelocities());
 
+        // Set up controller solver
+        robot_->InitController(data_);
+
         // Do additional controller setup
         // create the mapping between mujoco and pinocchio joints
         robot_->CreateJointMap(model_);

@@ -11,7 +11,6 @@ collision_bodies: [4, 7, 10, 13]  # for mujoco
 
 foot_type: "POINT_FEET"
 
-
 ## ----------------------- Configurations ----------------------- ##
 # initial joint config
 # xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
@@ -43,6 +42,11 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
                0., 0., 0.]
 
 ## ----------------------- Low Level Controller ----------------------- ##
+controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
 control_rate: 400  # Hz
+torque_bounds: [50, 50, 50,
+                50, 50, 50,
+                50, 50, 50,
+                50, 50, 50]
 
 

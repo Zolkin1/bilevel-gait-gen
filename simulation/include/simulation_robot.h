@@ -25,6 +25,8 @@ namespace simulator {
 
         void SetInitialCondition(const Eigen::VectorXd& initial_condition, const Eigen::VectorXd& initial_vel);
 
+        void InitController(const mjData* data);
+
         [[nodiscard]] std::string GetRobotXMLFile() const;
 
         [[nodiscard]] Eigen::VectorXd GetInitConfig() const;

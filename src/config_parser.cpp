@@ -30,8 +30,4 @@ namespace mpc::utils {
     std::vector<std::string> ConfigParser::ParseStringVector(const std::string &element) {
         return config_[element].as<std::vector<std::string>>();
     }
-
-    std::vector<int> ConfigParser::ParseIntVector(const std::string &element) {
-        return config_[element].as<std::vector<int>>();
-    }
 } //mpc::utils

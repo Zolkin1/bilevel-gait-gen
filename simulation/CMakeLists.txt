@@ -29,16 +29,18 @@ set(SIM_HEADER_LIST "include/simulator.h"
                     "include/glfw_corevideo.h"
                     "include/glfw_dispatch.h"
                     "include/platform_ui_adapter.h"
-                    "include/simulate.h")
+                    "include/simulate.h"
+                    "include/qp_control.h")
 
-add_library(simulator simulator.cpp
+add_library(simulator mujoco_sim/simulator.cpp
                       simulation_robot.cpp
                       controller.cpp
                     pd_grav_comp.cpp
-                    glfw_adapter.cc
-                    glfw_dispatch.cc
-                    platform_ui_adapter.cc
-                    simulate.cc
+        mujoco_sim/glfw_adapter.cc
+        mujoco_sim/glfw_dispatch.cc
+        mujoco_sim/platform_ui_adapter.cc
+        mujoco_sim/simulate.cc
+        qp_control.cpp
                       ${SIM_HEADER_LIST})
 
 target_include_directories(simulator PUBLIC include)
@@ -59,4 +61,9 @@ target_link_libraries(simulator PRIVATE yaml-cpp::yaml-cpp)
 # pinocchio
 find_package(pinocchio)
 target_link_libraries(simulator PRIVATE pinocchio)
+
+# OSPQ and OSQPEigen
+find_package(osqp REQUIRED)
+find_package(OsqpEigen REQUIRED)
+target_link_libraries(simulator PUBLIC osqp::osqp OsqpEigen::OsqpEigen)
 

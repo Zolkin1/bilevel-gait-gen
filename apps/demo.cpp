@@ -16,6 +16,7 @@
 #include "simulator.h"
 #include "simulation_robot.h"
 #include "pd_grav_comp.h"
+#include "qp_control.h"
 
 
 int main(int argc, char* argv[]) {
@@ -30,15 +31,26 @@ int main(int argc, char* argv[]) {
     mpc::utils::ConfigParser config = mpc::utils::ConfigParser(config_file);
 
     // Make the low level controller
-    std::unique_ptr<simulator::Controller> controller =
-            std::make_unique<simulator::PDGravComp>(config.ParseNumber("control_rate"),
-                                                    config.ParseString("robot_urdf"),
-                                                    config.ParseString("foot_type"),
-                                                    config.ParseEigenVector("standing_config"),
-                                                    config.ParseEigenVector("standing_vel"));   // number of inputs
+    std::unique_ptr<simulator::Controller> controller;
+    if(config.ParseString("controller_type") == "PD_GRAV_COMP") {
+        controller = std::make_unique<simulator::PDGravComp>(config.ParseNumber("control_rate"),
+                                                            config.ParseString("robot_urdf"),
+                                                            config.ParseString("foot_type"),
+                                                            config.ParseEigenVector("standing_config"),
+                                                            config.ParseEigenVector("standing_vel"));
+    } else if (config.ParseString("controller_type") == "QP_CONTROL") {
+        controller = std::make_unique<simulator::QPControl>(config.ParseNumber("control_rate"),
+                                                            config.ParseString("robot_urdf"),
+                                                            config.ParseString("foot_type"),
+                                                            config.ParseEigenVector("init_vel").size(),
+                                                            config.ParseEigenVector("torque_bounds"));
+    } else {
+        throw std::runtime_error("Invalid controller type in the yaml file.");
+    }
+
 
     controller->DefineContacts(config.ParseStringVector("collision_frames"),
-                                    config.ParseIntVector("collision_bodies"));
+                                    config.ParseStdVector<int>("collision_bodies"));
 
     controller->PrintConfigNames();
 
@@ -62,7 +74,6 @@ int main(int argc, char* argv[]) {
 
     sim.RunSimulator();
 
-    // Read in robot file (command line argument)
 
     // Create a model to be used by MPC (this will let the user specify anything not in the file)
     // this class will wrap pinocchio and provide everything the MPC needs

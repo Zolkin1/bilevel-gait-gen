@@ -15,6 +15,10 @@ namespace simulator {
         initial_vel_ = initial_vel;
     }
 
+    void SimulationRobot::InitController(const mjData* data) {
+        low_level_controller_->InitSolver(data);
+    }
+
     std::string SimulationRobot::GetRobotXMLFile() const {
         return robot_xml_path_;
     }

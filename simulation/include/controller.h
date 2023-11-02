@@ -19,6 +19,8 @@ namespace simulator {
     public:
         Controller(double control_freq, std::string robot_urdf, const std::string& foot_type);
 
+        virtual void InitSolver(const mjData* data);
+
         /**
          * Specifies which joints we should expect to be in contact with the world.
          */
@@ -29,6 +31,8 @@ namespace simulator {
         int GetNumInputs() const;
 
         void PrintConfigNames() const;
+
+        int GetNumContacts() const;
 
         /**
         * Interface with Mujoco to provide the current control action.

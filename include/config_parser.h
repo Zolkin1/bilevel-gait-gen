@@ -22,7 +22,10 @@ namespace mpc::utils {
 
         std::vector<std::string> ParseStringVector(const std::string& element);
 
-        std::vector<int> ParseIntVector(const std::string& element);
+        template<typename scalar>
+        std::vector<scalar> ParseStdVector(const std::string& element) {
+            return config_[element].as<std::vector<scalar>>();
+        }
 
     private:
         std::string file_name_;
