@@ -11,7 +11,7 @@ namespace simulator {
     class PDGravComp : public Controller {
     public:
         PDGravComp(double control_freq, std::string robot_urdf, const std::string& foot_type,
-                   Eigen::VectorXd config_set_point, Eigen::VectorXd vel_set_point);
+                   const Eigen::VectorXd& config_set_point, const Eigen::VectorXd& vel_set_point);
 
         /**
          * Computes the control action given the curren state and the set points.
@@ -31,27 +31,11 @@ namespace simulator {
         void ComputeFeedForwardValue(const mjData* data);
 
         /**
-         * Assigns the configuration set point as the desired position
-         * Note: assumes position actuators are first
-         */
-        void AssignPositionControl(std::vector<mjtNum>& control);
-
-        /**
-         * Assigns the velocity set point as the desired velocity
-         * Note: assumes velocity actuators are second
-         */
-        void AssignVelocityControl(std::vector<mjtNum>& control);
-
-        /**
          * Assigns the feedforward set point
          * Note: assumes feedforward acutators are last
          */
         void AssignFeedForward(std::vector<mjtNum>& control);
 
-
-        Eigen::VectorXd config_set_point_;
-        Eigen::VectorXd vel_set_point_;
-        Eigen::VectorXd feedforward_;
     };
 } // simulator
 

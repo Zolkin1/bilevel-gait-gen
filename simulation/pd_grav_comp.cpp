@@ -17,11 +17,13 @@
 
 
 namespace simulator {
-    PDGravComp::PDGravComp(double control_freq, std::string robot_urdf, const std::string& foot_type, Eigen::VectorXd config_set_point,
-                           Eigen::VectorXd vel_set_point):
-    Controller(control_freq, std::move(robot_urdf), foot_type), config_set_point_(std::move(config_set_point)),
-    vel_set_point_(std::move(vel_set_point)){
-        feedforward_ = Eigen::VectorXd::Zero(num_inputs_);
+    PDGravComp::PDGravComp(double control_freq, std::string robot_urdf, const std::string& foot_type,
+                           const Eigen::VectorXd& config_set_point, const Eigen::VectorXd& vel_set_point):
+            Controller(control_freq, std::move(robot_urdf), foot_type) {
+        acc_target_ = Eigen::VectorXd::Zero(num_inputs_);
+
+        config_target_ = config_set_point;
+        vel_target_ = vel_set_point;
     }
 
     std::vector<mjtNum> PDGravComp::ComputeControlAction(const mjModel* model, const mjData* data) {
@@ -116,27 +118,15 @@ namespace simulator {
         // TODO: Take in non-zero acceleration
         Eigen::VectorXd des_qddot = Eigen::VectorXd::Zero(pin_model_.nv);       // For now, it is zero desired acceleration
 
-        feedforward_ = temp.fullPivHouseholderQr().solve(Su*Q.transpose()*(pin_data_->M*des_qddot + pin_data_->C*v + pin_data_->g));
+        acc_target_ = temp.fullPivHouseholderQr().solve(Su * Q.transpose() * (pin_data_->M * des_qddot + pin_data_->C * v + pin_data_->g));
 
-        feedforward_ = ConvertPinocchioJointToMujoco(feedforward_);
+        acc_target_ = ConvertPinocchioJointToMujoco(acc_target_);
 
-    }
-
-    void PDGravComp::AssignPositionControl(std::vector<mjtNum>& control) {
-        for (int i = 0; i < num_inputs_; i++) {
-            control.at(i) = config_set_point_(i + FLOATING_BASE_OFFSET);
-        }
-    }
-
-    void PDGravComp::AssignVelocityControl(std::vector<mjtNum>& control) {
-        for (int i = num_inputs_; i < 2*num_inputs_; i++) {
-            control.at(i) = vel_set_point_(i - num_inputs_ + FLOATING_VEL_OFFSET);
-        }
     }
 
     void PDGravComp::AssignFeedForward(std::vector<mjtNum> &control) {
         for (int i = 2*num_inputs_; i < 3*num_inputs_; i++) {
-            control.at(i) = feedforward_(i - 2*num_inputs_);
+            control.at(i) = acc_target_(i - 2 * num_inputs_);
         }
     }
 }

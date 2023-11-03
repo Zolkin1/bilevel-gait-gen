@@ -43,7 +43,12 @@ int main(int argc, char* argv[]) {
                                                             config.ParseString("robot_urdf"),
                                                             config.ParseString("foot_type"),
                                                             config.ParseEigenVector("init_vel").size(),
-                                                            config.ParseEigenVector("torque_bounds"));
+                                                            config.ParseEigenVector("torque_bounds"),
+                                                            config.ParseNumber("friction_coef"));
+
+        controller->UpdateTargetConfig(config.ParseEigenVector("standing_config"));
+        controller->UpdateTargetVel(config.ParseEigenVector("standing_vel"));
+
     } else {
         throw std::runtime_error("Invalid controller type in the yaml file.");
     }

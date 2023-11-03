@@ -34,7 +34,7 @@ namespace simulator {
         }
     }
 
-    void Controller::InitSolver(const mjData* data) {}
+    void Controller::InitSolver(const mjModel* model, const mjData* data) {}
 
     void Controller::DefineContacts(const std::vector<std::string>& frames, const std::vector<int>& mujoco_bodies) {
         if (frames.size() != mujoco_bodies.size()) {
@@ -86,6 +86,18 @@ namespace simulator {
         return num_contacts;
     }
 
+    void Controller::UpdateTargetConfig(const Eigen::VectorXd& q) {
+        config_target_ = q;
+    }
+
+    void Controller::UpdateTargetVel(const Eigen::VectorXd& v) {
+        vel_target_ = v;
+    }
+
+    void Controller::UpdateTargetAcc(const Eigen::VectorXd& a) {
+        acc_target_ = a;
+    }
+
     Eigen::VectorXd Controller::ConvertMujocoConfigToPinocchio(const mjData* data) const {
         Eigen::VectorXd q = Eigen::VectorXd::Zero(pin_model_.nq);
 
@@ -127,18 +139,39 @@ namespace simulator {
         return v;
     }
 
-    void Controller::UpdateContacts(const mjModel* model, const mjData* data) {
+    Eigen::VectorXd Controller::ConvertMujocoAccToPinocchio(const mjData* data) const {
+        Eigen::VectorXd a = Eigen::VectorXd::Zero(pin_model_.nv);
+
+        // Floating base velocities
+        for (int i = 0; i < FLOATING_VEL_OFFSET; i++) {
+            a(i) = data->qacc[i];
+        }
+
+        // Joint velocities
+        for (int i = 0; i < mujoco_joint_keys_.size(); i++) {
+            a(mujoco_to_pinocchio_joint_map_.at(mujoco_joint_keys_.at(i)) - 2 + FLOATING_VEL_OFFSET) = data->qacc[i + FLOATING_VEL_OFFSET];
+        }
+
+        return a;
+    }
+
+    int Controller::UpdateContacts(const mjModel* model, const mjData* data) {
         for (auto && i : in_contact_) {
             i = false;
         }
+
+        int num_contacts = 0;
 
         for (int i = 0; i < data->ncon; i++) {
             for (int j = 0; j < mujoco_bodies_.size(); j++) {
                 if (model->geom_bodyid[data->contact[i].geom2] == mujoco_bodies_.at(j)) {
                     in_contact_.at(j) = true;
+                    num_contacts++;
                 }
             }
         }
+
+        return num_contacts;
     }
 
     Eigen::VectorXd Controller::ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints) {
@@ -151,6 +184,19 @@ namespace simulator {
         return mujoco_joints;
     }
 
+    Eigen::VectorXd Controller::ConvertPinocchioVelToMujoco(const Eigen::VectorXd& v) {
+        Eigen::VectorXd mujoco_vel(v.size());
+        // floating base
+        for (int i = 0; i < FLOATING_VEL_OFFSET; i++) {
+            mujoco_vel(i) = v(i);
+        }
+
+        // joints
+        mujoco_vel.tail(num_inputs_) = ConvertPinocchioJointToMujoco(v.tail(num_inputs_));
+
+        return mujoco_vel;
+    }
+
     void Controller::CreateJointMap(const mjModel* model) {
         for (int i = 0; i < model->njnt; i++) {
             for (int j = 0; j < pin_model_.njoints; j++) {
@@ -159,6 +205,18 @@ namespace simulator {
                     mujoco_joint_keys_.push_back(i);
                 }
             }
+        }
+    }
+
+    void Controller::AssignPositionControl(std::vector<mjtNum>& control) {
+        for (int i = 0; i < num_inputs_; i++) {
+            control.at(i) = config_target_(i + FLOATING_BASE_OFFSET);
+        }
+    }
+
+    void Controller::AssignVelocityControl(std::vector<mjtNum>& control) {
+        for (int i = num_inputs_; i < 2*num_inputs_; i++) {
+            control.at(i) = vel_target_(i - num_inputs_ + FLOATING_VEL_OFFSET);
         }
     }
 } // simulator

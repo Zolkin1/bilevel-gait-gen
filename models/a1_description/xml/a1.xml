@@ -136,32 +136,32 @@
     <actuator>       
         <!-- position commands -->
         <!-- kp = 25, kv = 7 works ok -->
-        <position name="FR_hip_p"       kp="25" ctrllimited="true" ctrlrange="-75 75" joint="FR_hip_joint"/>
-        <position name="FR_thigh_p"     kp="25" ctrllimited="true" ctrlrange="-75 75" joint="FR_thigh_joint"/>
-        <position name="FR_calf_p"      kp="25" ctrllimited="true" ctrlrange="-75 75" joint="FR_calf_joint"/>
-        <position name="FL_hip_p"       kp="25" ctrllimited="true" ctrlrange="-75 75" joint="FL_hip_joint"/>
-        <position name="FL_thigh_p"     kp="25" ctrllimited="true" ctrlrange="-75 75" joint="FL_thigh_joint"/>
-        <position name="FL_calf_p"      kp="25" ctrllimited="true" ctrlrange="-75 75" joint="FL_calf_joint"/>
-        <position name="RR_hip_p"       kp="25" ctrllimited="true" ctrlrange="-75 75" joint="RR_hip_joint"/>
-        <position name="RR_thigh_p"     kp="25" ctrllimited="true" ctrlrange="-75 75" joint="RR_thigh_joint"/>
-        <position name="RR_calf_p"      kp="25" ctrllimited="true" ctrlrange="-75 75" joint="RR_calf_joint" />
-        <position name="RL_hip_p"       kp="25" ctrllimited="true" ctrlrange="-75 75" joint="RL_hip_joint"/>
-        <position name="RL_thigh_p"     kp="25" ctrllimited="true" ctrlrange="-75 75" joint="RL_thigh_joint"/>
-        <position name="RL_calf_p"      kp="25" ctrllimited="true" ctrlrange="-75 75" joint="RL_calf_joint"/>
+        <position name="FR_hip_p"       kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FR_hip_joint"/>
+        <position name="FR_thigh_p"     kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FR_thigh_joint"/>
+        <position name="FR_calf_p"      kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FR_calf_joint"/>
+        <position name="FL_hip_p"       kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FL_hip_joint"/>
+        <position name="FL_thigh_p"     kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FL_thigh_joint"/>
+        <position name="FL_calf_p"      kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FL_calf_joint"/>
+        <position name="RR_hip_p"       kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RR_hip_joint"/>
+        <position name="RR_thigh_p"     kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RR_thigh_joint"/>
+        <position name="RR_calf_p"      kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RR_calf_joint" />
+        <position name="RL_hip_p"       kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RL_hip_joint"/>
+        <position name="RL_thigh_p"     kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RL_thigh_joint"/>
+        <position name="RL_calf_p"      kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RL_calf_joint"/>
 
         <!-- velocity commands -->
-        <velocity name="FR_hip_v"       kv="7" ctrllimited="true" ctrlrange="-50 50" joint="FR_hip_joint"/>
-        <velocity name="FR_thigh_v"     kv="7" ctrllimited="true" ctrlrange="-50 50" joint="FR_thigh_joint"/>
-        <velocity name="FR_calf_v"      kv="7" ctrllimited="true" ctrlrange="-50 50" joint="FR_calf_joint"/>
-        <velocity name="FL_hip_v"       kv="7" ctrllimited="true" ctrlrange="-50 50" joint="FL_hip_joint"/>
-        <velocity name="FL_thigh_v"     kv="7" ctrllimited="true" ctrlrange="-50 50" joint="FL_thigh_joint"/>
-        <velocity name="FL_calf_v"      kv="7" ctrllimited="true" ctrlrange="-50 50" joint="FL_calf_joint"/>
-        <velocity name="RR_hip_v"       kv="7" ctrllimited="true" ctrlrange="-50 50" joint="RR_hip_joint"/>
-        <velocity name="RR_thigh_v"     kv="7" ctrllimited="true" ctrlrange="-50 50" joint="RR_thigh_joint"/>
-        <velocity name="RR_calf_v"      kv="7" ctrllimited="true" ctrlrange="-50 50" joint="RR_calf_joint" />
-        <velocity name="RL_hip_v"       kv="7" ctrllimited="true" ctrlrange="-50 50" joint="RL_hip_joint"/>
-        <velocity name="RL_thigh_v"     kv="7" ctrllimited="true" ctrlrange="-50 50" joint="RL_thigh_joint"/>
-        <velocity name="RL_calf_v"      kv="7" ctrllimited="true" ctrlrange="-50 50" joint="RL_calf_joint"/>
+        <velocity name="FR_hip_v"       kv="5" ctrllimited="true" ctrlrange="-50 50" joint="FR_hip_joint"/>
+        <velocity name="FR_thigh_v"     kv="5" ctrllimited="true" ctrlrange="-50 50" joint="FR_thigh_joint"/>
+        <velocity name="FR_calf_v"      kv="5" ctrllimited="true" ctrlrange="-50 50" joint="FR_calf_joint"/>
+        <velocity name="FL_hip_v"       kv="5" ctrllimited="true" ctrlrange="-50 50" joint="FL_hip_joint"/>
+        <velocity name="FL_thigh_v"     kv="5" ctrllimited="true" ctrlrange="-50 50" joint="FL_thigh_joint"/>
+        <velocity name="FL_calf_v"      kv="5" ctrllimited="true" ctrlrange="-50 50" joint="FL_calf_joint"/>
+        <velocity name="RR_hip_v"       kv="5" ctrllimited="true" ctrlrange="-50 50" joint="RR_hip_joint"/>
+        <velocity name="RR_thigh_v"     kv="5" ctrllimited="true" ctrlrange="-50 50" joint="RR_thigh_joint"/>
+        <velocity name="RR_calf_v"      kv="5" ctrllimited="true" ctrlrange="-50 50" joint="RR_calf_joint" />
+        <velocity name="RL_hip_v"       kv="5" ctrllimited="true" ctrlrange="-50 50" joint="RL_hip_joint"/>
+        <velocity name="RL_thigh_v"     kv="5" ctrllimited="true" ctrlrange="-50 50" joint="RL_thigh_joint"/>
+        <velocity name="RL_calf_v"      kv="5" ctrllimited="true" ctrlrange="-50 50" joint="RL_calf_joint"/>
 
         <!-- feed forward commands -->
         <motor name="FR_hip"       gear="1" ctrllimited="true" ctrlrange="-50 50" joint="FR_hip_joint"/>

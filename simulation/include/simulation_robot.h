@@ -19,13 +19,14 @@
  */
 namespace simulator {
 
+    // TODO: This class should really handle ALL of the mujoco interface so this interface can be swapped for hardware.
     class SimulationRobot {
     public:
         SimulationRobot(const std::string& robot_xml_path, std::unique_ptr<Controller>& controller);
 
         void SetInitialCondition(const Eigen::VectorXd& initial_condition, const Eigen::VectorXd& initial_vel);
 
-        void InitController(const mjData* data);
+        void InitController(const mjModel* model, const mjData* data);
 
         [[nodiscard]] std::string GetRobotXMLFile() const;
 

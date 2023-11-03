@@ -19,7 +19,7 @@ namespace simulator {
     public:
         Controller(double control_freq, std::string robot_urdf, const std::string& foot_type);
 
-        virtual void InitSolver(const mjData* data);
+        virtual void InitSolver(const mjModel* model, const mjData* data);
 
         /**
          * Specifies which joints we should expect to be in contact with the world.
@@ -40,6 +40,10 @@ namespace simulator {
         virtual std::vector<mjtNum> ComputeControlAction(const mjModel* model, const mjData* data) = 0;
 
 
+        void UpdateTargetConfig(const Eigen::VectorXd& q);
+        void UpdateTargetVel(const Eigen::VectorXd& v);
+        void UpdateTargetAcc(const Eigen::VectorXd& a);
+
         /**
          * Creates the mapping of the joints from mujoco to pinocchio.
          * Note: Assumes the joints have the same names in both the URDF and the XML.
@@ -49,9 +53,30 @@ namespace simulator {
     protected:
         Eigen::VectorXd ConvertMujocoConfigToPinocchio(const mjData* data) const;
         Eigen::VectorXd ConvertMujocoVelToPinocchio(const mjData* data) const;
-        Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints);
+        Eigen::VectorXd ConvertMujocoAccToPinocchio(const mjData* data) const;
 
-        void UpdateContacts(const mjModel* model, const mjData* data);
+        Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints);
+        Eigen::VectorXd ConvertPinocchioVelToMujoco(const Eigen::VectorXd& v);
+
+        /**
+         * Update the internal contact vector and returns the number of current contacts.
+         * @param model mujoco model
+         * @param data mujoco data
+         * @return Number of current contacts.
+         */
+        int UpdateContacts(const mjModel* model, const mjData* data);
+
+        /**
+         * Assigns the configuration set point as the desired position
+         * Note: assumes position actuators are first
+         */
+        void AssignPositionControl(std::vector<mjtNum>& control);
+
+        /**
+         * Assigns the velocity set point as the desired velocity
+         * Note: assumes velocity actuators are second
+         */
+        void AssignVelocityControl(std::vector<mjtNum>& control);
 
         static constexpr int FLOATING_BASE_OFFSET = 7;
         static constexpr int FLOATING_VEL_OFFSET = 6;
@@ -74,6 +99,10 @@ namespace simulator {
 
         std::map<int, int> mujoco_to_pinocchio_joint_map_;
         std::vector<int> mujoco_joint_keys_;
+
+        Eigen::VectorXd config_target_;
+        Eigen::VectorXd vel_target_;
+        Eigen::VectorXd acc_target_;
     private:
     };
 } // simulator

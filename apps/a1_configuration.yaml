@@ -28,7 +28,7 @@ init_vel: [0., 0., 0., 0., 0., 0.,
            0., 0., 0.,
            0., 0., 0.]
 
-standing_config: [0., 0., 0.37, 0., 0., 0., 0.,
+standing_config: [0., 0., 0.37, 1., 0., 0., 0.,
                  -0.22, 0.2, -0.91,
                  0.12, 0.2, -0.91,
                  -0.0788, 0.4, -0.91,
@@ -43,10 +43,13 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
 
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
-control_rate: 400  # Hz
-torque_bounds: [50, 50, 50,
-                50, 50, 50,
-                50, 50, 50,
-                50, 50, 50]
+control_rate: 100  # Hz
+torque_bounds: [30, 30, 30,
+                30, 30, 30,
+                30, 30, 30,
+                30, 30, 30]
+friction_coef: 0.3
+base_pos_gains: [1, 2]  # kd_pos, kp_pos
+base_ang_gains: [1, 2]  # kd_ang, kp_ang
 
 
