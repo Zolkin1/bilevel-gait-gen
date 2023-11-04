@@ -44,10 +44,13 @@ int main(int argc, char* argv[]) {
                                                             config.ParseString("foot_type"),
                                                             config.ParseEigenVector("init_vel").size(),
                                                             config.ParseEigenVector("torque_bounds"),
-                                                            config.ParseNumber("friction_coef"));
-
-        controller->UpdateTargetConfig(config.ParseEigenVector("standing_config"));
-        controller->UpdateTargetVel(config.ParseEigenVector("standing_vel"));
+                                                            config.ParseNumber("friction_coef"),
+                                                            config.ParseStdVector<double>("base_pos_gains"),
+                                                            config.ParseStdVector<double>("base_ang_gains"),
+                                                            config.ParseStdVector<double>("joint_gains"),
+                                                            config.ParseNumber("leg_tracking_weight"),
+                                                            config.ParseNumber("torso_tracking_weight"),
+                                                            config.ParseNumber("force_tracking_weight"));
 
     } else {
         throw std::runtime_error("Invalid controller type in the yaml file.");
@@ -59,9 +62,14 @@ int main(int argc, char* argv[]) {
 
     controller->PrintConfigNames();
 
+    // TODO: Restructure mujoco and controller interface
+
     // Make the robot for simulation
     auto robot_file = config.ParseString("robot_xml");
     std::unique_ptr<simulator::SimulationRobot> robot = std::make_unique<simulator::SimulationRobot>(robot_file, controller);
+
+    robot->UpdateTargetConfig(config.ParseEigenVector("standing_config"));
+    robot->UpdateTargetVel(config.ParseEigenVector("standing_vel"));
 
     // Set the robot's initial condition
     // TODO: check the quaternion is normalized

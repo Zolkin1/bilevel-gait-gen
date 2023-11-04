@@ -13,30 +13,36 @@
 #include "qp_control.h"
 
 namespace simulator {
+    // TODO: Need a way to update the desired forces and make sure it is using the correct number of contacts
     QPControl::QPControl(double control_rate, std::string robot_urdf, const std::string &foot_type, int nv,
-                         const Eigen::VectorXd& torque_bounds, double friction_coef) :
+                         const Eigen::VectorXd& torque_bounds, double friction_coef,
+                         std::vector<double> base_pos_gains,
+                         std::vector<double> base_ang_gains,
+                         std::vector<double> joint_gains,
+                         double leg_weight,
+                         double torso_weight,
+                         double force_weight) :
                          Controller(control_rate, robot_urdf, foot_type), num_vel_(nv), friction_coef_(friction_coef) {
 
         torque_bounds_ = torque_bounds;
 
-        // TODO: be able to adjust these
-        torso_tracking_weight_ = 10;
-        leg_tracking_weight_ = 10;
-        force_tracking_weight_ = 1;
+        torso_tracking_weight_ = torso_weight;
+        leg_tracking_weight_ = leg_weight;
+        force_tracking_weight_ = force_weight;
 
-        // TODO: be able to adjust these
-        kv_pos_ = 1;
-        kp_pos_ = 2;
-        kv_ang_ = 1;
-        kp_ang_ = 2;
+        // Set gains
+        SetBasePosGains(base_pos_gains.at(0), base_pos_gains.at(1));
+        SetBaseAngleGains(base_ang_gains.at(0), base_ang_gains.at(1));
+        SetJointGains(joint_gains.at(0), joint_gains.at(1));
 
         // Initialize these to 0
         config_target_ = Eigen::VectorXd::Zero(num_vel_ + 1);
         vel_target_ = Eigen::VectorXd::Zero(num_vel_);
         acc_target_ = Eigen::VectorXd::Zero(num_vel_);
 
-        // TODO: Adjust any solver settings
+        // Set solver settings
         qp_solver_.settings()->setVerbosity(false);
+        qp_solver_.settings()->setPolish(true);     // Makes a HUGE difference
     }
 
     void QPControl::InitSolver(const mjModel* model, const mjData* data) {
@@ -49,8 +55,11 @@ namespace simulator {
 
         qp_solver_.data()->setNumberOfVariables(num_decision_vars_);
 
-        num_constraints_ = num_vel_ + 7*num_contacts + num_actuators_;
+        num_constraints_ = FLOATING_VEL_OFFSET + 7*num_contacts + num_actuators_;
         qp_solver_.data()->setNumberOfConstraints(num_constraints_);
+
+        // TODO: Should this be CONSTRAINT_PER_FOOT instead?
+        force_target_ = Eigen::VectorXd::Zero(3*num_contacts);
 
         A_ = Eigen::MatrixXd::Zero(num_constraints_, num_decision_vars_);
         lb_ = Eigen::VectorXd::Zero(num_constraints_);
@@ -68,7 +77,7 @@ namespace simulator {
         AddDynamicsConstraints(v);
         AddContactMotionConstraints(v);
         AddTorqueConstraints(v);
-        AddFrictionConeConstraints(v);
+        AddFrictionConeConstraints();
 
         // Init solver constraints
         Eigen::SparseMatrix<double> sparseA = A_.sparseView();
@@ -78,11 +87,10 @@ namespace simulator {
             throw std::runtime_error("Unable to add the constraints to the QP solver.");
         }
 
-        // TODO
         // Init the cost matricies
         AddLegTrackingCost(q,v);
         AddTorsoCost(q, v);
-//        AddForceTrackingCost();
+        AddForceTrackingCost();
 
         // Init solver costs
         Eigen::SparseMatrix<double> sparseP = P_.sparseView();
@@ -94,10 +102,12 @@ namespace simulator {
         if (!qp_solver_.initSolver()) {
             throw std::runtime_error("Unable to initialize the solver.");
         }
+
+        prev_num_contacts_ = num_contacts;
     }
 
     std::vector<mjtNum> QPControl::ComputeControlAction(const mjModel* model, const mjData* data) {
-        int num_contacts = UpdateContacts(model, data);
+        UpdateContacts(model, data);
 
         UpdateConstraintsAndCost(data);
 
@@ -118,16 +128,31 @@ namespace simulator {
         const Eigen::VectorXd v = ConvertMujocoVelToPinocchio(data);
         RecoverControlInputs(qp_sol, v, control_action);
 
-        // since i am passing to a PID controller, I still need to pass the configuration and velocity
+        // since I am passing to a PID controller, I still need to pass the configuration and velocity
         AssignPositionControl(control_action);
         AssignVelocityControl(control_action);
 
-//        std::cout << "feed forward: " << std::endl;
-//        for (int i = 0; i < num_inputs_; i++) {
-//            std::cout << control_action.at(i + 2*num_inputs_) << std::endl;
-//        }
+        std::cout << "feed forward: " << std::endl;
+        for (int i = 0; i < num_inputs_; i++) {
+            std::cout << control_action.at(i + 2*num_inputs_) << std::endl;
+        }
 
         return control_action;
+    }
+
+    void QPControl::SetBasePosGains(double kv, double kp) {
+        kv_pos_ = kv;
+        kp_pos_ = kp;
+    }
+
+    void QPControl::SetBaseAngleGains(double kv, double kp) {
+        kv_ang_ = kv;
+        kp_ang_ = kp;
+    }
+
+    void QPControl::SetJointGains(double kv, double kp) {
+        kv_joint_ = kv;
+        kp_joint_ = kp;
     }
 
     void QPControl::ComputeDynamicsTerms(const Eigen::VectorXd& q, const Eigen::VectorXd& v, const Eigen::VectorXd& a) {
@@ -149,13 +174,10 @@ namespace simulator {
         Js_ = Eigen::MatrixXd::Zero(Js_.rows(), Js_.cols());
         Js_ = GetConstraintJacobian(q);
 
+        // TODO: Remove the ones I don't use
         // Jsdot
         Jsdot_ = Eigen::MatrixXd::Zero(Jsdot_.rows(), Jsdot_.cols());
         Jsdot_ = GetConstraintJacobianDerivative(q, v);
-        JsR_ = GetConstraintRotationJacobian(q, v);
-
-        // Contact acceleration
-        contact_acc_ = GetContactAcc(q, v, a);
 
     }
 
@@ -176,15 +198,10 @@ namespace simulator {
     void QPControl::AddContactMotionConstraints(const Eigen::VectorXd& v) {
         // Assign to solver params
         if (Js_.size() > 0) {
-            // TODO: which one to use?
-            lb_.segment(FLOATING_VEL_OFFSET, Js_.rows()) = -Jsdot_ * v; // -contact_acc_;
+            lb_.segment(FLOATING_VEL_OFFSET, Js_.rows()) = -Jsdot_ * v;
             ub_.segment(FLOATING_VEL_OFFSET, Js_.rows()) = lb_.segment(FLOATING_VEL_OFFSET, Js_.rows());
 
             A_.block(FLOATING_VEL_OFFSET, 0, Js_.rows(), Js_.cols()) = Js_;
-
-//            std::cout << "Jsdot*v: \n" << Jsdot_*v << std::endl;
-//            std::cout << "contact acceleration: \n" << contact_acc_ << std::endl;
-//            std::cout << "Js: \n" << Js_ << std::endl;
         }
 
     }
@@ -206,7 +223,7 @@ namespace simulator {
                 -(pin_data_->C*v + pin_data_->g).segment(FLOATING_VEL_OFFSET, num_actuators_) + torque_bounds_;
     }
 
-    void QPControl::AddFrictionConeConstraints(const Eigen::VectorXd& v) {
+    void QPControl::AddFrictionConeConstraints() {
         // Since we assume flat ground:
         Eigen::Vector3d h = {1, 0, 0};
         Eigen::Vector3d l = {0, 1, 0};
@@ -214,30 +231,41 @@ namespace simulator {
 
         int num_contacts = GetNumContacts();
         for (int i = 0; i < num_contacts; i++) {
-            A_.block(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*i, num_vel_, 4, 3) <<
+            A_.block(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*i, num_vel_ + 3*i, 4, 3) <<
                     (h - n*friction_coef_).transpose(),
                     -(h + n*friction_coef_).transpose(),
                     (l - n*friction_coef_).transpose(),
                     -(l + n*friction_coef_).transpose();
-            ub_.segment(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*i, 4) = Eigen::Vector4d::Zero();
+            ub_.segment(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*i, 4) =
+                    Eigen::Vector4d::Zero();
             lb_.segment(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*i, 4) =
                     Eigen::Vector4d::Ones() * -OsqpEigen::INFTY;
         }
 
     }
 
-    // TODO: Implement properly
+    // TODO: Examine 2's in the cost function
+    // TODO: Make the leg tracking able to only track subset's of legs (i.e. swing legs)
     void QPControl::AddLegTrackingCost(const Eigen::VectorXd& q, const Eigen::VectorXd& v) {
         // For now, just make all the joint accelerations go to 0.
         P_.block(FLOATING_VEL_OFFSET, FLOATING_VEL_OFFSET, num_inputs_, num_inputs_) =
                 P_.block(FLOATING_VEL_OFFSET, FLOATING_VEL_OFFSET, num_inputs_, num_inputs_) + leg_tracking_weight_ *
-                Eigen::MatrixXd::Identity(num_inputs_, num_inputs_);
+                2*Eigen::MatrixXd::Identity(num_inputs_, num_inputs_);
+
+        Eigen::VectorXd target = acc_target_.tail(num_inputs_) +
+                                 kv_joint_*(vel_target_.tail(num_inputs_) - v.tail(num_inputs_)) +
+                                 kp_joint_*(config_target_.tail(num_inputs_) - q.tail(num_inputs_));
+
+//        std::cout << "config_target: \n" << config_target_ << std::endl;
+
+        w_.segment(FLOATING_VEL_OFFSET, num_inputs_) = w_.segment(FLOATING_VEL_OFFSET, num_inputs_) +
+                -2*target*leg_tracking_weight_;
     }
 
     void QPControl::AddTorsoCost(const Eigen::VectorXd& q, const Eigen::VectorXd& v) {
         // Add the position costs
         P_.topLeftCorner(POS_VARS, POS_VARS) = P_.topLeftCorner(POS_VARS, POS_VARS) +
-                torso_tracking_weight_*Eigen::MatrixXd::Identity(POS_VARS, POS_VARS);
+                torso_tracking_weight_*2*Eigen::MatrixXd::Identity(POS_VARS, POS_VARS);
 
         Eigen::VectorXd target = acc_target_.head(POS_VARS) + kv_pos_ * (vel_target_.head(POS_VARS) - v.head(POS_VARS)) +
                 kp_pos_*(config_target_.head(POS_VARS) - q.head(POS_VARS));
@@ -245,23 +273,33 @@ namespace simulator {
         w_.head(POS_VARS) = w_.head(POS_VARS) -2*target*torso_tracking_weight_;
 
         // Add the orientation costs
-        P_.block(POS_VARS, 0, 3, 3) = P_.block(POS_VARS, 0, 3, 3) + torso_tracking_weight_*Eigen::MatrixXd::Identity(3,3);
+        P_.block(POS_VARS, 0, 3, 3) = P_.block(POS_VARS, 0, 3, 3) + torso_tracking_weight_*2*Eigen::MatrixXd::Identity(3,3);
 
-        Eigen::Vector4d temp = config_target_.segment(POS_VARS, 4) - q.segment(POS_VARS, 4);
-        Eigen::Quaternion<double> quat_diff(temp);
-        Eigen::VectorXd angle_target = -kv_ang_*v.segment(POS_VARS, 3) +
-                kp_ang_*pinocchio::quaternion::log3(quat_diff);
+        Eigen::Quaternion<double> orientation(static_cast<Eigen::Vector4d>(q.segment(POS_VARS, 4)));
+        Eigen::Quaternion<double> des_orientation(static_cast<Eigen::Vector4d>(config_target_.segment(POS_VARS, 4)));
+        Eigen::VectorXd angle_target = kv_ang_*(vel_target_.segment(POS_VARS, 3) - v.segment(POS_VARS, 3)) +
+                kp_ang_*pinocchio::quaternion::log3(orientation.inverse()*des_orientation);
         w_.segment(POS_VARS, 3) = w_.segment(POS_VARS, 3) - 2*angle_target*torso_tracking_weight_;
     }
 
-    // TODO: Can I anything on the update? Maybe some of the costs...
-    // TODO: if the number of contacts don't change then we can re-use the sparsity
+    void QPControl::AddForceTrackingCost() {
+        int num_contacts = GetNumContacts();
+        P_.block(FLOATING_VEL_OFFSET + num_inputs_, num_vel_,
+                 CONSTRAINT_PER_FOOT*num_contacts, CONSTRAINT_PER_FOOT*num_contacts) =
+                         2*Eigen::MatrixXd::Identity(CONSTRAINT_PER_FOOT*num_contacts, CONSTRAINT_PER_FOOT*num_contacts);
+
+        Eigen::VectorXd target = force_target_;
+
+        w_.segment(FLOATING_VEL_OFFSET + num_inputs_, CONSTRAINT_PER_FOOT*num_contacts) = -2*target*force_tracking_weight_;
+    }
+
     void QPControl::UpdateConstraintsAndCost(const mjData* data) {
-        num_decision_vars_ = num_vel_ + CONSTRAINT_PER_FOOT*GetNumContacts();
+        int num_contacts = GetNumContacts();
+        num_decision_vars_ = num_vel_ + CONSTRAINT_PER_FOOT*num_contacts;
 
         qp_solver_.data()->setNumberOfVariables(num_decision_vars_);
 
-        num_constraints_ = num_vel_ + 7*GetNumContacts() + num_actuators_;
+        num_constraints_ = num_vel_ + 7*num_contacts + num_actuators_;
         qp_solver_.data()->setNumberOfConstraints(num_constraints_);
 
         A_ = Eigen::MatrixXd::Zero(num_constraints_, num_decision_vars_);
@@ -270,6 +308,9 @@ namespace simulator {
 
         P_ = Eigen::MatrixXd::Zero(num_decision_vars_, num_decision_vars_);
         w_ = Eigen::VectorXd::Zero(num_decision_vars_);
+
+        // TODO: Change. For now assuming we are always trying to apply 0 contact force
+        force_target_ = Eigen::VectorXd::Zero(3*num_contacts);
 
         const Eigen::VectorXd q = ConvertMujocoConfigToPinocchio(data);
         const Eigen::VectorXd v = ConvertMujocoVelToPinocchio(data);
@@ -280,35 +321,53 @@ namespace simulator {
         AddDynamicsConstraints(v);
         AddContactMotionConstraints(v);
         AddTorqueConstraints(v);
-        AddFrictionConeConstraints(v);
-
-        // Init solver constraints
-        Eigen::SparseMatrix<double> sparseA = A_.sparseView();
-        // I think if the solve size changes I might need to clear then set
-        qp_solver_.data()->clearLinearConstraintsMatrix();
-        qp_solver_.data()->clearHessianMatrix();
-        qp_solver_.clearSolver();
-
-        if (!(qp_solver_.data()->setLinearConstraintsMatrix(sparseA) &&
-              qp_solver_.data()->setBounds(lb_, ub_))) {
-            throw std::runtime_error("Unable to add the constraints to the QP solver.");
-        }
+        AddFrictionConeConstraints();
 
         // Init the cost matricies
         AddLegTrackingCost(q, v);
         AddTorsoCost(q, v);
-//        AddForceTrackingCost();
+        AddForceTrackingCost();
 
-        // Init solver costs
-        Eigen::SparseMatrix<double> sparseP = P_.sparseView();
-        if (!(qp_solver_.data()->setHessianMatrix(sparseP) && qp_solver_.data()->setGradient(w_))) {
-            throw std::runtime_error("Unable to add the costs to the QP solver.");
+        // TODO: Test this a bit more
+        // Check if the sparsity pattern changed
+        if (num_contacts != prev_num_contacts_) {
+            qp_solver_.data()->clearLinearConstraintsMatrix();
+            qp_solver_.data()->clearHessianMatrix();
+            qp_solver_.clearSolver();
+
+            // Set solver constraints
+            Eigen::SparseMatrix<double> sparseA = A_.sparseView();
+            if (!(qp_solver_.data()->setLinearConstraintsMatrix(sparseA) &&
+                  qp_solver_.data()->setBounds(lb_, ub_))) {
+                throw std::runtime_error("Unable to add the constraints to the QP solver.");
+            }
+
+            // Set solver costs
+            Eigen::SparseMatrix<double> sparseP = P_.sparseView();
+            if (!(qp_solver_.data()->setHessianMatrix(sparseP) && qp_solver_.data()->setGradient(w_))) {
+                throw std::runtime_error("Unable to add the costs to the QP solver.");
+            }
+
+            // Re-init
+            if (!qp_solver_.initSolver()) {
+                throw std::runtime_error("Unable to initialize the solver.");
+            }
+        } else {
+            // Set solver constraints
+            Eigen::SparseMatrix<double> sparseA = A_.sparseView();
+            if (!(qp_solver_.updateLinearConstraintsMatrix(sparseA) &&
+                  qp_solver_.updateBounds(lb_, ub_))) {
+                throw std::runtime_error("Unable to add the constraints to the QP solver.");
+            }
+
+            // Set solver costs
+            Eigen::SparseMatrix<double> sparseP = P_.sparseView();
+            if (!(qp_solver_.updateHessianMatrix(sparseP) && qp_solver_.updateGradient(w_))) {
+                throw std::runtime_error("Unable to add the costs to the QP solver.");
+            }
         }
 
-        // Maybe I need to re-init
-        if (!qp_solver_.initSolver()) {
-            throw std::runtime_error("Unable to initialize the solver.");
-        }
+        prev_num_contacts_ = num_contacts;
     }
 
     void QPControl::RecoverControlInputs(const Eigen::VectorXd& qp_sol, const Eigen::VectorXd& v,
@@ -339,10 +398,9 @@ namespace simulator {
         int j = 0;
         for (int i = 0; i < contact_frames_.size(); i++) {
             if (in_contact_.at(i)) {
-                int frame_id = pin_model_.getFrameId(pin_model_.frames.at(contact_frames_.at(i)).name,
-                                                     pin_model_.frames.at(contact_frames_.at(i)).type);
+                int frame_id = static_cast<int>(pin_model_.getFrameId(pin_model_.frames.at(contact_frames_.at(i)).name,
+                                                     pin_model_.frames.at(contact_frames_.at(i)).type));
 
-                // TODO: Can I use getFrameVelocity()?
                 pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J);
                 Js.block(j * CONSTRAINT_PER_FOOT, 0, CONSTRAINT_PER_FOOT, J.cols()) =
                         J.topLeftCorner(CONSTRAINT_PER_FOOT, pin_model_.nv);
@@ -365,8 +423,8 @@ namespace simulator {
         int j = 0;
         for (int i = 0; i < contact_frames_.size(); i++) {
             if (in_contact_.at(i)) {
-                int frame_id = pin_model_.getFrameId(pin_model_.frames.at(contact_frames_.at(i)).name,
-                                                     pin_model_.frames.at(contact_frames_.at(i)).type);
+                int frame_id = static_cast<int>(pin_model_.getFrameId(pin_model_.frames.at(contact_frames_.at(i)).name,
+                                                     pin_model_.frames.at(contact_frames_.at(i)).type));
 
                 pinocchio::getFrameJacobianTimeVariation(pin_model_, *pin_data_,
                                                          frame_id, pinocchio::LOCAL_WORLD_ALIGNED, Jdot);
@@ -378,52 +436,6 @@ namespace simulator {
         }
 
         return Jsdot;
-    }
-
-    Eigen::MatrixXd QPControl::GetConstraintRotationJacobian(const Eigen::VectorXd& q, const Eigen::VectorXd& v) {
-        pinocchio::computeJointJacobians(pin_model_, *pin_data_, q);
-        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);  // might not need this
-
-        int num_contacts = GetNumContacts();
-        Eigen::MatrixXd Js = Eigen::MatrixXd::Zero(CONSTRAINT_PER_FOOT*num_contacts, num_vel_);
-        Eigen::MatrixXd J = Eigen::MatrixXd::Zero(FLOATING_VEL_OFFSET, num_vel_);
-
-        int j = 0;
-        for (int i = 0; i < contact_frames_.size(); i++) {
-            if (in_contact_.at(i)) {
-                int frame_id = pin_model_.getFrameId(pin_model_.frames.at(contact_frames_.at(i)).name,
-                                                     pin_model_.frames.at(contact_frames_.at(i)).type);
-
-                pinocchio::getFrameJacobian(pin_model_, *pin_data_,
-                                                         frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J);
-                Js.block(j * 3, 0, 3, J.cols()) = J.block(3, 0, 3, pin_model_.nv);
-                j++;
-                J = Eigen::MatrixXd::Zero(J.rows(), J.cols());
-            }
-        }
-
-        return Js;
-    }
-
-    Eigen::VectorXd QPControl::GetContactAcc(const Eigen::VectorXd& q, const Eigen::VectorXd& v, const Eigen::VectorXd& a) {
-        // second order fk:
-        pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, a);
-        Eigen::VectorXd contact_acc = Eigen::VectorXd::Zero(CONSTRAINT_PER_FOOT*GetNumContacts());
-
-        int j = 0;
-        for (int i = 0; i < contact_frames_.size(); i++) {
-            if (in_contact_.at(i)) {
-                int frame_id = pin_model_.getFrameId(pin_model_.frames.at(contact_frames_.at(i)).name,
-                                                     pin_model_.frames.at(contact_frames_.at(i)).type);
-
-                pinocchio::Motion::Vector6 frame_acc =
-                        pinocchio::getFrameAcceleration(pin_model_, *pin_data_, frame_id, pinocchio::LOCAL_WORLD_ALIGNED);
-                contact_acc.segment(j * CONSTRAINT_PER_FOOT, CONSTRAINT_PER_FOOT) = frame_acc.head(CONSTRAINT_PER_FOOT);
-                j++;
-            }
-        }
-
-        return contact_acc;
     }
 
 } // simulator

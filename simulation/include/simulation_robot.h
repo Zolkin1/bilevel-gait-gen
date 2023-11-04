@@ -28,6 +28,10 @@ namespace simulator {
 
         void InitController(const mjModel* model, const mjData* data);
 
+        void UpdateTargetConfig(Eigen::VectorXd q);
+
+        void UpdateTargetVel(Eigen::VectorXd v);
+
         [[nodiscard]] std::string GetRobotXMLFile() const;
 
         [[nodiscard]] Eigen::VectorXd GetInitConfig() const;
@@ -53,6 +57,11 @@ namespace simulator {
 
         Eigen::VectorXd initial_config_;
         Eigen::VectorXd initial_vel_;
+
+        bool joint_map_created_;
+
+        Eigen::VectorXd target_config_;
+        Eigen::VectorXd target_vel_;
     };
 } // simulator
 

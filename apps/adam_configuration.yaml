@@ -45,4 +45,4 @@ standing_vel: [0., 0., 0., 0., 0, 0,
 ## ----------------------- Low Level Controller ----------------------- ##
 control_rate: 400  # Hz
 
-
+controller_type: "PD_GRAV_COMP"   # or QP_CONTROL

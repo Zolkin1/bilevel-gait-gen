@@ -16,7 +16,7 @@ foot_type: "POINT_FEET"
 # xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
 init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
               -0.02, 0.144, -0.976,     # front right
-              0.22, 0.4, -0.977,      # front left
+              0.02, 0.4, -0.977,      # front left
               -0.08, 0.45, -1.03,       # rear right
               0.08, 0.45, -1.03]        # rear left
 
@@ -28,11 +28,11 @@ init_vel: [0., 0., 0., 0., 0., 0.,
            0., 0., 0.,
            0., 0., 0.]
 
-standing_config: [0., 0., 0.37, 1., 0., 0., 0.,
+standing_config: [0., 0., 0.35, 1., 0., 0., 0.,
                  -0.22, 0.2, -0.91,
-                 0.12, 0.2, -0.91,
-                 -0.0788, 0.4, -0.91,
-                 0.0798, 0.4, -0.91]
+                 0.22, -0.2, -0.91,
+                 -0.0788, 0.6, -.91,
+                 0.0798, 0.6, -.91]
 
 
 standing_vel: [0., 0., 0., 0., 0., 0.,
@@ -43,13 +43,17 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
 
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
-control_rate: 100  # Hz
-torque_bounds: [30, 30, 30,
-                30, 30, 30,
-                30, 30, 30,
-                30, 30, 30]
+control_rate: 400  # Hz
+torque_bounds: [33.5, 33.5, 33.5,
+                33.5, 33.5, 33.5,
+                33.5, 33.5, 33.5,
+                33.5, 33.5, 33.5]
 friction_coef: 0.3
-base_pos_gains: [1, 2]  # kd_pos, kp_pos
-base_ang_gains: [1, 2]  # kd_ang, kp_ang
+base_pos_gains: [12, 100]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
+base_ang_gains: [12, 100]  # kd_ang, kp_ang
+joint_gains: [20, 200]     # I can get these pretty high without getting close to the torque bounds
 
+leg_tracking_weight: 100
+torso_tracking_weight: 10
+force_tracking_weight: 1
 

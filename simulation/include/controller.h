@@ -40,6 +40,10 @@ namespace simulator {
         virtual std::vector<mjtNum> ComputeControlAction(const mjModel* model, const mjData* data) = 0;
 
 
+        /**
+         * Note: assumes q is in mujoco order
+         * @param q
+         */
         void UpdateTargetConfig(const Eigen::VectorXd& q);
         void UpdateTargetVel(const Eigen::VectorXd& v);
         void UpdateTargetAcc(const Eigen::VectorXd& a);
@@ -54,6 +58,9 @@ namespace simulator {
         Eigen::VectorXd ConvertMujocoConfigToPinocchio(const mjData* data) const;
         Eigen::VectorXd ConvertMujocoVelToPinocchio(const mjData* data) const;
         Eigen::VectorXd ConvertMujocoAccToPinocchio(const mjData* data) const;
+
+        Eigen::VectorXd ConvertMujocoVecConfigToPinocchio(const Eigen::VectorXd& q) const;
+        Eigen::VectorXd ConvertMujocoVecVelLikeToPinocchio(const Eigen::VectorXd& v) const;
 
         Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints);
         Eigen::VectorXd ConvertPinocchioVelToMujoco(const Eigen::VectorXd& v);
@@ -83,7 +90,11 @@ namespace simulator {
         static constexpr int CONSTRAINT_PER_POINT_FOOT = 3;
         static constexpr int CONSTRAINT_PER_FLAT_FOOT = 6;
 
-       int CONSTRAINT_PER_FOOT;
+        // Number of position variables
+        static constexpr int POS_VARS = 3;
+
+
+        int CONSTRAINT_PER_FOOT;
 
         double rate_;
         int num_inputs_;

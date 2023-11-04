@@ -8,6 +8,7 @@ namespace simulator {
     SimulationRobot::SimulationRobot(const std::string& robot_xml_path, std::unique_ptr<Controller>& controller) :
         low_level_controller_(std::move(controller)) {
         robot_xml_path_ = robot_xml_path;
+        joint_map_created_ = false;
     }
 
     void SimulationRobot::SetInitialCondition(const Eigen::VectorXd& initial_config, const Eigen::VectorXd& initial_vel) {
@@ -17,6 +18,22 @@ namespace simulator {
 
     void SimulationRobot::InitController(const mjModel* model, const mjData* data) {
         low_level_controller_->InitSolver(model, data);
+    }
+
+    void SimulationRobot::UpdateTargetConfig(Eigen::VectorXd q) {
+        if (joint_map_created_) {
+            low_level_controller_->UpdateTargetConfig(q);
+        } else {
+            target_config_ = q;
+        }
+    }
+
+    void SimulationRobot::UpdateTargetVel(Eigen::VectorXd v) {
+        if (joint_map_created_) {
+            low_level_controller_->UpdateTargetVel(v);
+        } else {
+            target_vel_ = v;
+        }
     }
 
     std::string SimulationRobot::GetRobotXMLFile() const {
@@ -53,6 +70,8 @@ namespace simulator {
 
     void SimulationRobot::CreateJointMap(const mjModel* model) {
         low_level_controller_->CreateJointMap(model);
+        low_level_controller_->UpdateTargetConfig(target_config_);
+        low_level_controller_->UpdateTargetVel(target_vel_);
     }
 
 } // simulator

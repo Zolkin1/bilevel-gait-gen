@@ -87,15 +87,15 @@ namespace simulator {
     }
 
     void Controller::UpdateTargetConfig(const Eigen::VectorXd& q) {
-        config_target_ = q;
+        config_target_ = ConvertMujocoVecConfigToPinocchio(q);
     }
 
     void Controller::UpdateTargetVel(const Eigen::VectorXd& v) {
-        vel_target_ = v;
+        vel_target_ = ConvertMujocoVecVelLikeToPinocchio(v);
     }
 
     void Controller::UpdateTargetAcc(const Eigen::VectorXd& a) {
-        acc_target_ = a;
+        acc_target_ = ConvertMujocoVecVelLikeToPinocchio(a);
     }
 
     Eigen::VectorXd Controller::ConvertMujocoConfigToPinocchio(const mjData* data) const {
@@ -153,6 +153,49 @@ namespace simulator {
         }
 
         return a;
+    }
+
+    Eigen::VectorXd Controller::ConvertMujocoVecConfigToPinocchio(const Eigen::VectorXd& q) const {
+        Eigen::VectorXd q_out = Eigen::VectorXd::Zero(pin_model_.nq);
+
+        // Floating base config
+        // floating base position
+        for (int i = 0; i < 3; i++) {
+            q_out(i) = q(i);
+        }
+
+        // floating base quaternion, note pinocchio uses (x,y,z,w_) and mujoco uses (w_,x,y,z)
+        q_out(6) = q(3);
+        q_out(3) = q(4);
+        q_out(4) = q(5);
+        q_out(5) = q(6);
+
+
+        // Joints
+        for (int i = 0; i < mujoco_joint_keys_.size(); i++) {
+            q_out(mujoco_to_pinocchio_joint_map_.at(mujoco_joint_keys_.at(i)) - 2 + FLOATING_BASE_OFFSET) =
+                    q(i + FLOATING_BASE_OFFSET);
+        }
+
+
+        return q_out;
+    }
+
+    Eigen::VectorXd Controller::ConvertMujocoVecVelLikeToPinocchio(const Eigen::VectorXd& v) const {
+        Eigen::VectorXd v_out = Eigen::VectorXd::Zero(pin_model_.nv);
+
+        // Floating base velocities
+        for (int i = 0; i < FLOATING_VEL_OFFSET; i++) {
+            v_out(i) = v(i);
+        }
+
+        // Joint velocities
+        for (int i = 0; i < mujoco_joint_keys_.size(); i++) {
+            v_out(mujoco_to_pinocchio_joint_map_.at(mujoco_joint_keys_.at(i)) - 2 + FLOATING_VEL_OFFSET) =
+                    v(i + FLOATING_VEL_OFFSET);
+        }
+
+        return v_out;
     }
 
     int Controller::UpdateContacts(const mjModel* model, const mjData* data) {

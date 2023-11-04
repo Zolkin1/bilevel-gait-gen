@@ -38,25 +38,40 @@
  *
  *   decision variables: [qddot, lambda] \in R^{nv + 3*ncontacts}
  *   constraints:
- *   - dynamics \in R^{nv}
+ *   - dynamics \in R^{FLOATING_VEL}
  *   - friction cone (pyramid)  \in R^{4 * ncontacts}
  *   - stationary contacts \in R^{3 * ncontacs}
  *   - torque limits \in R^{njoints}
  *
- *   total constraints: nv + 4*ncontacts + 3*ncontacts + njoints
+ *   total constraints: FLOATING_VEL + 4*ncontacts + 3*ncontacts + njoints
  */
-
-// TODO: Is this a dense problem?
 
 namespace simulator {
     class QPControl : public Controller {
     public:
         QPControl(double control_rate, std::string robot_urdf, const std::string& foot_type, int nv,
-                  const Eigen::VectorXd& torque_bounds, double friction_coef);
+                  const Eigen::VectorXd& torque_bounds, double friction_coef,
+                  std::vector<double> base_pos_gains,
+                  std::vector<double> base_ang_gains,
+                  std::vector<double> joint_gains,
+                  double leg_weight,
+                  double torso_weight,
+                  double force_weight);
 
         void InitSolver(const mjModel* model, const mjData* data) override;
 
         std::vector<mjtNum> ComputeControlAction(const mjModel* model, const mjData* data) override;
+
+        void SetBasePosGains(double kv, double kp);
+
+        void SetBaseAngleGains(double kv, double kp);
+
+        /**
+         * Note: assumes the same kp and kv for each joint.
+         * @param kv
+         * @param kp
+         */
+        void SetJointGains(double kv, double kp);
 
     protected:
     private:
@@ -95,9 +110,14 @@ namespace simulator {
          * Note: Assumes ComputeDynamicsTerms has already been called.
          * Note: Assumes standing on flat ground
          */
-        void AddFrictionConeConstraints(const Eigen::VectorXd& v);
+        void AddFrictionConeConstraints();
 
         // Functions to add the necessary costs
+        /**
+         * Tracks a desired joint acceleration, velocity, and angle. Uses a PD controller.
+         * @param q
+         * @param v
+         */
         void AddLegTrackingCost(const Eigen::VectorXd& q, const Eigen::VectorXd& v);
 
         /**
@@ -107,6 +127,10 @@ namespace simulator {
          */
         void AddTorsoCost(const Eigen::VectorXd& q, const Eigen::VectorXd& v);
 
+
+        /**
+         * Tries to track a pre-defined force. Currently there are no PD gains.
+         */
         void AddForceTrackingCost();
 
         void UpdateConstraintsAndCost(const mjData* data);
@@ -119,11 +143,8 @@ namespace simulator {
 
         Eigen::MatrixXd GetConstraintJacobian(const Eigen::VectorXd& q);
         Eigen::MatrixXd GetConstraintJacobianDerivative(const Eigen::VectorXd& q, const Eigen::VectorXd& v);
-        Eigen::MatrixXd GetConstraintRotationJacobian(const Eigen::VectorXd& q, const Eigen::VectorXd& v);
 
-        Eigen::VectorXd GetContactAcc(const Eigen::VectorXd& q, const Eigen::VectorXd& v, const Eigen::VectorXd& a);
-
-        // Hold the underlying QP problem and any other needed data structures
+        // QP Solver
         OsqpEigen::Solver qp_solver_;
 
         Eigen::MatrixXd P_;      // quadratic term
@@ -137,28 +158,33 @@ namespace simulator {
         double leg_tracking_weight_;
         double force_tracking_weight_;
 
-        // Other member variables
         int num_vel_;
         int num_actuators_;
         int num_constraints_;
         int num_decision_vars_;
 
+        int prev_num_contacts_;
+
         Eigen::VectorXd torque_bounds_;
 
         Eigen::MatrixXd Js_;
         Eigen::MatrixXd Jsdot_;
-        Eigen::MatrixXd JsR_;
-        Eigen::VectorXd contact_acc_;
 
-        static constexpr int POS_VARS = 3;
-
+        // Floating base position gains
         double kv_pos_;
         double kp_pos_;
 
+        // Floating base angle gains
         double kv_ang_;
         double kp_ang_;
 
+        // Joint gains
+        double kv_joint_;
+        double kp_joint_;
+
         double friction_coef_;
+
+        Eigen::VectorXd force_target_;
     };
 }   // simulator
 
