@@ -2,9 +2,9 @@
 // Copyright (c) 2023 Zachary Olkin. All rights reserved.
 //
 
-#include "config_parser.h"
+#include "include/config_parser.h"
 
-namespace mpc::utils {
+namespace utils {
     ConfigParser::ConfigParser(const std::string& file_name) : file_name_(file_name) {
         config_ = YAML::LoadFile(file_name_);
     }

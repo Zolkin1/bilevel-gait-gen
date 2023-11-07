@@ -1,5 +1,3 @@
-# Setup Mujoco things
-
 # Setup Mujoco path
 set(MUJOCO_VERSION "mujoco-3.0.0" CACHE STRING "mujoco version")
 set(MUJOCO_DIR "/home/$ENV{USER}/${MUJOCO_VERSION}" CACHE PATH "Path to Mujoco dir")
@@ -22,26 +20,23 @@ set_property(TARGET mujoco PROPERTY IMPORTED_LOCATION ${MUJOCO_DIR}/lib/libmujoc
 
 set(SIM_HEADER_LIST "include/simulator.h"
                     "include/simulation_robot.h"
-                    "include/pd_grav_comp.h"
-                    "include/controller.h"
+                    "../controllers/include/pd_grav_comp.h"
+                    "../controllers/include/controller.h"
                     "include/glfw_adapter.h"
                     "include/array_safety.h"
                     "include/glfw_corevideo.h"
                     "include/glfw_dispatch.h"
                     "include/platform_ui_adapter.h"
                     "include/simulate.h"
-                    "include/qp_control.h")
+                    "../controllers/include/qp_control.h")
 
 add_library(simulator mujoco_sim/simulator.cpp
                       simulation_robot.cpp
-                      controller.cpp
-                    pd_grav_comp.cpp
         mujoco_sim/glfw_adapter.cc
         mujoco_sim/glfw_dispatch.cc
         mujoco_sim/platform_ui_adapter.cc
         mujoco_sim/simulate.cc
-        qp_control.cpp
-                      ${SIM_HEADER_LIST})
+        ${SIM_HEADER_LIST})
 
 target_include_directories(simulator PUBLIC include)
 target_link_libraries(simulator PUBLIC mujoco)
@@ -62,8 +57,5 @@ target_link_libraries(simulator PRIVATE yaml-cpp::yaml-cpp)
 find_package(pinocchio)
 target_link_libraries(simulator PRIVATE pinocchio)
 
-# OSPQ and OSQPEigen
-find_package(osqp REQUIRED)
-find_package(OsqpEigen REQUIRED)
-target_link_libraries(simulator PUBLIC osqp::osqp OsqpEigen::OsqpEigen)
+target_link_libraries(simulator PRIVATE controller)
 

@@ -28,18 +28,18 @@ int main(int argc, char* argv[]) {
 
     // Needs the absolute path for now
     std::string config_file(argv[1]);
-    mpc::utils::ConfigParser config = mpc::utils::ConfigParser(config_file);
+    utils::ConfigParser config = utils::ConfigParser(config_file);
 
     // Make the low level controller
-    std::unique_ptr<simulator::Controller> controller;
+    std::unique_ptr<controller::Controller> controller;
     if(config.ParseString("controller_type") == "PD_GRAV_COMP") {
-        controller = std::make_unique<simulator::PDGravComp>(config.ParseNumber("control_rate"),
+        controller = std::make_unique<controller::PDGravComp>(config.ParseNumber("control_rate"),
                                                             config.ParseString("robot_urdf"),
                                                             config.ParseString("foot_type"),
                                                             config.ParseEigenVector("standing_config"),
                                                             config.ParseEigenVector("standing_vel"));
     } else if (config.ParseString("controller_type") == "QP_CONTROL") {
-        controller = std::make_unique<simulator::QPControl>(config.ParseNumber("control_rate"),
+        controller = std::make_unique<controller::QPControl>(config.ParseNumber("control_rate"),
                                                             config.ParseString("robot_urdf"),
                                                             config.ParseString("foot_type"),
                                                             config.ParseEigenVector("init_vel").size(),
@@ -56,36 +56,33 @@ int main(int argc, char* argv[]) {
         throw std::runtime_error("Invalid controller type in the yaml file.");
     }
 
-
-    controller->DefineContacts(config.ParseStringVector("collision_frames"),
-                                    config.ParseStdVector<int>("collision_bodies"));
-
     controller->PrintConfigNames();
-
-    // TODO: Restructure mujoco and controller interface
 
     // Make the robot for simulation
     auto robot_file = config.ParseString("robot_xml");
     std::unique_ptr<simulator::SimulationRobot> robot = std::make_unique<simulator::SimulationRobot>(robot_file, controller);
 
-    robot->UpdateTargetConfig(config.ParseEigenVector("standing_config"));
-    robot->UpdateTargetVel(config.ParseEigenVector("standing_vel"));
+    // Create a simulation object and populate the robot with mujoco data
+    simulator::Simulator sim(robot);
+
+    // Set up controller solver
+    robot->InitController();
+    robot->DefineContacts(config.ParseStringVector("collision_frames"),
+                           config.ParseStdVector<int>("collision_bodies"));
 
     // Set the robot's initial condition
     // TODO: check the quaternion is normalized
     Eigen::VectorXd init_config = config.ParseEigenVector("init_config");
     Eigen::VectorXd init_vel = config.ParseEigenVector("init_vel");
     robot->SetInitialCondition(init_config, init_vel);
+    robot->UpdateTargetConfig(config.ParseEigenVector("standing_config"));
+    robot->UpdateTargetVel(config.ParseEigenVector("standing_vel"));
 
-    // Get the standing configuration
-    Eigen::VectorXd standing_config = config.ParseEigenVector("standing_config");
+    // Setup sim
+    sim.SetupSimulator(robot);
 
-    // Everything in the robot needs to be setup by here because it is consumed by the simulator
-    simulator::Simulator sim(robot);
-
-    sim.SetupSimulator();
-
-    sim.RunSimulator();
+    // Run sim
+    sim.RunSimulator(robot);
 
 
     // Create a model to be used by MPC (this will let the user specify anything not in the file)

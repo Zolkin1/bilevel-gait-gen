@@ -1,3 +1,4 @@
+## --------- Yaml for unit tests --------- ##
 # Configurations for the robot
 
 # XML file location
@@ -11,23 +12,20 @@ collision_bodies: [4, 7, 10, 13]  # for mujoco
 
 foot_type: "POINT_FEET"
 
-
 ## ----------------------- Configurations ----------------------- ##
-# initial joint config
-# xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
-init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
-              -0.02, 0.144, -0.976,     # front right
-              0.22, 0.4, -0.977,      # front left
-              -0.08, 0.45, -1.03,       # rear right
-              0.08, 0.45, -1.03]        # rear left
+# picked to be different for the test
+init_config: [2., 0.4, 0.3541, 1., 0, 0, 0,
+              -0.02, 0.144, -0.9,
+              0.22, 0.4, -0.8,
+              -0.07, 0.3, -0.5,
+              0.08, 0.45, -1.03]
 
-# initial joint velocity
-# xv, yv, zv, angle rates, v0, ..., v11
-init_vel: [0., 0., 0., 0., 0., 0.,
-           0., 0., 0.,
-           0., 0., 0.,
-           0., 0., 0.,
-           0., 0., 0.]
+# picked to be different for the test
+init_vel: [0., 1., 2., 3., 4., 5.,
+           6., 7., 8.,
+           9., 10., 11.,
+           12., 13., 14.,
+           15., 16., 17.]
 
 standing_config: [0., 0., 0.37, 0., 0., 0., 0.,
                  -0.22, 0.2, -0.91,

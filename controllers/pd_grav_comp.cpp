@@ -6,7 +6,6 @@
 #include <Eigen/QR>
 #include <utility>
 
-#include "mujoco.h"
 #include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/crba.hpp"
 #include "pinocchio/algorithm/rnea.hpp"
@@ -16,27 +15,26 @@
 #include "pd_grav_comp.h"
 
 
-namespace simulator {
+namespace controller {
     PDGravComp::PDGravComp(double control_freq, std::string robot_urdf, const std::string& foot_type,
                            const Eigen::VectorXd& config_set_point, const Eigen::VectorXd& vel_set_point):
             Controller(control_freq, std::move(robot_urdf), foot_type) {
         acc_target_ = Eigen::VectorXd::Zero(num_inputs_);
 
-        config_target_ = config_set_point;
-        vel_target_ = vel_set_point;
+        UpdateTargetConfig(config_set_point);
+        UpdateTargetVel(vel_set_point);
     }
 
-    std::vector<mjtNum> PDGravComp::ComputeControlAction(const mjModel* model, const mjData* data) {
-        // Compute position and velocity set point
-
-        // Update contacts
-        UpdateContacts(model, data);
+    Eigen::VectorXd PDGravComp::ComputeControlAction(const Eigen::VectorXd& q,
+                                                         const Eigen::VectorXd& v,
+                                                         const Eigen::VectorXd& a,
+                                                         const Contact& contact) {
 
         // Compute feedforward torque
-        ComputeFeedForwardValue(data);
+        ComputeFeedForwardValue(q, v, contact);
 
         // Assign the values in order to the vector
-        std::vector<mjtNum> control(3*num_inputs_);     // 3 gives position, velocity, feedforward
+        Eigen::VectorXd control = Eigen::VectorXd::Zero(3*num_inputs_);     // 3 gives position, velocity, feedforward
         AssignPositionControl(control);
         AssignVelocityControl(control);
         AssignFeedForward(control);
@@ -44,10 +42,7 @@ namespace simulator {
         return control;
     }
 
-    void PDGravComp::ComputeFeedForwardValue(const mjData* data) {
-        const Eigen::VectorXd q = ConvertMujocoConfigToPinocchio(data);
-        const Eigen::VectorXd v = ConvertMujocoVelToPinocchio(data);
-
+    void PDGravComp::ComputeFeedForwardValue(const Eigen::VectorXd& q, const Eigen::VectorXd& v, const Contact& contact) {
         // Update the forward kinematics
         pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
 
@@ -65,7 +60,8 @@ namespace simulator {
         pinocchio::crba(pin_model_, *pin_data_,  q);
 
         // Make M symmetric
-        pin_data_->M.triangularView<Eigen::StrictlyLower>() = pin_data_->M.transpose().triangularView<Eigen::StrictlyLower>();
+        pin_data_->M.triangularView<Eigen::StrictlyLower>() =
+                pin_data_->M.transpose().triangularView<Eigen::StrictlyLower>();
 
         // h = floating base centripetal, coriolis and gravity forces
         pinocchio::computeCoriolisMatrix(pin_model_, *pin_data_, q, v);
@@ -73,12 +69,8 @@ namespace simulator {
 
 
         // Jc = Jacobian of k linearly indep. constraints (k X nv)
-        int k = 0;
-        for (auto && i : in_contact_) {
-            if (i) {
-                k += CONSTRAINT_PER_FOOT;
-            }
-        }
+        int k = contact.GetNumContacts()*CONSTRAINT_PER_FOOT;
+
         Eigen::MatrixXd Jc = Eigen::MatrixXd::Zero(k, pin_model_.nv);
 
         pinocchio::computeJointJacobians(pin_model_, *pin_data_, q);
@@ -89,9 +81,10 @@ namespace simulator {
 
         // Only grab the frames for feet in contact
         int j = 0;
-        for (int i = 0; i < contact_frames_.size(); i++) {
-            if (in_contact_.at(i)) {
-                int frame_id = pin_model_.getFrameId(pin_model_.frames.at(contact_frames_.at(i)).name, pin_model_.frames.at(contact_frames_.at(i)).type);
+        for (int i = 0; i < contact.contact_frames_.size(); i++) {
+            if (contact.in_contact_.at(i)) {
+                int frame_id = pin_model_.getFrameId(pin_model_.frames.at(contact.contact_frames_.at(i)).name,
+                                                     pin_model_.frames.at(contact.contact_frames_.at(i)).type);
 
                 pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_id, pinocchio::LOCAL_WORLD_ALIGNED, J);
                 Jc.block(j * CONSTRAINT_PER_FOOT, 0, CONSTRAINT_PER_FOOT, J.cols()) =
@@ -118,15 +111,14 @@ namespace simulator {
         // TODO: Take in non-zero acceleration
         Eigen::VectorXd des_qddot = Eigen::VectorXd::Zero(pin_model_.nv);       // For now, it is zero desired acceleration
 
-        acc_target_ = temp.fullPivHouseholderQr().solve(Su * Q.transpose() * (pin_data_->M * des_qddot + pin_data_->C * v + pin_data_->g));
-
-        acc_target_ = ConvertPinocchioJointToMujoco(acc_target_);
+        acc_target_ = temp.fullPivHouseholderQr().solve(Su * Q.transpose() *
+                (pin_data_->M * des_qddot + pin_data_->C * v + pin_data_->g));
 
     }
 
-    void PDGravComp::AssignFeedForward(std::vector<mjtNum> &control) {
+    void PDGravComp::AssignFeedForward(Eigen::VectorXd& control) {
         for (int i = 2*num_inputs_; i < 3*num_inputs_; i++) {
-            control.at(i) = acc_target_(i - 2 * num_inputs_);
+            control(i) = acc_target_(i - 2 * num_inputs_);
         }
     }
-}
+} // controller

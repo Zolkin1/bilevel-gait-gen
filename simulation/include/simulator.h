@@ -46,14 +46,15 @@ namespace simulator {
         /**
          * Simulator constructor.
          */
+         // TODO: maybe make this a shared pointer
         explicit Simulator(std::unique_ptr<SimulationRobot>& robot);
 
         /**
          * Setup the simulator
          */
-        void SetupSimulator();
+        void SetupSimulator(const std::unique_ptr<SimulationRobot>& robot);
 
-        void RunSimulator();
+        void RunSimulator(std::unique_ptr<SimulationRobot>& robot);
 
         /**
          * Interfaces with the mujoco data to set the state of the robot.
@@ -66,8 +67,6 @@ namespace simulator {
         static void SimulateLoop(mujoco::Simulate* sim, SimulationRobot* robot);
 
         // ----------------------- Member Variables ----------------------- //
-        std::unique_ptr<SimulationRobot> robot_;
-
         std::unique_ptr<mujoco::Simulate> sim;
 
         static constexpr double syncMisalign = 0.1;        // maximum mis-alignment before re-sync (simulation seconds)

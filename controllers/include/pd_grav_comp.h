@@ -7,7 +7,7 @@
 
 #include "controller.h"
 
-namespace simulator {
+namespace controller {
     class PDGravComp : public Controller {
     public:
         PDGravComp(double control_freq, std::string robot_urdf, const std::string& foot_type,
@@ -21,22 +21,25 @@ namespace simulator {
          * @param model
          * @return a vector of control inputs to be given to the PD control
          */
-        std::vector<mjtNum> ComputeControlAction(const mjModel* model, const mjData* data) override;
+        Eigen::VectorXd ComputeControlAction(const Eigen::VectorXd& q,
+                                                 const Eigen::VectorXd& v,
+                                                 const Eigen::VectorXd& a,
+                                                 const Contact& contact) override;
 
     private:
         /**
          * Computes the feed forward torque given the current state.
          * Assigns the feedforward torque to the private vector.
          */
-        void ComputeFeedForwardValue(const mjData* data);
+        void ComputeFeedForwardValue(const Eigen::VectorXd& q, const Eigen::VectorXd& v, const Contact& contact);
 
         /**
          * Assigns the feedforward set point
          * Note: assumes feedforward acutators are last
          */
-        void AssignFeedForward(std::vector<mjtNum>& control);
+        void AssignFeedForward(Eigen::VectorXd& control);
 
     };
-} // simulator
+} // controller
 
 #endif //BILEVEL_GAIT_GEN_PD_GRAV_COMP_H

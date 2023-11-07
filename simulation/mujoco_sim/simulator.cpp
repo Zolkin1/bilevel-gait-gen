@@ -22,17 +22,18 @@ namespace simulator {
 
     using Seconds = std::chrono::duration<double>;
 
-    Simulator::Simulator(std::unique_ptr<SimulationRobot>& robot) :
-    robot_(std::move(robot)) {
+    Simulator::Simulator(std::unique_ptr<SimulationRobot>& robot) {
         char error[1000] = "Could not load binary model";
-        model_ = mj_loadXML(robot_->GetRobotXMLFile().c_str(), nullptr, error, 1000);
+        model_ = mj_loadXML(robot->GetRobotXMLFile().c_str(), nullptr, error, 1000);
 
         if (!model_) {
             mju_error("Load model error: %s", error);
         }
+
+        robot->SetSimModel(model_);
     }
 
-    void Simulator::SetupSimulator() {
+    void Simulator::SetupSimulator(const std::unique_ptr<SimulationRobot>& robot) {
         // initialize visualization data structures
         mjv_defaultCamera(&cam_);
         mjv_defaultOption(&opt_);
@@ -44,24 +45,18 @@ namespace simulator {
                 &cam_, &opt_, &pert, /* is_passive = */ false
         );
 
-        sim->LoadMessage(robot_->GetRobotXMLFile().c_str());
+        sim->LoadMessage(robot->GetRobotXMLFile().c_str());
         data_ = mj_makeData(model_);
 
         // Set state to current initial condition
-        this->SetState(robot_->GetInitConfig(), robot_->GetInitVelocities());
+        this->SetState(robot->GetInitConfig(), robot->GetInitVelocities());
 
-        // Set up controller solver
-        robot_->InitController(model_, data_);
-
-        // Do additional controller setup
-        // create the mapping between mujoco and pinocchio joints
-        robot_->CreateJointMap(model_);
     }
 
-    void Simulator::RunSimulator() {
+    void Simulator::RunSimulator(std::unique_ptr<SimulationRobot>& robot) {
 
         // Create a simulation thread
-        std::thread simulationThreadHandle(&SimulateLoop, sim.get(), robot_.get());
+        std::thread simulationThreadHandle(&SimulateLoop, sim.get(), robot.get());
 
         sim->RenderLoop();
         simulationThreadHandle.join();
@@ -148,7 +143,7 @@ namespace simulator {
                             if (data_->time - last_control_time >= robot->GetController()->GetRate() ||
                                 data_->time < last_control_time) {
 
-                                robot->GetControlAction(model_, data_, data_->ctrl);
+                                robot->GetControlAction(data_, data_->ctrl);
 
                                 last_control_time = data_->time;
                             }
@@ -175,7 +170,7 @@ namespace simulator {
                                 if (data_->time - last_control_time >= robot->GetController()->GetRate() ||
                                     data_->time < last_control_time) {
 
-                                    robot->GetControlAction(model_, data_, data_->ctrl);
+                                    robot->GetControlAction(data_, data_->ctrl);
 
                                     last_control_time = data_->time;
                                 }

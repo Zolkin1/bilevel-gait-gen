@@ -9,7 +9,7 @@
 
 #include "yaml-cpp/yaml.h"
 
-namespace mpc::utils {
+namespace utils {
     class ConfigParser {
     public:
         ConfigParser(const std::string& file_name);
@@ -20,6 +20,7 @@ namespace mpc::utils {
 
         std::string ParseString(const std::string& element);
 
+        // TODO: Remove
         std::vector<std::string> ParseStringVector(const std::string& element);
 
         template<typename scalar>

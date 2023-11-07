@@ -23,7 +23,11 @@ if(CMAKE_PROJECT_NAME STREQUAL bilevel-gait-gen AND BUILD_TESTING)
     add_subdirectory(test)
 endif()
 
-add_subdirectory(src)
+add_subdirectory(utils)
+
+add_subdirectory(mpc)
+
+add_subdirectory(controllers)
 
 add_subdirectory(apps)
 

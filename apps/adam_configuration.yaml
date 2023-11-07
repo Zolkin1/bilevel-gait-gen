@@ -45,4 +45,17 @@ standing_vel: [0., 0., 0., 0., 0, 0,
 ## ----------------------- Low Level Controller ----------------------- ##
 control_rate: 400  # Hz
 
-controller_type: "PD_GRAV_COMP"   # or QP_CONTROL
+controller_type: "PD_GRAV_COMP" # QP_CONTROL
+
+torque_bounds: [33.5, 33.5, 33.5, 33.5,
+                33.5, 33.5, 33.5, 33.5,
+                33.5, 33.5, 33.5,
+                33.5, 33.5, 33.5]
+friction_coef: 0.3
+base_pos_gains: [12, 100]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
+base_ang_gains: [12, 100]  # kd_ang, kp_ang
+joint_gains: [20, 200]     # I can get these pretty high without getting close to the torque bounds
+
+leg_tracking_weight: 100
+torso_tracking_weight: 10
+force_tracking_weight: 1
