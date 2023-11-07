@@ -1,5 +1,0 @@
-if(EXISTS "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/cmake-build-test/test/controller_sim_test-b12d07c_tests.cmake")
-  include("/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/cmake-build-test/test/controller_sim_test-b12d07c_tests.cmake")
-else()
-  add_test(controller_sim_test_NOT_BUILT-b12d07c controller_sim_test_NOT_BUILT-b12d07c)
-endif()

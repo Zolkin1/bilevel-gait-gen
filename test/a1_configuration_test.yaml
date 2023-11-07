@@ -1,0 +1,46 @@
+## --------- Yaml for unit tests --------- ##
+# Configurations for the robot
+
+# XML file location
+robot_xml: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/xml/a1.xml"
+
+robot_urdf: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/urdf/a1.urdf"
+
+collision_frames: ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]    # for pinocchio
+collision_bodies: [4, 7, 10, 13]  # for mujoco
+# these need to match ^
+
+foot_type: "POINT_FEET"
+
+## ----------------------- Configurations ----------------------- ##
+# picked to be different for the test
+init_config: [2., 0.4, 0.3541, 1., 0, 0, 0,
+              -0.02, 0.144, -0.9,
+              0.22, 0.4, -0.8,
+              -0.07, 0.3, -0.5,
+              0.08, 0.45, -1.03]
+
+# picked to be different for the test
+init_vel: [0., 1., 2., 3., 4., 5.,
+           6., 7., 8.,
+           9., 10., 11.,
+           12., 13., 14.,
+           15., 16., 17.]
+
+standing_config: [0., 0., 0.37, 0., 0., 0., 0.,
+                 -0.22, 0.2, -0.91,
+                 0.12, 0.2, -0.91,
+                 -0.0788, 0.4, -0.91,
+                 0.0798, 0.4, -0.91]
+
+
+standing_vel: [0., 0., 0., 0., 0., 0.,
+               0., 0., 0.,
+               0., 0., 0.,
+               0., 0., 0.,
+               0., 0., 0.]
+
+## ----------------------- Low Level Controller ----------------------- ##
+control_rate: 400  # Hz
+
+
