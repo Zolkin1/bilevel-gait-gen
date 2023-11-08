@@ -1,7 +1,10 @@
 
-set(UTIL_HEADER_LIST "include/config_parser.h")
+set(UTIL_HEADER_LIST "include/config_parser.h"
+        "include/logger.h")
 
-add_library(utils config_parser.cpp ${UTIL_HEADER_LIST})
+add_library(utils config_parser.cpp
+        logger.cpp
+        ${UTIL_HEADER_LIST})
 target_include_directories(utils PUBLIC include)
 
 # Eigen

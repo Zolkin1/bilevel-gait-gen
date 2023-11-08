@@ -2217,7 +2217,7 @@ void Simulate::LoadOnRenderThread() {
   std::memcpy(qvel_.data(), this->d_->qvel, sizeof(this->d_->qvel[0]) * this->m_->nv);
  qvel_prev_ = qvel_;
 
-  // allocate history buffer: smaller of {2000 states, 100 MB}
+  // allocate history buffer: smaller of {2000 states_, 100 MB}
   if (!this->is_passive_) {
     constexpr int kHistoryLength = 2000;
     constexpr int kMaxHistoryBytes = 1e8;
