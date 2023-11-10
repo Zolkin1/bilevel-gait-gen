@@ -7,12 +7,13 @@
 namespace mpc {
 
     MPC::MPC(std::unique_ptr<MPCInfo> info, const std::string& robot_urdf) :
-    info_(std::move(info)), model_(robot_urdf), num_joints_(model_.GetNumJoints()),
+    info_(std::move(info)), model_(robot_urdf, info->ee_frames, info_->discretization_steps), num_joints_(model_.GetNumJoints()),
     num_states_(model_.GetNumConfig() + 6), num_ee_(model_.GetNumEndEffectors()), num_inputs_(num_joints_ + 6*num_ee_),
-    prev_traj_(info_->num_nodes, num_states_, num_inputs_) {
+    prev_traj_(info_->num_nodes, num_states_, CreateDefaultSwitchingTimes(), info_->time_horizon/info_->num_nodes) {
 
         // TODO: deal with the parameterization. Is this really the size of the inputs?
 
+        assert(info_->ee_frames.size() == num_ee_);
 
         if (info_->vel_bounds.size() != num_joints_ || info_->joint_bounds.size() != num_joints_) {
             throw std::runtime_error("Velocity or joint bounds do not match the number of joints on the robot.");
@@ -58,84 +59,86 @@ namespace mpc {
         data_.dynamics_constraints.topLeftCorner(num_states_, num_states_) = -matrix_t::Identity(num_states_, num_states_);
         data_.dynamics_constants.head(num_states_) = -centroidal_state;
 
-        for (int i = 0; i < info_->num_nodes; i++) {
-            // Get linear dynamics at each time node
-            matrix_t A = model_.GetLinearDiscreteDynamicsState(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-            matrix_t B = model_.GetLinearDiscreteDynamicsInput(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-            vector_t C = model_.GetConstantDiscreteDynamics(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
+        matrix_t A = model_.GetLinearDiscreteDynamicsState(prev_traj_.GetStates().at(0), prev_traj_.GetInputs().at(0))
 
-            // Update dynamics equality constraint
-            data_.dynamics_constraints.block(i*num_states_ + num_states_, i*(num_states_+num_inputs_),
-                                             num_states_, num_states_) = A;
-            data_.dynamics_constraints.block(i*num_states_ + num_states_, i*(num_states_+num_inputs_) + num_states_,
-                                             num_states_, num_inputs_) = B;
-            data_.dynamics_constraints.block(i*num_states_ + num_states_, num_states_ + num_inputs_,
-                                             num_states_, num_states_) = -matrix_t::Identity(num_states_, num_states_);
-            data_.dynamics_constants.segment(i*num_states_ + num_states_, num_states_) = C;
-
-
-            // Need to add for each end effector
-            for (int j = 0; j < num_ee_; j++) {
-                // Get linearization of FK at each time node
-                // TODO: Specify which end effector.
-                matrix_t G = model_.GetFKLinearization(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-                data_.equality_constraints.block(i * POS_VARS * num_ee_ + j * POS_VARS, i * (num_states_ + num_inputs_),
-                                                 POS_VARS, num_states_) = G;
-
-                vector_t g = model_.GetFK(prev_traj_.states_.at(i));
-                data_.equality_constants.segment(i * POS_VARS * num_ee_ + j * POS_VARS, POS_VARS) = g;
-            }
-            data_.equality_constraints.block(i * POS_VARS * num_ee_,
-                                             i * (num_states_ + num_inputs_) + num_states_ + pos_start_idx_,
-                                             POS_VARS*num_ee_,
-                                             num_inputs_) = matrix_t::Identity(POS_VARS*num_ee_, POS_VARS*num_ee_);
-
-            // Inequality constraints
-            // TODO: For now these are all constant, so I don't need to re-calc each time
-            // Friction cone constraints can be enforced at all times (because even 0 force is in the cone). Might
-            // want to be careful with the numerical instabilities doing that.
-            data_.inequality_constraints.block(i*(4*num_ee_ + 2*num_joints_),
-                                               i*(num_inputs_ + num_states_) + num_states_ + force_start_idx_,
-                                               4*num_ee_, num_ee_) = friction_pyramid_;
-            data_.inequality_constants_ub.segment(i*(4*num_ee_ + 2*num_joints_), 4*num_ee_) = vector_t::Zero(4*num_ee_);
-
-            // Velocity bounds
-            data_.inequality_constants_ub.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
-                                                  num_joints_) = info_->vel_bounds;
-            data_.inequality_constants_lb.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
-                                                  num_joints_) = -info_->vel_bounds;
-            data_.inequality_constraints.block(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
-                                               i*(num_inputs_ + num_states_) + num_states_ + vel_start_idx,
-                                               num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
-
-            // Configuration bounds
-            data_.inequality_constants_ub.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
-                                                 num_joints_) = info_->joint_bounds;
-            data_.inequality_constants_lb.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
-                                                  num_joints_) = -info_->joint_bounds;
-            data_.inequality_constraints.block(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
-                                               i*(num_inputs_ + num_states_) + pos_start_idx_,
-                                               num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
-
-
-            // Get hessian approx of discrete cost function (generalized gauss newton)
-            matrix_t J = GetCostHessianApprox(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-            data_.cost_quadratic.block(i*(num_states_ + num_inputs_), i*(num_states_ + num_inputs_),
-                                       num_states_ + num_inputs_, num_states_ + num_inputs_) = J;
-
-
-            // Get gradient of discrete cost function
-            vector_t w = GetCostGradient(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-            data_.cost_linear.segment(i*(num_states_ + num_inputs_), num_states_ + num_inputs_) = w;
-        }
-
-        // TODO: potentially search only null space of other equality constraint
-
-        // Setup QP
-        qp_solver.SetupQP(data_);
-
-        // solve qp
-        prev_traj_ = qp_solver.SolveQP();
+//        for (int i = 0; i < info_->num_nodes; i++) {
+//            // Get linear dynamics at each time node
+//            matrix_t A = model_.GetLinearDiscreteDynamicsState(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
+//            matrix_t B = model_.GetLinearDiscreteDynamicsInput(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
+//            vector_t C = model_.GetConstantDiscreteDynamics(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
+//
+//            // Update dynamics equality constraint
+//            data_.dynamics_constraints.block(i*num_states_ + num_states_, i*(num_states_+num_inputs_),
+//                                             num_states_, num_states_) = A;
+//            data_.dynamics_constraints.block(i*num_states_ + num_states_, i*(num_states_+num_inputs_) + num_states_,
+//                                             num_states_, num_inputs_) = B;
+//            data_.dynamics_constraints.block(i*num_states_ + num_states_, num_states_ + num_inputs_,
+//                                             num_states_, num_states_) = -matrix_t::Identity(num_states_, num_states_);
+//            data_.dynamics_constants.segment(i*num_states_ + num_states_, num_states_) = C;
+//
+//
+//            // Need to add for each end effector
+//            for (int j = 0; j < num_ee_; j++) {
+//                // Get linearization of FK at each time node
+//                // TODO: Specify which end effector.
+//                matrix_t G = model_.GetFKLinearization(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
+//                data_.equality_constraints.block(i * POS_VARS * num_ee_ + j * POS_VARS, i * (num_states_ + num_inputs_),
+//                                                 POS_VARS, num_states_) = G;
+//
+//                vector_t g = model_.GetFK(prev_traj_.states_.at(i));
+//                data_.equality_constants.segment(i * POS_VARS * num_ee_ + j * POS_VARS, POS_VARS) = g;
+//            }
+//            data_.equality_constraints.block(i * POS_VARS * num_ee_,
+//                                             i * (num_states_ + num_inputs_) + num_states_ + pos_start_idx_,
+//                                             POS_VARS*num_ee_,
+//                                             num_inputs_) = matrix_t::Identity(POS_VARS*num_ee_, POS_VARS*num_ee_);
+//
+//            // Inequality constraints
+//            // TODO: For now these are all constant, so I don't need to re-calc each time
+//            // Friction cone constraints can be enforced at all times (because even 0 force is in the cone). Might
+//            // want to be careful with the numerical instabilities doing that.
+//            data_.inequality_constraints.block(i*(4*num_ee_ + 2*num_joints_),
+//                                               i*(num_inputs_ + num_states_) + num_states_ + force_start_idx_,
+//                                               4*num_ee_, num_ee_) = friction_pyramid_;
+//            data_.inequality_constants_ub.segment(i*(4*num_ee_ + 2*num_joints_), 4*num_ee_) = vector_t::Zero(4*num_ee_);
+//
+//            // Velocity bounds
+//            data_.inequality_constants_ub.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
+//                                                  num_joints_) = info_->vel_bounds;
+//            data_.inequality_constants_lb.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
+//                                                  num_joints_) = -info_->vel_bounds;
+//            data_.inequality_constraints.block(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
+//                                               i*(num_inputs_ + num_states_) + num_states_ + vel_start_idx,
+//                                               num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
+//
+//            // Configuration bounds
+//            data_.inequality_constants_ub.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
+//                                                 num_joints_) = info_->joint_bounds;
+//            data_.inequality_constants_lb.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
+//                                                  num_joints_) = -info_->joint_bounds;
+//            data_.inequality_constraints.block(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
+//                                               i*(num_inputs_ + num_states_) + pos_start_idx_,
+//                                               num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
+//
+//
+//            // Get hessian approx of discrete cost function (generalized gauss newton)
+//            matrix_t J = GetCostHessianApprox(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
+//            data_.cost_quadratic.block(i*(num_states_ + num_inputs_), i*(num_states_ + num_inputs_),
+//                                       num_states_ + num_inputs_, num_states_ + num_inputs_) = J;
+//
+//
+//            // Get gradient of discrete cost function
+//            vector_t w = GetCostGradient(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
+//            data_.cost_linear.segment(i*(num_states_ + num_inputs_), num_states_ + num_inputs_) = w;
+//        }
+//
+//        // TODO: potentially search only null space of other equality constraint
+//
+//        // Setup QP
+//        qp_solver.SetupQP(data_);
+//
+//        // solve qp
+//        prev_traj_ = qp_solver.SolveQP();
 
         return prev_traj_;
 
@@ -189,7 +192,7 @@ namespace mpc {
 
     }
 
-    void MPC::SetFrictionPyramid() const {
+    void MPC::SetFrictionPyramid() {
         // Assumes flat ground
         Eigen::Vector3d h = {1, 0, 0};
         Eigen::Vector3d l = {0, 1, 0};

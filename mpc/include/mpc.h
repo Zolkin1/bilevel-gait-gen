@@ -27,10 +27,11 @@ namespace mpc {
         double time_horizon;
         int num_qp_iterations;
         int num_contacts;
-        IntegratorTypes int_type;
         double friction_coef;
         vector_t vel_bounds;
         vector_t joint_bounds;
+        std::vector<std::string> ee_frames;
+        int discretization_steps;
     };
 
     // mpc data, stored as a struct to be cache friendly
@@ -69,8 +70,12 @@ namespace mpc {
         // ---------------- Private Member Functions ---------------- //
         // Assumes flat ground and constant coef of friction
         // Since we have flat ground and a constant coefficient of friction, we can just make one pyramid
-        void SetFrictionPyramid() const;
+        void SetFrictionPyramid();
 
+        /**
+         * Creates a default switching time vector for use in initialization
+         */
+        static std::vector<std::vector<double>> CreateDefaultSwitchingTimes();
 
         // ---------------- Member Variables ---------------- //
         // Centroidal model

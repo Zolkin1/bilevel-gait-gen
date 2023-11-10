@@ -5,9 +5,12 @@
 #ifndef BILEVEL_GAIT_GEN_QP_INTERFACE_H
 #define BILEVEL_GAIT_GEN_QP_INTERFACE_H
 
-#include "mpc.h"
+#include "trajectory.h"
 
 namespace mpc {
+
+    using vector_t = Eigen::VectorXd;
+
     /**
      * Base class to handle all interfaces to the underlying QP solver.
      * Each QP solver should have its own child class that implements these functions.

@@ -33,24 +33,24 @@ int main(int argc, char* argv[]) {
     // Make the low level controller
     std::unique_ptr<controller::Controller> controller;
     if(config.ParseString("controller_type") == "PD_GRAV_COMP") {
-        controller = std::make_unique<controller::PDGravComp>(config.ParseNumber("control_rate"),
+        controller = std::make_unique<controller::PDGravComp>(config.ParseNumber<double>("control_rate"),
                                                             config.ParseString("robot_urdf"),
                                                             config.ParseString("foot_type"),
                                                             config.ParseEigenVector("standing_config"),
                                                             config.ParseEigenVector("standing_vel"));
     } else if (config.ParseString("controller_type") == "QP_CONTROL") {
-        controller = std::make_unique<controller::QPControl>(config.ParseNumber("control_rate"),
+        controller = std::make_unique<controller::QPControl>(config.ParseNumber<double>("control_rate"),
                                                             config.ParseString("robot_urdf"),
                                                             config.ParseString("foot_type"),
                                                             config.ParseEigenVector("init_vel").size(),
                                                             config.ParseEigenVector("torque_bounds"),
-                                                            config.ParseNumber("friction_coef"),
+                                                            config.ParseNumber<double>("friction_coef"),
                                                             config.ParseStdVector<double>("base_pos_gains"),
                                                             config.ParseStdVector<double>("base_ang_gains"),
                                                             config.ParseStdVector<double>("joint_gains"),
-                                                            config.ParseNumber("leg_tracking_weight"),
-                                                            config.ParseNumber("torso_tracking_weight"),
-                                                            config.ParseNumber("force_tracking_weight"));
+                                                            config.ParseNumber<double>("leg_tracking_weight"),
+                                                            config.ParseNumber<double>("torso_tracking_weight"),
+                                                            config.ParseNumber<double>("force_tracking_weight"));
 
     } else {
         throw std::runtime_error("Invalid controller type in the yaml file.");

@@ -6,12 +6,15 @@
 #define BILEVEL_GAIT_GEN_TRAJECTORY_H
 
 #include <Eigen/Core>
-#include "mpc.h"
+
+#include "inputs.h"
 
 namespace mpc {
+    using vector_t = Eigen::VectorXd;
+
     class Trajectory {
     public:
-        Trajectory(int len, int state_size, int input_size);
+        Trajectory(int len, int state_size, const std::vector<std::vector<double>>& switching_times, double node_dt);
 
         Trajectory(const Trajectory& traj);
 
@@ -29,7 +32,7 @@ namespace mpc {
     protected:
     private:
         std::vector<vector_t> states_;
-        std::vector<vector_t> inputs_;
+        Inputs inputs_;
     };
 } // mpc
 

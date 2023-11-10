@@ -3,13 +3,19 @@ set(MPC_HEADER_LIST "include/mpc.h"
         "include/qp_interface.h"
         "include/centroidal_model.h"
         "include/integrator.h"
-        "include/trajectory.h")
+        "include/trajectory.h"
+        "include/spline.h"
+        "include/inputs.h"
+        "include/euler_integrator.h")
 
 add_library(mpc mpc.cpp
         qp_interface.cpp
         centroidal_model.cpp
         integrator.cpp
         trajectory.cpp
+        spline.cpp
+        inputs.cpp
+        euler_integrator.cpp
         ${MPC_HEADER_LIST})
 target_include_directories(mpc PUBLIC include)
 
