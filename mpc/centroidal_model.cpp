@@ -17,6 +17,8 @@
 namespace mpc {
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
 
+    // TODO: Move to a xyz orientation representation for the configuration. Drop the quaternion.
+
     CentroidalModel::CentroidalModel(const std::string &robot_urdf, const std::vector<std::string>& frames,
                                      int discretization_steps) :
             GRAVITY(0., 0., -9.81) {
@@ -27,7 +29,7 @@ namespace mpc {
         pin_data_ = std::make_unique<pinocchio::Data>(pin_model_);
 
         num_joints_ = pin_model_.nq - FLOATING_BASE_OFFSET;
-        num_total_states_ = 6 + pin_model_.nq;
+        num_total_states_ = MOMENTUM_OFFSET + pin_model_.nq - 1;
 
         robot_mass_ = pin_data_->mass[0];
 
@@ -44,16 +46,14 @@ namespace mpc {
 
     matrix_t CentroidalModel::GetLinearDiscreteDynamicsState(const vector_t& state, const Inputs& input,
                                                              int node, double time) {
-        // Calculate the jacobian wrt the state and evaluate it at the input and state given
-        const int num_states = FLOATING_BASE_OFFSET + MOMENTUM_OFFSET + num_joints_;
-
-        matrix_t A = matrix_t::Zero(num_states, num_states);
+        matrix_t A = matrix_t::Zero(num_total_states_, num_total_states_);
 
         // TODO: double check all the frames
 
         // TODO: is this zero or the jacobian of the FK?
-        vector_t q = state.tail(FLOATING_BASE_OFFSET + num_joints_);
+        vector_t q = ConvertMPCStateToPinocchioState(state);
         pinocchio::computeJointJacobians(pin_model_, *pin_data_, q);    // compute here so we don't need to recompute each time
+        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
         Eigen::Matrix3Xd cross_sum = Eigen::Matrix3Xd::Zero(3, q.size());
         for (int i = 0; i < num_ee_; i++) {
             // Get the jacobian of the FK
@@ -107,12 +107,13 @@ namespace mpc {
 
     }
 
-    vector_t CentroidalModel::GetFKJacobianForEndEffector(const vector_t& q, const std::string& frame, bool compute_jac) {
+    matrix_t CentroidalModel::GetFKJacobianForEndEffector(const vector_t& q, const std::string& frame, bool compute_jac) {
         if (compute_jac) {
             pinocchio::computeJointJacobians(pin_model_, *pin_data_, q);
+            pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
         }
 
-        matrix_t J;
+        matrix6x_t J(6,pin_model_.nv);
         pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_map_.at(frame), pinocchio::LOCAL_WORLD_ALIGNED, J);
 
         // Only return the position coordinates
@@ -124,8 +125,9 @@ namespace mpc {
         return pin_data_->oMi.at(frame_map_.at(frame)).translation();
     }
 
+    // Note: The MPC state is NOT using a quaternion representation
     int CentroidalModel::GetNumConfig() const {
-        return pin_model_.nq;
+        return pin_model_.nq - 1;
     }
 
     int CentroidalModel::GetNumJoints() const {
@@ -134,6 +136,45 @@ namespace mpc {
 
     int CentroidalModel::GetNumEndEffectors() const {
         return num_ee_;
+    }
+
+    vector_t CentroidalModel::ConvertMPCStateToPinocchioState(const mpc::vector_t &state) const {
+        Eigen::Vector4d quat = ConvertZYXRotToQuaternion(state.segment(3,3));
+        vector_t q(state.size() + 1);
+        q.head(POS_VARS) = state.head(POS_VARS);
+        q.segment(POS_VARS, 4) = quat;
+        q.tail(num_joints_) = state.tail(num_joints_);
+
+        return quat;
+    }
+
+    // converts to a x,y,z,w quaternion
+    Eigen::Vector4d CentroidalModel::ConvertZYXRotToQuaternion(const Eigen::Vector3d& zyx_rot) {
+        Eigen::Quaterniond quat = static_cast<Eigen::Quaterniond>(Eigen::AngleAxisd(zyx_rot(0), Eigen::Matrix<double, 3, 1>::UnitZ()) *
+                                           Eigen::AngleAxisd(zyx_rot(1), Eigen::Matrix<double, 3, 1>::UnitY()) *
+                                           Eigen::AngleAxisd(zyx_rot(2), Eigen::Matrix<double, 3, 1>::UnitX()));
+        Eigen::Vector4d quat_vec;
+        quat_vec(0) = quat.x();
+        quat_vec(1) = quat.y();
+        quat_vec(2) = quat.z();
+        quat_vec(3) = quat.w();
+        return quat_vec;
+    }
+
+    Eigen::Vector3d CentroidalModel::ConvertQuaternionToZYXRot(const Eigen::Vector4d& quat) {
+        Eigen::Vector3d rot;
+        double q_w = quat(3);
+        double q_x = quat(0);
+        double q_y = quat(1);
+        double q_z = quat(2);
+        // x
+        rot(2) = std::atan2(2*(q_w*q_x + q_y*q_z), 1 - 2*(q_x*q_x + q_y*q_y));
+        // y
+        rot(1) = -M_PI/2 + 2*std::atan2(std::sqrt(1 + 2*(q_w*q_y - q_x*q_z)), std::sqrt(1 - 2*(q_w*q_y - q_x*q_z)));
+        // z
+        rot(0) = std::atan2(2*(q_w*q_z + q_x*q_y), 1 - 2*(q_y*q_y + q_z*q_z));
+
+        return rot;
     }
 
     void CentroidalModel::CreateFrameMap(const std::vector<std::string>& frames) {

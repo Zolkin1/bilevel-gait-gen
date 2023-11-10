@@ -8,5 +8,24 @@ target_link_libraries(sim_test PUBLIC simulator)
 target_link_libraries(sim_test PUBLIC controller)
 target_link_libraries(sim_test PUBLIC utils)
 
+add_executable(mpc_test mpc_test.cpp)
+target_link_libraries(mpc_test PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(mpc_test PUBLIC mpc)
+target_link_libraries(mpc_test PUBLIC utils)
+
 include(Catch)
 catch_discover_tests(sim_test)
+catch_discover_tests(mpc_test)
+
+add_custom_command(TARGET sim_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/a1_configuration_test.yaml
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_config.yaml
+        $<TARGET_FILE_DIR:sim_test>
+)
+
+add_custom_command(TARGET mpc_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/a1_configuration_test.yaml
+        $<TARGET_FILE_DIR:sim_test>
+)

@@ -6,16 +6,35 @@
 
 namespace mpc {
 
-    MPC::MPC(std::unique_ptr<MPCInfo> info, const std::string& robot_urdf) :
-    info_(std::move(info)), model_(robot_urdf, info->ee_frames, info_->discretization_steps), num_joints_(model_.GetNumJoints()),
-    num_states_(model_.GetNumConfig() + 6), num_ee_(model_.GetNumEndEffectors()), num_inputs_(num_joints_ + 6*num_ee_),
-    prev_traj_(info_->num_nodes, num_states_, CreateDefaultSwitchingTimes(), info_->time_horizon/info_->num_nodes) {
+    MPCInfo::MPCInfo() {}
+    MPCInfo::MPCInfo(const MPCInfo& info) {
+        num_nodes = info.num_nodes;
+        time_horizon = info.time_horizon;
+        num_qp_iterations = info.num_qp_iterations;
+        num_contacts = info.num_contacts;
+        friction_coef = info.friction_coef;
+        vel_bounds = info.vel_bounds;
+        joint_bounds = info.joint_bounds;
+        ee_frames = info.ee_frames;
+        discretization_steps = info.discretization_steps;
+        num_switches = info.num_switches;
+    }
+
+    MPC::MPC(const MPCInfo& info, const std::string& robot_urdf) :
+        info_(info),
+        model_(robot_urdf, info.ee_frames, info.discretization_steps),
+        num_joints_(model_.GetNumJoints()),
+        num_states_(model_.GetNumConfig() + 6),
+        num_ee_(model_.GetNumEndEffectors()),
+        prev_traj_(info_.num_nodes, num_states_,
+               CreateDefaultSwitchingTimes(info.num_switches, num_ee_, info.time_horizon),
+               info.time_horizon/info.num_nodes) {
 
         // TODO: deal with the parameterization. Is this really the size of the inputs?
 
-        assert(info_->ee_frames.size() == num_ee_);
+        assert(info_.ee_frames.size() == num_ee_);
 
-        if (info_->vel_bounds.size() != num_joints_ || info_->joint_bounds.size() != num_joints_) {
+        if (info_.vel_bounds.size() != num_joints_ || info_.joint_bounds.size() != num_joints_) {
             throw std::runtime_error("Velocity or joint bounds do not match the number of joints on the robot.");
         }
 
@@ -27,13 +46,14 @@ namespace mpc {
         force_start_idx_ = 0;
         pos_start_idx_ = num_ee_*POS_VARS;
         vel_start_idx = pos_start_idx_ + num_ee_*POS_VARS;
+        num_inputs_ = num_joints_ + 6*num_ee_;
 
-        assert(num_inputs_ == vel_start_idx + num_joints_ + 1);
+        assert(num_inputs_ == vel_start_idx + num_joints_);
 
-        decision_vars_ = info_->num_nodes*(num_states_ + num_inputs_);
-        dynamics_constraints_ = info_->num_nodes*num_states_;
-        equality_constraints_ = info_->num_nodes*POS_VARS*num_ee_;
-        inequality_constraints_ = info_->num_nodes*(4*num_ee_ + 2*num_joints_);
+        decision_vars_ = info_.num_nodes*(num_states_ + num_inputs_);
+        dynamics_constraints_ = info_.num_nodes*num_states_;
+        equality_constraints_ = info_.num_nodes*POS_VARS*num_ee_;
+        inequality_constraints_ = info_.num_nodes*(4*num_ee_ + 2*num_joints_);
 
         SetFrictionPyramid();
     }
@@ -59,7 +79,9 @@ namespace mpc {
         data_.dynamics_constraints.topLeftCorner(num_states_, num_states_) = -matrix_t::Identity(num_states_, num_states_);
         data_.dynamics_constants.head(num_states_) = -centroidal_state;
 
-        matrix_t A = model_.GetLinearDiscreteDynamicsState(prev_traj_.GetStates().at(0), prev_traj_.GetInputs().at(0))
+        matrix_t A = model_.GetLinearDiscreteDynamicsState(prev_traj_.GetStates().at(0), prev_traj_.GetInputs(), 0, 0.1);
+
+        std::cout << "A: " << A << std::endl;
 
 //        for (int i = 0; i < info_->num_nodes; i++) {
 //            // Get linear dynamics at each time node
@@ -198,10 +220,23 @@ namespace mpc {
         Eigen::Vector3d l = {0, 1, 0};
         Eigen::Vector3d n = {0, 0, 1};
 
-        friction_pyramid_ << (h - n*info_->friction_coef).transpose(),
-                            -(h + n*info_->friction_coef).transpose(),
-                            (l - n*info_->friction_coef).transpose(),
-                            -(l + n*info_->friction_coef).transpose();
+        friction_pyramid_ << (h - n*info_.friction_coef).transpose(),
+                            -(h + n*info_.friction_coef).transpose(),
+                            (l - n*info_.friction_coef).transpose(),
+                            -(l + n*info_.friction_coef).transpose();
     }
+
+    std::vector<std::vector<double>> MPC::CreateDefaultSwitchingTimes(int num_switches, int num_ee, double horizon) {
+        std::vector<std::vector<double>> switching_times;
+        for (int i = 0; i < num_ee; i++) {
+            std::vector<double> times;
+            for (int j = 0; j < num_switches; j++) {
+                times.push_back((j+1)*horizon/num_switches);
+            }
+            switching_times.push_back(times);
+        }
+
+        return switching_times;
+    };
 
 } // mpc

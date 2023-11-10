@@ -14,11 +14,11 @@
 #include "pd_grav_comp.h"
 
 TEST_CASE("configuration parser", "[utils]") {
-    std::string config_file = "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/test/test_config.yaml";
+    std::string config_file = "test_config.yaml";
     utils::ConfigParser config = utils::ConfigParser(config_file);
 
     REQUIRE(config.ParseString("test_string") == "hello");
-    REQUIRE(config.ParseNumber("test_num") == 4);
+    REQUIRE(config.ParseNumber<int>("test_num") == 4);
     REQUIRE(config.ParseStringVector("test_string_vec").at(0) == "hello");
     REQUIRE(config.ParseStringVector("test_string_vec").at(1) == "world");
 
@@ -29,12 +29,12 @@ TEST_CASE("configuration parser", "[utils]") {
 
 TEST_CASE("Basic simulator/interface functions", "[simulator]") {
     // Hard code the yaml
-    std::string config_file("/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/test/a1_configuration_test.yaml");
+    std::string config_file("a1_configuration_test.yaml");
     utils::ConfigParser config = utils::ConfigParser(config_file);
 
     // Make the low level controller
     std::unique_ptr<controller::Controller> controller =
-            std::make_unique<controller::PDGravComp>(config.ParseNumber("control_rate"),
+            std::make_unique<controller::PDGravComp>(config.ParseNumber<double>("control_rate"),
                                                     config.ParseString("robot_urdf"),
                                                     config.ParseString("foot_type"),
                                                     config.ParseEigenVector("standing_config"),

@@ -57,3 +57,18 @@ leg_tracking_weight: 100
 torso_tracking_weight: 10
 force_tracking_weight: 1
 
+## ----------------------- MPC ----------------------- ##
+discretization_steps: 1
+num_nodes: 5
+time_horizon: 1
+num_qp: 1
+vel_bounds: [10, 10, 10,
+             10, 10, 10,
+             10, 10, 10,
+             10, 10, 10]
+joint_bounds: [10, 10, 10,
+               10, 10, 10,
+               10, 10, 10,
+               10, 10, 10]
+
+num_switches: 2

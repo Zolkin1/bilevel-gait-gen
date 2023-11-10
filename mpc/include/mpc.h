@@ -32,6 +32,10 @@ namespace mpc {
         vector_t joint_bounds;
         std::vector<std::string> ee_frames;
         int discretization_steps;
+        int num_switches;
+
+        MPCInfo();
+        MPCInfo(const MPCInfo& info);
     };
 
     // mpc data, stored as a struct to be cache friendly
@@ -56,7 +60,7 @@ namespace mpc {
 
     class MPC final {
     public:
-        MPC(std::unique_ptr<MPCInfo> info, const std::string& robot_urdf);
+        MPC(const MPCInfo& info, const std::string& robot_urdf);
 
         Trajectory Solve(const vector_t& centroidal_state);
 
@@ -75,7 +79,7 @@ namespace mpc {
         /**
          * Creates a default switching time vector for use in initialization
          */
-        static std::vector<std::vector<double>> CreateDefaultSwitchingTimes();
+        static std::vector<std::vector<double>> CreateDefaultSwitchingTimes(int num_switches, int num_ee, double horizon);
 
         // ---------------- Member Variables ---------------- //
         // Centroidal model
@@ -84,7 +88,7 @@ namespace mpc {
         MPCData data_;
 
         // MPC info
-        const std::unique_ptr<MPCInfo> info_;
+        const MPCInfo info_;
 
         int dynamics_constraints_;
         int equality_constraints_;
@@ -110,7 +114,7 @@ namespace mpc {
         Eigen::Matrix<double, 4, 3> friction_pyramid_;
 
         // QP Interface
-        QPInterface qp_solver;
+        //QPInterface qp_solver;
 
         // previous trajectory
         Trajectory prev_traj_;

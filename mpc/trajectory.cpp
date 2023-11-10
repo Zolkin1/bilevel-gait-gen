@@ -29,8 +29,8 @@ namespace mpc {
         return states_;
     }
 
-    std::vector<vector_t> Trajectory::GetInputs() const {
-//        return inputs_;
+    const Inputs& Trajectory::GetInputs() const {
+        return inputs_;
     }
 
     void Trajectory::Reset() {

@@ -19,6 +19,7 @@ namespace mpc {
     using matrix_t =  Eigen::MatrixXd;
 
     class CentroidalModel {
+        // Note: I am using tait-bryan z-y-x angles
     public:
         explicit CentroidalModel(const std::string& robot_urdf, const std::vector<std::string>& frames,
                                  int discretization_steps);
@@ -33,7 +34,7 @@ namespace mpc {
         // Needs to return with the frame transition built in
         matrix_t GetFKLinearization(const vector_t& state, const vector_t& input);
 
-        vector_t GetFKJacobianForEndEffector(const vector_t& state, const std::string& frame, bool compute_jac);
+        matrix_t GetFKJacobianForEndEffector(const vector_t& state, const std::string& frame, bool compute_jac);
 
         Eigen::Vector3d GetEndEffectorLocationCOMFrame(const vector_t& state, const std::string& frame) const;
 
@@ -45,9 +46,14 @@ namespace mpc {
 
         vector_t CalcDynamics(const vector_t& state, const Inputs& input, double time) const;
 
+        static Eigen::Vector4d ConvertZYXRotToQuaternion(const Eigen::Vector3d& zyx_rot);
+        static Eigen::Vector3d ConvertQuaternionToZYXRot(const Eigen::Vector4d& quat);
+
         // conversion from full state to centroidal state
     protected:
     private:
+        vector_t ConvertMPCStateToPinocchioState(const vector_t& state) const;
+
         void CreateFrameMap(const std::vector<std::string>& frames);
 
         // pinocchio model
@@ -76,6 +82,7 @@ namespace mpc {
         static int constexpr FLOATING_BASE_OFFSET = 7;
         static int constexpr FLOATING_VEL_OFFSET = 6;
         static int constexpr MOMENTUM_OFFSET = 6;
+        static int constexpr POS_VARS = 3;
 
         const Eigen::Vector3d GRAVITY;
     };

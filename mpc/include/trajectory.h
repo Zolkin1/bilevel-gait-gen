@@ -16,11 +16,11 @@ namespace mpc {
     public:
         Trajectory(int len, int state_size, const std::vector<std::vector<double>>& switching_times, double node_dt);
 
-        Trajectory(const Trajectory& traj);
+//        Trajectory(const Trajectory& traj);
 
         std::vector<vector_t> GetStates() const;
 
-        std::vector<vector_t> GetInputs() const;
+        const Inputs& GetInputs() const;
 
         /**
          * Resets all states_ and inputs to 0

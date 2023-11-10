@@ -43,4 +43,19 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
 ## ----------------------- Low Level Controller ----------------------- ##
 control_rate: 400  # Hz
 
+## ----------------------- MPC ----------------------- ##
+discretization_steps: 1
+num_nodes: 5
+time_horizon: 1
+num_qp: 1
+friction_coef: 0.3
+vel_bounds: [10, 10, 10,
+             10, 10, 10,
+             10, 10, 10,
+             10, 10, 10]
+joint_bounds: [10, 10, 10,
+               10, 10, 10,
+               10, 10, 10,
+               10, 10, 10]
+
 
