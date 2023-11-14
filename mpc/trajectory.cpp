@@ -6,8 +6,9 @@
 
 namespace mpc {
 
-    Trajectory::Trajectory(int len, int state_size, const std::vector<std::vector<double>>& switching_times, double node_dt) :
-            inputs_(switching_times, state_size - 13, len, node_dt) {
+    Trajectory::Trajectory(int len, int state_size, int num_joints,
+                           const std::vector<std::vector<double>>& switching_times, double node_dt) :
+            inputs_(switching_times, num_joints, len, node_dt) {
         for (int i = 0; i < len; i++) {
             states_.push_back(vector_t::Zero(state_size));
         }
@@ -48,9 +49,8 @@ namespace mpc {
         states_.at(idx) = state;
     }
 
-    void Trajectory::SetInput(int idx, const vector_t& input) {
-//        assert(input.size() == inputs_.at(0).size());
-//        inputs_.at(idx) = input;
+    void Trajectory::SetInput(const Inputs& input) {
+        inputs_ = input;
     }
 
 } // mpc

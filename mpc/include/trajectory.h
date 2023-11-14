@@ -14,7 +14,8 @@ namespace mpc {
 
     class Trajectory {
     public:
-        Trajectory(int len, int state_size, const std::vector<std::vector<double>>& switching_times, double node_dt);
+        Trajectory(int len, int state_size, int num_joints,
+                   const std::vector<std::vector<double>>& switching_times, double node_dt);
 
 //        Trajectory(const Trajectory& traj);
 
@@ -28,7 +29,7 @@ namespace mpc {
         void Reset();
 
         void SetState(int idx, const vector_t& state);
-        void SetInput(int idx, const vector_t& input);
+        void SetInput(const Inputs& input);
     protected:
     private:
         std::vector<vector_t> states_;

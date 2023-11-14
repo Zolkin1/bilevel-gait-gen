@@ -15,6 +15,8 @@ namespace mpc {
      * Each polynomial has a start and an end time and a set of defining variables.
      */
     class Spline {
+    static int constexpr POLY_ORDER = 4;    // actually a cubic
+
     public:
         Spline(int num_polys, const std::vector<double>& times, bool start_on_poly);
 
@@ -26,12 +28,13 @@ namespace mpc {
 
         void SetPolyVars(double time);
 
-        void SetPolyVars(int poly_num);
+        void SetPolyVars(int poly_num, const std::array<double, POLY_ORDER>& vars);
 
         void SetPolyVar(int poly_num, int var_idx);
+
+        int GetTotalPoly() const;
     protected:
     private:
-        static int constexpr POLY_ORDER = 4;    // actually a cubic
 
         // Time should be [0, DeltaT]
         static double EvalPoly(const std::array<double, POLY_ORDER>& poly_vals, double time, double DeltaT);
@@ -42,6 +45,8 @@ namespace mpc {
         // The poly vals are: x0, x0dot, x1, x1dot. DeltaT is determined by the switching times
 
         std::vector<double> poly_times_;    // The start and end of each polynomial
+
+        int total_poly_;
     };
 } // mpc
 

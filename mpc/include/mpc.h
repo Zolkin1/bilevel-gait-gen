@@ -33,6 +33,7 @@ namespace mpc {
         std::vector<std::string> ee_frames;
         int discretization_steps;
         int num_switches;
+        double integrator_dt;
 
         MPCInfo();
         MPCInfo(const MPCInfo& info);
@@ -69,17 +70,18 @@ namespace mpc {
         matrix_t GetCostHessianApprox(const vector_t& state, const vector_t& input);
 
         vector_t GetCostGradient(const vector_t& state, const vector_t& input);
+
+        /**
+         * Creates a default switching time vector for use in initialization
+         */
+        static std::vector<std::vector<double>> CreateDefaultSwitchingTimes(int num_switches, int num_ee, double horizon);
+
     protected:
     private:
         // ---------------- Private Member Functions ---------------- //
         // Assumes flat ground and constant coef of friction
         // Since we have flat ground and a constant coefficient of friction, we can just make one pyramid
         void SetFrictionPyramid();
-
-        /**
-         * Creates a default switching time vector for use in initialization
-         */
-        static std::vector<std::vector<double>> CreateDefaultSwitchingTimes(int num_switches, int num_ee, double horizon);
 
         // ---------------- Member Variables ---------------- //
         // Centroidal model

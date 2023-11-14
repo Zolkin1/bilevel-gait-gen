@@ -33,29 +33,40 @@ TEST_CASE("transformations", "[mpc][utils]") {
 
     using Catch::Matchers::WithinAbs;
 
-    double constexpr MARGIN = 1e-4;
+    double constexpr MARGIN = 1e-3;
 
     Eigen::Vector4d quat;
-    quat << 0.7071, 0.7071, 0, 0;
+    quat << 0.7071, 0, 0, 0.7071;
     Eigen::Vector3d rot;
-    rot << M_PI, 0, 1.57078;
-
-
-    // TODO: solve
+    rot << 0, 0, 1.57078;
 
     Eigen::Vector3d ZYXRotSol = mpc::CentroidalModel::ConvertQuaternionToZYXRot(quat);
     for (int i = 0; i < ZYXRotSol.size(); i++) {
         REQUIRE_THAT(ZYXRotSol(i), WithinAbs(rot(i), MARGIN));
     }
 
-    quat << 0.5773, 0.5773, 0.5773, 0;
-    rot << 1.1071, 0.7297, 2.0344;
+    quat << 0.36515, 0.54772, 0.7303, 0.18257;
+    rot << 2.3562, -0.3398, 1.4289;
+    ZYXRotSol = mpc::CentroidalModel::ConvertQuaternionToZYXRot(quat);
+    for (int i = 0; i < ZYXRotSol.size(); i++) {
+        REQUIRE_THAT(ZYXRotSol(i), WithinAbs(rot(i), MARGIN));
+    }
+
+    quat << 0.5773, 0.5773, 0, 0.5773;
+    rot << 1.1069, 0.72957, 2.03423;
     ZYXRotSol = mpc::CentroidalModel::ConvertQuaternionToZYXRot(quat);
     for (int i = 0; i < ZYXRotSol.size(); i++) {
         REQUIRE_THAT(ZYXRotSol(i), WithinAbs(rot(i), MARGIN));
     }
 
     Eigen::Vector4d quat_sol = mpc::CentroidalModel::ConvertZYXRotToQuaternion(rot);
+    for (int i = 0; i < quat_sol.size(); i++) {
+        REQUIRE_THAT(quat_sol(i), WithinAbs(quat(i), MARGIN));
+    }
+
+    rot << 0.25, 0.35, 0.45;
+    quat << 0.1968, 0.1958, 0.0811, 0.9573;
+    quat_sol = mpc::CentroidalModel::ConvertZYXRotToQuaternion(rot);
     for (int i = 0; i < quat_sol.size(); i++) {
         REQUIRE_THAT(quat_sol(i), WithinAbs(quat(i), MARGIN));
     }

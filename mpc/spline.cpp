@@ -9,14 +9,13 @@
 
 namespace mpc {
     Spline::Spline(int num_polys, const std::vector<double> &times, bool start_on_poly) {
-        int total_poly = 0;
         // Determine the total number of polynomials. Depends on if we start on a single or a multiple
         if (start_on_poly) {
-            total_poly = num_polys * (std::ceil((times.size() - 1)/2) + 1) + std::floor((times.size() - 1)/2) + 1;
+            total_poly_ = num_polys * (std::ceil((times.size() - 1)/2) + 1) + std::floor((times.size() - 1)/2) + 1;
         } else {
-            total_poly = num_polys * (std::floor((times.size() - 1)/2) + 1) + std::ceil((times.size() - 1)/2) + 1;
+            total_poly_ = num_polys * (std::floor((times.size() - 1)/2) + 1) + std::ceil((times.size() - 1)/2) + 1;
         }
-        for (int i = 0; i < total_poly; i++) {
+        for (int i = 0; i < total_poly_; i++) {
             poly_vars_.push_back(ZERO_POLY);
         }
 
@@ -48,6 +47,10 @@ namespace mpc {
         throw std::runtime_error("Invalid time to query the spline.");
     }
 
+    void Spline::SetPolyVars(int poly_num, const std::array<double, POLY_ORDER>& vars) {
+        poly_vars_.at(poly_num) = vars;
+    }
+
     double Spline::EvalPoly(const std::array<double, POLY_ORDER>& poly_vals, double time, double DeltaT) {
         double a2 = -(1/pow(DeltaT, 2))*3*(poly_vals.at(0) - poly_vals.at(1)) -
                 (1/DeltaT)*(2*poly_vals.at(2) + poly_vals.at(3));
@@ -56,6 +59,10 @@ namespace mpc {
         double val = poly_vals.at(0) + poly_vals.at(1)*time + a2*pow(time, 2) + a3*pow(time, 3);
 
         return val;
+    }
+
+    int Spline::GetTotalPoly() const {
+        return total_poly_;
     }
 
 } // mpc

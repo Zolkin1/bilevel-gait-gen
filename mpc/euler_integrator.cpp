@@ -30,7 +30,7 @@ namespace mpc {
     }
 
     matrix_t EulerIntegrator::CalcDerivWrtStateSingleStep(const mpc::vector_t &ic, const mpc::matrix_t &dfdx) {
-        return dfdx*dt_ + matrix_t::Identity(ic.size(), ic.size());
+        return dfdx*dt_ + matrix_t::Identity(ic.size() - 1, ic.size() - 1);
     }
 
     matrix_t EulerIntegrator::CalcDerivWrtInputSingleStep(const mpc::vector_t &ic, const mpc::matrix_t &dfdu) {

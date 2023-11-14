@@ -72,3 +72,4 @@ joint_bounds: [10, 10, 10,
                10, 10, 10]
 
 num_switches: 2
+integrator_dt: 0.2

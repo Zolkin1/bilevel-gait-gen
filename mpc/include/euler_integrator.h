@@ -9,6 +9,7 @@
 
 namespace mpc {
     class EulerIntegrator : public Integrator {
+    public:
         EulerIntegrator(double dt);
 
         vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, double final_time,
@@ -19,6 +20,8 @@ namespace mpc {
 
         // Only does a single step
         matrix_t CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu) override;
+    protected:
+    private:
     };
 }
 

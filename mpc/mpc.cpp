@@ -18,15 +18,16 @@ namespace mpc {
         ee_frames = info.ee_frames;
         discretization_steps = info.discretization_steps;
         num_switches = info.num_switches;
+        integrator_dt = info.integrator_dt;
     }
 
     MPC::MPC(const MPCInfo& info, const std::string& robot_urdf) :
         info_(info),
-        model_(robot_urdf, info.ee_frames, info.discretization_steps),
+        model_(robot_urdf, info.ee_frames, info.discretization_steps, info.integrator_dt),
         num_joints_(model_.GetNumJoints()),
-        num_states_(model_.GetNumConfig() + 6),
+        num_states_(model_.GetPinocchioNumConfig() + 6),
         num_ee_(model_.GetNumEndEffectors()),
-        prev_traj_(info_.num_nodes, num_states_,
+        prev_traj_(info.num_nodes, num_states_, num_joints_,
                CreateDefaultSwitchingTimes(info.num_switches, num_ee_, info.time_horizon),
                info.time_horizon/info.num_nodes) {
 
@@ -79,9 +80,58 @@ namespace mpc {
         data_.dynamics_constraints.topLeftCorner(num_states_, num_states_) = -matrix_t::Identity(num_states_, num_states_);
         data_.dynamics_constants.head(num_states_) = -centroidal_state;
 
-        matrix_t A = model_.GetLinearDiscreteDynamicsState(prev_traj_.GetStates().at(0), prev_traj_.GetInputs(), 0, 0.1);
+        matrix_t A, B;
+        vector_t C;
+        model_.GetLinearDiscreteDynamics(centroidal_state, centroidal_state, prev_traj_.GetInputs(), 0, 0.1,
+                                              A, B, C);
 
-        std::cout << "A: " << A << std::endl;
+
+        std::cout << "A: \n" << A << std::endl;
+        std::cout << "B: \n" << B << std::endl;
+        std::cout << "C: \n" << C << std::endl;
+
+        // xbar, ubar = prev_traj
+
+        // modify the state
+        vector_t state = prev_traj_.GetStates().at(0);
+        vector_t xbar = CentroidalModel::ConvertManifoldStateToAlgebraState(state, centroidal_state);
+        for (int i = 0; i < state.size(); i++) {
+            if (i < 6) {
+                state(i) += 0.1;
+            } else if (i > 11) {
+                state(i) += 0.01;
+            }
+        }
+
+        // Modify the inputs
+        auto switching_times = mpc::MPC::CreateDefaultSwitchingTimes(info_.num_switches, 4, info_.time_horizon);
+        Inputs input_new(prev_traj_.GetInputs());
+        std::array<mpc::Spline, 3> forces = {mpc::Spline(2, switching_times.at(0), true), mpc::Spline(2, switching_times.at(0), true),
+                                             mpc::Spline(2, switching_times.at(0), true)};
+        std::array<double, 4> vars = {1.1, 0, 1.1, 0};
+        for (int coord = 0; coord < 3; coord++) {
+            for (int poly = 0; poly < input_new.GetForces().at(0).at(0).GetTotalPoly(); poly++) {
+                forces.at(coord).SetPolyVars(poly, vars);
+            }
+        }
+
+        for (int i = 0; i < num_ee_; i++) {
+            input_new.SetEndEffectorForce(i, forces);
+        }
+
+        vector_t joint_vels(num_joints_);
+        joint_vels << .1,0,0, 0,.2,.3, 0,.1,.1, .4,.5,.1;
+        input_new.SetJointVels(joint_vels, 0.1);
+
+        vector_t state_alg = CentroidalModel::ConvertManifoldStateToAlgebraState(state, centroidal_state);
+
+        vector_t xdot_true = model_.CalcDynamics(state, input_new, 0.1);
+        vector_t xdot_approx = A*(state_alg - xbar) +
+                B*(input_new.GetInputVector(0.1) - prev_traj_.GetInputs().GetInputVector(0.1)) + C;
+
+        std::cout << "xdot true: \n" << xdot_true << std::endl;
+        std::cout << "xdot approx: \n" << xdot_approx << std::endl;
+
 
 //        for (int i = 0; i < info_->num_nodes; i++) {
 //            // Get linear dynamics at each time node
@@ -102,7 +152,6 @@ namespace mpc {
 //            // Need to add for each end effector
 //            for (int j = 0; j < num_ee_; j++) {
 //                // Get linearization of FK at each time node
-//                // TODO: Specify which end effector.
 //                matrix_t G = model_.GetFKLinearization(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
 //                data_.equality_constraints.block(i * POS_VARS * num_ee_ + j * POS_VARS, i * (num_states_ + num_inputs_),
 //                                                 POS_VARS, num_states_) = G;
@@ -212,6 +261,10 @@ namespace mpc {
         // Solve QP (to completion?)
 
 
+    }
+
+    void MPC::SetWarmStartTrajectory(const mpc::Trajectory &trajectory) {
+        prev_traj_ = trajectory;
     }
 
     void MPC::SetFrictionPyramid() {
