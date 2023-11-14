@@ -82,8 +82,7 @@ namespace mpc {
 
         matrix_t A, B;
         vector_t C;
-        model_.GetLinearDiscreteDynamics(centroidal_state, centroidal_state, prev_traj_.GetInputs(), 0, 0.1,
-                                              A, B, C);
+        model_.GetLinearDiscreteDynamics(centroidal_state, centroidal_state, prev_traj_.GetInputs(), 0.6, A, B, C);
 
 
         std::cout << "A: \n" << A << std::endl;
@@ -108,7 +107,7 @@ namespace mpc {
         Inputs input_new(prev_traj_.GetInputs());
         std::array<mpc::Spline, 3> forces = {mpc::Spline(2, switching_times.at(0), true), mpc::Spline(2, switching_times.at(0), true),
                                              mpc::Spline(2, switching_times.at(0), true)};
-        std::array<double, 4> vars = {1.1, 0, 1.1, 0};
+        std::array<double, 4> vars = {1.1, 1.1, 0, 0};
         for (int coord = 0; coord < 3; coord++) {
             for (int poly = 0; poly < input_new.GetForces().at(0).at(0).GetTotalPoly(); poly++) {
                 forces.at(coord).SetPolyVars(poly, vars);

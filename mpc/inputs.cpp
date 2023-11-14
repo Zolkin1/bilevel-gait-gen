@@ -102,7 +102,7 @@ namespace mpc {
     }
 
     int Inputs::GetNumInputs() const {
-        return 3*forces_.size() + 3*positions_.size() + joint_vels_.at(0).size();
+        return 3*forces_.size()*forces_.at(0).at(0).GetTotalPolyVars() + joint_vels_.at(0).size();
     }
 
     int Inputs::GetNumForces() const {
@@ -114,12 +114,23 @@ namespace mpc {
     }
 
     vector_t Inputs::GetInputVector(double time) const {
-        vector_t input = vector_t::Zero(joint_vels_.at(0).size() + GetNumForces());
-        vector_t force_vec = vector_t::Zero(GetNumForces());
-        for (int i = 0; i < forces_.size(); i++) {
-            force_vec(i*3) = forces_.at(i).at(0).ValueAt(time);
-            force_vec(i*3 + 1) = forces_.at(i).at(1).ValueAt(time);
-            force_vec(i*3 + 2) = forces_.at(i).at(2).ValueAt(time);
+        const int POLY_ORDER = 4;
+        vector_t input = vector_t::Zero(GetNumInputs());
+
+        int poly_vars_per_spline = forces_.at(0).at(0).GetTotalPolyVars();
+
+        vector_t force_vec = vector_t::Zero(GetNumForces()*poly_vars_per_spline);
+        int j = 0;
+        for (const auto & force : forces_) {
+            vector_t fx = force.at(0).GetAllPolyVars();
+            vector_t fy = force.at(1).GetAllPolyVars();
+            vector_t fz = force.at(2).GetAllPolyVars();
+
+            force_vec.segment(j*poly_vars_per_spline, poly_vars_per_spline) = fx;
+            force_vec.segment((j+1)*poly_vars_per_spline, poly_vars_per_spline) = fy;
+            force_vec.segment((j+2)*poly_vars_per_spline, poly_vars_per_spline) = fz;
+
+            j += 3;
         }
         input << force_vec, GetVels(time);
 
@@ -128,6 +139,19 @@ namespace mpc {
 
     std::vector<vector_t> Inputs::GetAllVels() const {
         return joint_vels_;
+    }
+
+    Eigen::Matrix<double, 3, 4> Inputs::GetForcePolyVarsLin(int end_effector, double time) const {
+        Eigen::Matrix<double, 3, 4> vars = Eigen::Matrix<double, 3, 4>::Zero();
+        for (int coord = 0; coord < 3; coord++) {
+            vars.row(coord) = forces_.at(end_effector).at(coord).GetPolyVarsLin(time);
+        }
+
+        return vars;
+    }
+
+    int Inputs::GetForcePolyIdx(double time) const {
+        return forces_.at(0).at(0).GetPolyIdx(time);
     }
 
 }

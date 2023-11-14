@@ -26,18 +26,13 @@ namespace mpc {
                                  int discretization_steps, double dt);
 
         /**
-         * The state given should be: [h, qb, qj]. h is the linear and angular momenetum at the COM
-         * qb is the floating base. x,y,z then a quaternion in pinocchio form. qj is the joint configurations.
-         * Then the pinocchio configuration vector is the same as the configuration vector here.
-         * The MPC decision variables will be [h, qb_alg, qj]. qb_alg is the floating base in the lie algebra.
          * @param state
          * @param input
          * @param node
          * @param time
          * @return
          */
-         // TODO: remove node argument
-        void GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Inputs& input, int node, double time,
+        void GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Inputs& input, double time,
                                            matrix_t& A, matrix_t& B, vector_t& C);
 
         // See computeForwardKinematicsDerivatives
@@ -73,7 +68,7 @@ namespace mpc {
         static int constexpr POS_VARS = 3;
 
         vector_t ComputePinocchioVelocities(const vector_t& state, const vector_t& joint_vels, const matrix_t& CMMbinv,
-                                            const matrix_t& CMMj);
+                                            const matrix_t& CMMj) const;
 
         vector_t ConvertMPCStateToPinocchioState(const vector_t& state) const;
         vector_t ConvertPinocchioStateToMPCState(const Eigen::Vector<double, MOMENTUM_OFFSET>& momentum,

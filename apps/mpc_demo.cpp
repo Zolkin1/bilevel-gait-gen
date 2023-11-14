@@ -61,7 +61,7 @@ int main() {
                                          mpc::Spline(2, switching_times.at(0), false)};
 
     // For the test just make everything constant, non-zero
-    std::array<double, 4> vars = {1, 0, 1, 0};
+    std::array<double, 4> vars = {1, 1, 0, 0};
     for (int coord = 0; coord < 3; coord++) {
         for (int poly = 0; poly < input.GetForces().at(0).at(0).GetTotalPoly(); poly++) {
             forces.at(coord).SetPolyVars(poly, vars);

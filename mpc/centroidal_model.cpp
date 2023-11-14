@@ -49,34 +49,30 @@ namespace mpc {
 
     // TODO: Need to linearize the inputs in terms of the parameterization
     void CentroidalModel::GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Inputs& input,
-                                                             int node, double time, matrix_t& A, matrix_t& B,
+                                                             double time, matrix_t& A, matrix_t& B,
                                                              vector_t& C) {
-
-//        std::cout << "State: \n" << state << std::endl;
-
-//        vector_t alg_state = ConvertManifoldStateToAlgebraState(state, ref_state);
 
         // Get the pinocchio configuration
         vector_t q_pin = ConvertMPCStateToPinocchioState(state);
 
+        // ------------------------------------------- //
+        // --------------- Calculate A --------------- //
+        // ------------------------------------------- //
         A = matrix_t::Zero(num_total_states_, num_total_states_);
 
-        pinocchio::computeJointJacobians(pin_model_, *pin_data_, q_pin);    // compute here so we don't need to recompute each time
+        pinocchio::computeJointJacobians(pin_model_, *pin_data_, q_pin);
         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin);
 
         Eigen::Matrix3Xd cross_sum = Eigen::Matrix3Xd::Zero(3, pin_model_.nv);
         for (int i = 0; i < num_ee_; i++) {
             // Get the jacobian of the FK
             matrix_t J = GetFKJacobianForEndEffector(q_pin, frames_.at(i), false);
-//            std::cout << "J: \n" << J << std::endl;
             Eigen::Vector3d force = input.GetForce(i, time);
-//            std::cout << "force for ee #" << i << ": \n" << force << std::endl;
             for (int j = 0; j < pin_model_.nv; j++) {
                 // Cross product with the corresponding input force, add these for all the end effectors
                 cross_sum.col(j) += static_cast<Eigen::Vector3d>(-J.col(j)).cross(force);
             }
         }
-//        std::cout << "Cross sum: " << cross_sum << std::endl;
         A.block(3, MOMENTUM_OFFSET, cross_sum.rows(), cross_sum.cols()) = cross_sum;
 
         // Deal with centroidal dynamics
@@ -93,7 +89,7 @@ namespace mpc {
         matrix6x_t dhdotdq = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
         matrix6x_t dhdotdv = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
 
-        // Get all the terms I need
+        // Get dhdq
         // TODO: I only need this for dhdq so I can just steal that one line for efficiency
         pinocchio::computeCentroidalDynamicsDerivatives(pin_model_, *pin_data_, q_pin, v_pin, a_pin,
                                                         dhdq, dhdotdq, dhdotdv, CMM);
@@ -106,25 +102,40 @@ namespace mpc {
         // I need the partial w.r.t to each configuration variable
         // Note: (A^-1)' = (A^-1)*A'*(A^-1)
 
+        // ------------------------------------------- //
         // --------------- Calculate B --------------- //
-        int num_forces = input.GetNumForces();
-        int num_inputs = input.GetNumInputs(); //num_forces + input.GetNumPositions() + num_joints_;
+        // ------------------------------------------- //
+        int num_inputs = input.GetNumInputs();
+
+        // Inputs: [f_{c1,p1}^{x}(1), ... , f_{c1, p1}^{x}(4), f_{c1,p2}^{x}(1), ... , f_{c1, p2}^{x}(4), ... ]
+        //          = [f_{c1,p1}^{x}, f_{c1,p2}^{x}, f_{c1,p3}^{x}, ... ]
+        //          = [f_{c1}^{x}, f_{c1}^{y}, f_{c1}^{z}, f_{c2}^{x}, f_{c2}^{y}, f_{c2}^{z}, ... ]
+        //     Given a specific time, we only need to look at one pj (polynomial j) and thus
+        //     one set of columns for each spline.
 
         B = matrix_t::Zero(num_total_states_, num_inputs);
         // --- Linear momentum --- //
-        B.topRows<3>() << matrix_t::Constant(3, num_forces, 1),
-                                    matrix_t::Zero(3, num_inputs - num_forces);
+        // Linear in each force, and each force is linear in its coefficients at each point in time.
+        int idx = input.GetForcePolyIdx(time);
+        int vars_per_spline = input.GetForces().at(0).at(0).GetTotalPolyVars();
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int coord = 0; coord < 3; coord++) {
+                Eigen::Matrix<double, 3, 4> vars_lin = input.GetForcePolyVarsLin(ee, time);
+                B.block<1, Spline::POLY_ORDER>(coord, ee*3*vars_per_spline + coord*vars_per_spline + idx*Spline::POLY_ORDER)
+                        = vars_lin.row(coord);
+            }
+        }
 
         Eigen::Matrix3d Id = Eigen::Matrix3d::Identity();
         // --- Angular momentum --- //
-        for (int i = 0; i < num_ee_; i++) {
-            Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(i));
-            for (int j = 0; j < 3; j++) {
-                B.block<3,1>(3, i*3 + j) =
-                        ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(j)));
-
-//                B.block<3,1>(3, num_forces + i*3 + j) =
-//                        static_cast<Eigen::Vector3d>(Id.col(j)).cross(input.GetForce(i, time));
+        for (int ee = 0; ee < num_ee_; ee++) {
+            Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
+            for (int coord = 0; coord < 3; coord++) {
+                Eigen::Matrix<double, 3, 4> vars_lin = input.GetForcePolyVarsLin(ee, time);
+                for (int poly = 0; poly < Spline::POLY_ORDER; poly++) {
+                    B.block<3, 1>(3, ee*3*vars_per_spline + coord*vars_per_spline + idx*Spline::POLY_ORDER + poly) =
+                            ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(coord, poly);
+                }
             }
         }
 
@@ -138,7 +149,9 @@ namespace mpc {
                 matrix_t::Identity(num_joints_, num_joints_);
 
 
-        // -------- Calculate C ------- //
+        // ------------------------------------------- //
+        // ---------------- Calculate C -------------- //
+        // ------------------------------------------- //
         C = CalcDynamics(state, input, time);
 
         // Discretize with the integrator
@@ -165,7 +178,7 @@ namespace mpc {
         return pin_data_->oMf.at(frame_map_.at(frame)).translation();
     }
 
-    // Note: The MPC state is NOT using a quaternion representation
+    // Note: The MPC state is using a quaternion representation
     int CentroidalModel::GetPinocchioNumConfig() const {
         return pin_model_.nq;
     }
@@ -179,7 +192,7 @@ namespace mpc {
     }
 
     vector_t CentroidalModel::ComputePinocchioVelocities(const vector_t& state, const vector_t& joint_vels,
-                                                         const matrix_t& CMMbinv, const matrix_t& CMMj) {
+                                                         const matrix_t& CMMbinv, const matrix_t& CMMj) const {
         vector_t v_pin(FLOATING_VEL_OFFSET + num_joints_);
 
         v_pin.head<FLOATING_VEL_OFFSET>() = CMMbinv * (state.head<MOMENTUM_OFFSET>() - CMMj*joint_vels);
@@ -193,8 +206,6 @@ namespace mpc {
         vector_t q(pin_model_.nq);
 
         q.head(POS_VARS) = state.segment<POS_VARS>(MOMENTUM_OFFSET);
-//        Eigen::Vector4d quat = ConvertZYXRotToQuaternion(state.segment(3,3));
-//        q.segment(POS_VARS, 4) = quat;
         q.segment<4>(POS_VARS) = state.segment<4>(MOMENTUM_OFFSET + POS_VARS);
         q.tail(num_joints_) = state.tail(num_joints_);
 
