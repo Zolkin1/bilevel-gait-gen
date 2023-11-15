@@ -23,6 +23,10 @@ namespace mpc {
 
         const Inputs& GetInputs() const;
 
+        const std::vector<std::array<Spline, 3>>& GetPositions() const;
+
+        Eigen::Matrix<double, 3, 4> GetPositionsPolyVarsLin(int end_effector, double time) const;
+
         /**
          * Resets all states_ and inputs to 0
          */
@@ -34,6 +38,7 @@ namespace mpc {
     private:
         std::vector<vector_t> states_;
         Inputs inputs_;
+        std::vector<std::array<Spline, 3>> end_effector_pos_;
     };
 } // mpc
 

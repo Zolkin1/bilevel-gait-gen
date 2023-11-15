@@ -6,6 +6,7 @@
 #define BILEVEL_GAIT_GEN_QP_INTERFACE_H
 
 #include "trajectory.h"
+#include "qp_data.h"
 
 namespace mpc {
 
@@ -19,9 +20,9 @@ namespace mpc {
     public:
         QPInterface();
 
-        void SetupQP();
+        virtual void SetupQP(const QPData& data) = 0;
 
-        Trajectory SolveQP;
+        virtual Trajectory Solve() = 0;
     protected:
     private:
 

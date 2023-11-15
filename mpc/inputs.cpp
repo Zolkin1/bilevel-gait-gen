@@ -72,7 +72,13 @@ namespace mpc {
     }
 
     vector_t Inputs::GetVels(double time) const {
+        assert(time >= 0);
+        assert(time <= joint_vels_.size()*node_dt_);
+
         int idx = floor(time/node_dt_); // TODO: Check
+        if (idx == joint_vels_.size()) {
+            idx -= 1;
+        }
         return joint_vels_.at(idx);
     }
 

@@ -47,7 +47,6 @@ namespace mpc {
         discretization_steps_ = discretization_steps;
     }
 
-    // TODO: Need to linearize the inputs in terms of the parameterization
     void CentroidalModel::GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Inputs& input,
                                                              double time, matrix_t& A, matrix_t& B,
                                                              vector_t& C) {
@@ -158,6 +157,24 @@ namespace mpc {
         //A = integrator_->CalcDerivWrtStateSingleStep(state, A);
         //B = integrator_->CalcDerivWrtInputSingleStep(state, B);
 
+    }
+
+    void CentroidalModel::GetFKLinearization(const vector_t& state, const Inputs& input, int end_effector,
+                                                 matrix_t& A, vector_t& C) {
+        vector_t q_pin = ConvertMPCStateToPinocchioState(state);
+        A = matrix_t::Zero(3, pin_model_.nv);
+        C = vector_t::Zero(3);
+
+        pinocchio::computeJointJacobians(pin_model_, *pin_data_, q_pin);
+        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin);
+
+        matrix6x_t J = matrix6x_t::Zero(6, pin_model_.nv);
+        pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_map_.at(frames_.at(end_effector)),
+                                    pinocchio::LOCAL_WORLD_ALIGNED, J);
+
+        A = J.topRows<3>();
+
+        C = GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector));
     }
 
     matrix_t CentroidalModel::GetFKJacobianForEndEffector(const vector_t& q, const std::string& frame, bool compute_jac) {

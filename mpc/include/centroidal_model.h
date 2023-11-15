@@ -22,6 +22,12 @@ namespace mpc {
     class CentroidalModel {
         // Note: I am using tait-bryan z-y-x angles
     public:
+        // Constants
+        static int constexpr FLOATING_BASE_OFFSET = 7;      // 7 for quaternion, 6 for euler
+        static int constexpr FLOATING_VEL_OFFSET = 6;
+        static int constexpr MOMENTUM_OFFSET = 6;
+        static int constexpr POS_VARS = 3;
+
         explicit CentroidalModel(const std::string& robot_urdf, const std::vector<std::string>& frames,
                                  int discretization_steps, double dt);
 
@@ -37,7 +43,8 @@ namespace mpc {
 
         // See computeForwardKinematicsDerivatives
         // Needs to return with the frame transition built in
-        matrix_t GetFKLinearization(const vector_t& state, const vector_t& input);
+        void GetFKLinearization(const vector_t& state, const Inputs& input, int end_effector,
+                                    matrix_t& A, vector_t& C);
 
         matrix_t GetFKJacobianForEndEffector(const vector_t& state, const std::string& frame, bool compute_jac);
 
@@ -61,11 +68,6 @@ namespace mpc {
         // conversion from full state to centroidal state
     protected:
     private:
-        // Constants
-        static int constexpr FLOATING_BASE_OFFSET = 7;      // 7 for quaternion, 6 for euler
-        static int constexpr FLOATING_VEL_OFFSET = 6;
-        static int constexpr MOMENTUM_OFFSET = 6;
-        static int constexpr POS_VARS = 3;
 
         vector_t ComputePinocchioVelocities(const vector_t& state, const vector_t& joint_vels, const matrix_t& CMMbinv,
                                             const matrix_t& CMMj) const;

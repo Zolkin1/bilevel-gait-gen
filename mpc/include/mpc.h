@@ -12,6 +12,7 @@
 #include "centroidal_model.h"
 #include "qp_interface.h"
 #include "trajectory.h"
+#include "qp_data.h"
 
 namespace mpc {
     /**
@@ -39,26 +40,6 @@ namespace mpc {
         MPCInfo(const MPCInfo& info);
     };
 
-    // mpc data, stored as a struct to be cache friendly
-    // - gradients and hessians
-    // - constant terms
-    // - warm start
-    // TODO: is this really the struct I want?
-    struct MPCData {
-        matrix_t dynamics_constraints;
-        vector_t dynamics_constants;
-
-        matrix_t equality_constraints;
-        vector_t equality_constants;
-
-        matrix_t inequality_constraints;
-        vector_t inequality_constants_ub;
-        vector_t inequality_constants_lb;
-
-        matrix_t cost_quadratic;
-        vector_t cost_linear;
-    };
-
     class MPC final {
     public:
         MPC(const MPCInfo& info, const std::string& robot_urdf);
@@ -67,9 +48,18 @@ namespace mpc {
 
         void SetWarmStartTrajectory(const Trajectory& trajectory);
 
-        matrix_t GetCostHessianApprox(const vector_t& state, const vector_t& input);
+        // TODO: Support gauss newton on the cost. For now just accept quadratic cost
+        void SetQuadraticCostTerm(const matrix_t& Q);
 
-        vector_t GetCostGradient(const vector_t& state, const vector_t& input);
+        void SetLinearCostTerm(const vector_t& w);
+
+        // TODO: Use final cost!
+        void SetQuadraticFinalCost(const matrix_t& Phi);
+
+        // TODO: Support gauss newton on the cost. For now just accept quadratic cost
+        void AddHessianApproxCost(const vector_t& state, double time, int node);
+
+        void AddGradientCost(const vector_t& state, double time, int node);
 
         /**
          * Creates a default switching time vector for use in initialization
@@ -83,11 +73,27 @@ namespace mpc {
         // Since we have flat ground and a constant coefficient of friction, we can just make one pyramid
         void SetFrictionPyramid();
 
+        void ResetQPMats();
+
+        void AddDynamicsConstraints(const vector_t& state, double time, int node);
+
+        void AddFKConstraints(const vector_t& state, double time, int node);
+
+        void AddInequalityConstraints(const vector_t& state, double time, int node);
+
+        int GetForceSplineIndex(int end_effector, double time, int coord) const;
+
+        int GetPositionSplineIndex(int end_effector, double time, int coord) const;
+
+        int GetVelocityIndex(int node) const;
+
+        int GetJointIndex(int node) const;
+
         // ---------------- Member Variables ---------------- //
         // Centroidal model
         CentroidalModel model_;
 
-        MPCData data_;
+        QPData data_;
 
         // MPC info
         const MPCInfo info_;
@@ -96,6 +102,8 @@ namespace mpc {
         int equality_constraints_;
         int inequality_constraints_;
         int decision_vars_;
+        int force_spline_vars_;
+        int pos_spline_vars_;
 
         int num_states_;    // number of states in the MPC model, not in the underlying pinocchio model
         int num_inputs_;    // number of inputs in the MPC model, now in the underlying pinocchio model
@@ -103,8 +111,6 @@ namespace mpc {
         int num_ee_;
 
         int force_start_idx_;
-        int pos_start_idx_;
-        int vel_start_idx;
         int com_start_idx_;
         int config_start_idx_;
 
@@ -116,10 +122,15 @@ namespace mpc {
         Eigen::Matrix<double, 4, 3> friction_pyramid_;
 
         // QP Interface
-        //QPInterface qp_solver;
+        std::unique_ptr<QPInterface> qp_solver;
 
         // previous trajectory
         Trajectory prev_traj_;
+
+        // Cost terms
+        matrix_t Q_;
+        vector_t w_;
+        matrix_t Phi_;
 
         // constants
         static int constexpr POS_VARS = 3;

@@ -8,6 +8,7 @@
 #include "spline.h"
 
 using vector_t = Eigen::VectorXd;
+using matrix_t = Eigen::MatrixXd;
 
 Eigen::Vector4d ConvertMujocoQuatToPinocchioQuat(const Eigen::Vector4d& quat) {
     Eigen::Vector4d pin_quat;
@@ -34,7 +35,7 @@ int main() {
     info.ee_frames = config.ParseStdVector<std::string>("collision_frames");
     info.num_switches = config.ParseNumber<int>("num_switches");
     info.integrator_dt = config.ParseNumber<double>("integrator_dt");
-
+    info.num_contacts = info.ee_frames.size();
 
     mpc::MPC mpc(info, config.ParseString("robot_urdf"));
 
@@ -79,6 +80,13 @@ int main() {
     traj.SetInput(input);
 
     mpc.SetWarmStartTrajectory(traj);
+
+    matrix_t Q = matrix_t::Identity(24, 24);
+    vector_t w = vector_t::Zero(24);
+
+    mpc.SetLinearCostTerm(w);
+    mpc.SetQuadraticCostTerm(Q);
+    mpc.SetQuadraticFinalCost(10*Q);
 
     vector_t curr_state(6+7+12);
     curr_state << 1, 0, 0.1,

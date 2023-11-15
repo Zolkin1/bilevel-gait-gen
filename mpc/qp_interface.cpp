@@ -3,3 +3,9 @@
 //
 
 #include "include/qp_interface.h"
+
+namespace mpc {
+
+    QPInterface::QPInterface() {}
+
+} // mpc
