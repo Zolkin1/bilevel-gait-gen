@@ -22,11 +22,11 @@ namespace mpc {
 
         virtual void SetupQP(const QPData& data) = 0;
 
-        virtual Trajectory Solve() = 0;
+        virtual vector_t Solve() = 0;
+
+        virtual vector_t GetInfinity(int size) const;
     protected:
     private:
-
-
     };
 }
 

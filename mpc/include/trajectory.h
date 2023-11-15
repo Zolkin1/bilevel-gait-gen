@@ -27,6 +27,10 @@ namespace mpc {
 
         Eigen::Matrix<double, 3, 4> GetPositionsPolyVarsLin(int end_effector, double time) const;
 
+        void UpdatePosition(int end_effector, int coord, const std::vector<std::array<double, Spline::POLY_ORDER>>& vars);
+
+        void UpdateForce(int end_effector, int coord, const std::vector<std::array<double, Spline::POLY_ORDER>>& vars);
+
         /**
          * Resets all states_ and inputs to 0
          */
@@ -34,6 +38,7 @@ namespace mpc {
 
         void SetState(int idx, const vector_t& state);
         void SetInput(const Inputs& input);
+        void SetInputVels(int idx, const vector_t& joint_vels);
     protected:
     private:
         std::vector<vector_t> states_;

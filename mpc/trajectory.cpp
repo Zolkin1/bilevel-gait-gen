@@ -42,6 +42,16 @@ namespace mpc {
         return vars;
     }
 
+    void Trajectory::UpdatePosition(int end_effector, int coord,
+                                    const std::vector<std::array<double, Spline::POLY_ORDER>>& vars) {
+        end_effector_pos_.at(end_effector).at(coord).SetAllSplineVars(vars);
+    }
+
+    void Trajectory::UpdateForce(int end_effector, int coord,
+                                 const std::vector<std::array<double, Spline::POLY_ORDER>>& vars) {
+        inputs_.UpdateForce(end_effector, coord, vars);
+    }
+
     void Trajectory::Reset() {
 //        assert(states_.size() == inputs_.size() + 1);
 //        for (int i = 0; i < states_.size(); i++) {
@@ -59,6 +69,10 @@ namespace mpc {
 
     void Trajectory::SetInput(const Inputs& input) {
         inputs_ = input;
+    }
+
+    void Trajectory::SetInputVels(int idx, const mpc::vector_t& joint_vels) {
+        inputs_.SetJointVelsNoTime(joint_vels, idx);
     }
 
 } // mpc

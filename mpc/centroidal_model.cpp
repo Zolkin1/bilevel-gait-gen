@@ -154,8 +154,8 @@ namespace mpc {
         C = CalcDynamics(state, input, time);
 
         // Discretize with the integrator
-        //A = integrator_->CalcDerivWrtStateSingleStep(state, A);
-        //B = integrator_->CalcDerivWrtInputSingleStep(state, B);
+        A = integrator_->CalcDerivWrtStateSingleStep(state, A);
+        B = integrator_->CalcDerivWrtInputSingleStep(state, B);
 
     }
 

@@ -13,6 +13,27 @@
 namespace mpc {
     using vector_t = Eigen::VectorXd;
 
+    // 11/15/23: Starting a spline rework
+    /*
+     * Note that the spline should always be continuous. In my case, it will always be a set of nth order polynomials
+     * followed by a constant and so forth.
+     *
+     * The constant is parameterized by a single variable.
+     *
+     * The polynomials are each, say, 4 variables. But due to continuity, for each pair, there will only be 6 free
+     * variables: start:[x0, x0dot] connecting:[x1, x1dot] end:[x2, x2dot] So we have removed two variables.
+     *
+     * Let's examine a stance phase followed by a swing phase. Stance has one: x0. Swing (for 2 polynomials) has 6
+     * nominally, but we have an initial constraint, so it actually has 4 variables. So there are a total of 5.
+     *
+     * Now consider stance, swing, stance. stance (1) + swing (2) + stance (1). Stance has been reduced to 2 (only the
+     * middle position and derivative). If the swing had 3 polynomials then we get an extra 2 variables for a total of 8.
+     *
+     * If we end on a swing then that last end gets a position and derivative.
+     *
+     * So each spline will be made of sections of constants and polynomials.
+     */
+
     /**
      * Spline class.
      * Each continuous parameterization is given by a spline, which is composed of a set of polynomials.
@@ -30,14 +51,14 @@ namespace mpc {
 
         double DerivWrtVars(double time) const;
 
-        void SetPolyVars(double time);
-
         /**
          * Sets the polynomial variables for a given polynomial in the spline.
          * @param poly_num Index of the polynomial to modify
          * @param vars new polynomial variables
          */
         void SetPolyVars(int poly_num, const std::array<double, POLY_ORDER>& vars);
+
+        void SetAllSplineVars(const std::vector<std::array<double, POLY_ORDER>>& vars);
 
         void SetPolyVar(int poly_num, int var_idx);
 

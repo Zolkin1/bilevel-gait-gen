@@ -72,6 +72,9 @@ namespace mpc {
          */
         void SetJointVels(const vector_t& vels, double time);
 
+        // TODO: do better
+        void SetJointVelsNoTime(const vector_t& vels, int index);
+
         /**
          *
          * @return the total number of scalar parameters used to describe the input
@@ -120,9 +123,11 @@ namespace mpc {
          */
         int GetForcePolyIdx(double time) const;
 
+        void UpdateForce(int end_effector, int coord, const std::vector<std::array<double, Spline::POLY_ORDER>>& vars);
     protected:
     private:
         std::vector<std::array<Spline, 3>> forces_;    // We need a spline for each coordinate of each end effector
+        // TODO: remove positions
         std::vector<std::array<Spline, 3>> positions_;
         std::vector<vector_t> joint_vels_;      // These are discrete, ZOH velocities.
         double node_dt_;

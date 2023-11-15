@@ -52,7 +52,15 @@ namespace mpc {
         poly_vars_.at(poly_num) = vars;
     }
 
-    // Time between 0 and 1
+    void Spline::SetAllSplineVars(const std::vector<std::array<double, POLY_ORDER>>& vars) {
+        if (vars.size() != poly_vars_.size()) {
+            throw std::runtime_error("Not enough polynomial sections provided.");
+        }
+
+        poly_vars_ = vars;
+    }
+
+    // Time between 0 and DT
     double Spline::EvalPoly(const std::array<double, POLY_ORDER>& poly_vals, double time, double DeltaT) {
         double a2 = -(1/pow(DeltaT, 2))*3*(poly_vals.at(0) - poly_vals.at(1)) -
                 (1/DeltaT)*(2*poly_vals.at(2) + poly_vals.at(3));

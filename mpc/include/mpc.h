@@ -83,11 +83,21 @@ namespace mpc {
 
         int GetForceSplineIndex(int end_effector, double time, int coord) const;
 
+        // TODO: Do this better
+        int GetForceSplineIndexNoTime(int end_effector, int idx, int coord) const;
+
         int GetPositionSplineIndex(int end_effector, double time, int coord) const;
+
+        // TODO: Do this better
+        int GetPositionSplineIndexNoTime(int end_effector, int idx, int coord) const;
 
         int GetVelocityIndex(int node) const;
 
         int GetJointIndex(int node) const;
+
+        Trajectory ConvertQPSolToTrajectory(const vector_t& qp_sol, const vector_t& init_state) const;
+
+        void EnforceFootSlipAndForceAtADistance();
 
         // ---------------- Member Variables ---------------- //
         // Centroidal model
@@ -98,21 +108,13 @@ namespace mpc {
         // MPC info
         const MPCInfo info_;
 
-        int dynamics_constraints_;
-        int equality_constraints_;
-        int inequality_constraints_;
-        int decision_vars_;
         int force_spline_vars_;
         int pos_spline_vars_;
 
         int num_states_;    // number of states in the MPC model, not in the underlying pinocchio model
-        int num_inputs_;    // number of inputs in the MPC model, now in the underlying pinocchio model
         int num_joints_;
         int num_ee_;
 
-        int force_start_idx_;
-        int com_start_idx_;
-        int config_start_idx_;
 
         // force parameterization
 

@@ -17,19 +17,22 @@ namespace mpc {
 
         void SetupQP(const QPData& data) override;
 
-        Trajectory Solve() override;
+        vector_t Solve() override;
+
+        vector_t GetInfinity(int size) const override;
     protected:
     private:
         // TODO: write
-        matrix_t ConvertDataToOSQPConstraintMat(const QPData& data);
-        vector_t ConvertDataToOSQPlb(const QPData& data);
-        vector_t ConvertDataToOSQPub(const QPData& data);
+        void ConvertDataToOSQPConstraints(const QPData& data);
 
-        matrix_t ConvertDataToOSQPCostMat(const QPData& data);
-        matrix_t ConvertDataToOSQPCostVec(const QPData& data);
+        void ConvertDataToOSQPCost(const QPData& data);
 
         // QP Solver
         OsqpEigen::Solver qp_solver_;
+
+        // OSQP specific vectors and matricies
+        matrix_t A_, P_;
+        vector_t lb_, ub_, w_;
     };
 } // mpc
 

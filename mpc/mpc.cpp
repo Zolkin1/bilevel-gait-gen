@@ -2,7 +2,10 @@
 // Copyright (c) 2023 Zachary Olkin. All rights reserved.
 //
 
-#include "include/mpc.h"
+#include <array>
+
+#include "mpc.h"
+#include "osqp_interface.h"
 
 namespace mpc {
 
@@ -46,19 +49,16 @@ namespace mpc {
         // --------------------------------- //
 
         // state vector: [lcom, kcom, qb, q0, ..., qnj]
-        com_start_idx_ = 0;
-        config_start_idx_ = 6;
-
         // input vector: [f1, ..., fnee, v0, ..., vnj]. Note each f is a set of 3 splines.
-        force_start_idx_ = 0;
-        num_inputs_ = prev_traj_.GetInputs().GetInputVector(0).size();
 
         force_spline_vars_ = num_ee_ * 3 * prev_traj_.GetInputs().GetForces().at(0).at(0).GetTotalPolyVars();
         pos_spline_vars_ = num_ee_*3*prev_traj_.GetPositions().at(0).at(0).GetTotalPolyVars();
-        decision_vars_ = info_.num_nodes*(num_states_ + num_joints_) + force_spline_vars_ + pos_spline_vars_;
-        dynamics_constraints_ = (info_.num_nodes+1)*num_states_;
-        equality_constraints_ = info_.num_nodes*POS_VARS*num_ee_;
-        inequality_constraints_ = info_.num_nodes*(4*num_ee_ + 2*num_joints_);
+        data_.num_decision_vars = info_.num_nodes*(num_states_ + num_joints_) + force_spline_vars_ + pos_spline_vars_;
+        data_.num_dynamics_constraints = (info_.num_nodes+1)*num_states_;
+        data_.num_equality_constraints = info_.num_nodes*POS_VARS*num_ee_;
+        data_.num_inequality_constraints = info_.num_nodes*(4*num_ee_ + 2*num_joints_);
+
+        qp_solver = std::make_unique<OSQPInterface>();
 
         SetFrictionPyramid();
     }
@@ -78,7 +78,11 @@ namespace mpc {
         data_.dynamics_constants.head(num_states_) =
                 -CentroidalModel::ConvertManifoldStateToAlgebraState(centroidal_state, centroidal_state);
 
-        int total_spline_vars = num_ee_ * 3 * prev_traj_.GetInputs().GetForces().at(0).at(0).GetTotalPolyVars();
+
+        // TODO: Enforce no foot slide and no force at a distance.
+        // Two options:
+        //  1. Enforce equality constraints for certain variables. Probably easiest.
+        //  2. Remove certain variables from the decision vector. Harder, but def the correct way in general.
 
         matrix_t G;
         vector_t g;
@@ -98,197 +102,21 @@ namespace mpc {
             AddGradientCost(centroidal_state, time, i);
         }
 
+        // TODO: look into doing this better
+        EnforceFootSlipAndForceAtADistance();
+
         qp_solver->SetupQP(data_);
-        qp_solver->Solve();
+        vector_t sol = qp_solver->Solve();
 
-//        std::cout << "Solution: " << sol << std::endl;
+        // TODO: Did I just compute a dx or a new x?
+        // I believe I calculated x
+        // So if I want to take a smaller step, I can recover dx. Should probably check this.
 
+        prev_traj_ = ConvertQPSolToTrajectory(sol, centroidal_state);
 
-        // TODO: Convert back to manifold valued.
-
-//        std::cout << "Dynamics constraints: \n" << data_.dynamics_constraints << std::endl;
-
-//        std::cout << "A: \n" << A << std::endl;
-//        std::cout << "B: \n" << B << std::endl;
-//        std::cout << "C: \n" << C << std::endl;
-//
-//        // xbar, ubar = prev_traj
-//
-//        // modify the state
-//        vector_t state = prev_traj_.GetStates().at(0);
-//        vector_t xbar = CentroidalModel::ConvertManifoldStateToAlgebraState(state, centroidal_state);
-//        for (int i = 0; i < state.size(); i++) {
-//            if (i < 6) {
-//                state(i) += 0.1;
-//            } else if (i > 11) {
-//                state(i) += 0.01;
-//            }
-//        }
-//
-//        // Modify the inputs
-//        auto switching_times = mpc::MPC::CreateDefaultSwitchingTimes(info_.num_switches, 4, info_.time_horizon);
-//        Inputs input_new(prev_traj_.GetInputs());
-//        std::array<mpc::Spline, 3> forces = {mpc::Spline(2, switching_times.at(0), true), mpc::Spline(2, switching_times.at(0), true),
-//                                             mpc::Spline(2, switching_times.at(0), true)};
-//        std::array<double, 4> vars = {1.1, 1.1, 0, 0};
-//        for (int coord = 0; coord < 3; coord++) {
-//            for (int poly = 0; poly < input_new.GetForces().at(0).at(0).GetTotalPoly(); poly++) {
-//                forces.at(coord).SetPolyVars(poly, vars);
-//            }
-//        }
-//
-//        for (int i = 0; i < num_ee_; i++) {
-//            input_new.SetEndEffectorForce(i, forces);
-//        }
-//
-//        vector_t joint_vels(num_joints_);
-//        joint_vels << .1,0,0, 0,.2,.3, 0,.1,.1, .4,.5,.1;
-//        input_new.SetJointVels(joint_vels, 0.1);
-//
-//        vector_t state_alg = CentroidalModel::ConvertManifoldStateToAlgebraState(state, centroidal_state);
-//
-//        vector_t xdot_true = model_.CalcDynamics(state, input_new, 0.1);
-//        vector_t xdot_approx = A*(state_alg - xbar) +
-//                B*(input_new.GetInputVector(0.1) - prev_traj_.GetInputs().GetInputVector(0.1)) + C;
-//
-//        std::cout << "xdot true: \n" << xdot_true << std::endl;
-//        std::cout << "xdot approx: \n" << xdot_approx << std::endl;
-//
-//        matrix_t fk_lin;
-//        vector_t fk_constant;
-//        model_.GetFKLinearization(centroidal_state, prev_traj_.GetInputs(), 0, fk_lin, fk_constant);
-//
-//        std::cout << "FK linearization: \n" << fk_lin << std::endl;
-//        std::cout << "FK constant term: \n" << fk_constant <<std::endl;
-
-//        for (int i = 0; i < info_->num_nodes; i++) {
-//            // Get linear dynamics at each time node
-//            matrix_t A = model_.GetLinearDiscreteDynamicsState(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-//            matrix_t B = model_.GetLinearDiscreteDynamicsInput(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-//            vector_t C = model_.GetConstantDiscreteDynamics(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-//
-//            // Update dynamics equality constraint
-//            data_.dynamics_constraints.block(i*num_states_ + num_states_, i*(num_states_+num_inputs_),
-//                                             num_states_, num_states_) = A;
-//            data_.dynamics_constraints.block(i*num_states_ + num_states_, i*(num_states_+num_inputs_) + num_states_,
-//                                             num_states_, num_inputs_) = B;
-//            data_.dynamics_constraints.block(i*num_states_ + num_states_, num_states_ + num_inputs_,
-//                                             num_states_, num_states_) = -matrix_t::Identity(num_states_, num_states_);
-//            data_.dynamics_constants.segment(i*num_states_ + num_states_, num_states_) = C;
-//
-//
-//            // Need to add for each end effector
-//            for (int j = 0; j < num_ee_; j++) {
-//                // Get linearization of FK at each time node
-//                matrix_t G = model_.GetFKLinearization(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-//                data_.equality_constraints.block(i * POS_VARS * num_ee_ + j * POS_VARS, i * (num_states_ + num_inputs_),
-//                                                 POS_VARS, num_states_) = G;
-//
-//                vector_t g = model_.GetFK(prev_traj_.states_.at(i));
-//                data_.equality_constants.segment(i * POS_VARS * num_ee_ + j * POS_VARS, POS_VARS) = g;
-//            }
-//            data_.equality_constraints.block(i * POS_VARS * num_ee_,
-//                                             i * (num_states_ + num_inputs_) + num_states_ + pos_start_idx_,
-//                                             POS_VARS*num_ee_,
-//                                             num_inputs_) = matrix_t::Identity(POS_VARS*num_ee_, POS_VARS*num_ee_);
-//
-//            // Inequality constraints
-//            // TODO: For now these are all constant, so I don't need to re-calc each time
-//            // Friction cone constraints can be enforced at all times (because even 0 force is in the cone). Might
-//            // want to be careful with the numerical instabilities doing that.
-//            data_.inequality_constraints.block(i*(4*num_ee_ + 2*num_joints_),
-//                                               i*(num_inputs_ + num_states_) + num_states_ + force_start_idx_,
-//                                               4*num_ee_, num_ee_) = friction_pyramid_;
-//            data_.inequality_constants_ub.segment(i*(4*num_ee_ + 2*num_joints_), 4*num_ee_) = vector_t::Zero(4*num_ee_);
-//
-//            // Velocity bounds
-//            data_.inequality_constants_ub.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
-//                                                  num_joints_) = info_->vel_bounds;
-//            data_.inequality_constants_lb.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
-//                                                  num_joints_) = -info_->vel_bounds;
-//            data_.inequality_constraints.block(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
-//                                               i*(num_inputs_ + num_states_) + num_states_ + vel_start_idx,
-//                                               num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
-//
-//            // Configuration bounds
-//            data_.inequality_constants_ub.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
-//                                                 num_joints_) = info_->joint_bounds;
-//            data_.inequality_constants_lb.segment(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
-//                                                  num_joints_) = -info_->joint_bounds;
-//            data_.inequality_constraints.block(i*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
-//                                               i*(num_inputs_ + num_states_) + pos_start_idx_,
-//                                               num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
-//
-//
-//            // Get hessian approx of discrete cost function (generalized gauss newton)
-//            matrix_t J = GetCostHessianApprox(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-//            data_.cost_quadratic.block(i*(num_states_ + num_inputs_), i*(num_states_ + num_inputs_),
-//                                       num_states_ + num_inputs_, num_states_ + num_inputs_) = J;
-//
-//
-//            // Get gradient of discrete cost function
-//            vector_t w = GetCostGradient(prev_traj_.states_.at(i), prev_traj_.inputs_.at(i));
-//            data_.cost_linear.segment(i*(num_states_ + num_inputs_), num_states_ + num_inputs_) = w;
-//        }
-//
-//        // TODO: potentially search only null space of other equality constraint
-//
-//        // Setup QP
-//        qp_solver.SetupQP(data_);
-//
-//        // solve qp
-//        prev_traj_ = qp_solver.SolveQP();
+//        std::cout << "Solution: \n" << sol << std::endl;
 
         return prev_traj_;
-
-        // --------------------------------------------------------------- //
-        // ---------------------- At each time node: --------------------- //
-        // --------------------------------------------------------------- //
-
-        // ---------------- Dynamics equality constraints ---------------- //
-        // Get discrete centroidal dynamics
-
-        // ------------------ Other equality constraints ----------------- //
-        // foot position input = forward kinematics of the joints at each point
-
-        // -------------------- Inequality constraints ------------------- //
-        // Joint velocity constraints (not sure if I need these)
-        // Joint angle constraints
-        // Friction cone constraints
-
-        // ---------------------- Cost function ------------------------- //
-        // Get discrete cost function
-
-        // ---------------- Form lagrangian ---------------- //
-
-        // ---------------- Gradient and Hessian approx of lagrangian ---------------- //
-        // Note: these need to happen at each node independetly (I believe), so can potentially compute in parallel
-        // Get linearization of discrete centroidal dynamics
-        // Linearization of other equality constraints
-        // Linearization of inequality constraints
-
-        // ---------------- QP Solve ---------------- //
-        // Update QP solver
-        // Solve
-
-        // line search?
-
-
-        // Concise:
-        // Initial conditions
-        // Get linear dynamics at each time node
-        // Get linearization of FK at each time node
-        // Velocity constraints assumed polytopic and constant over time
-        // Joint constraints assumed polytopic and constant over time
-        // Friction pyramids are used
-        // Get hessian approx of discrete cost function (generalized gauss newton)
-        // Get gradient of discrete cost function
-        // Contribution of constraints to the hessian may need to be ignored
-        // Potentially search only in the null space of the fk constraint
-        // Setup QP
-        // Solve QP (to completion?)
-
-
     }
 
     void MPC::SetWarmStartTrajectory(const mpc::Trajectory &trajectory) {
@@ -332,18 +160,18 @@ namespace mpc {
     }
 
     void MPC::ResetQPMats() {
-        data_.dynamics_constraints = matrix_t::Zero(dynamics_constraints_, decision_vars_);
-        data_.dynamics_constants = vector_t::Zero(dynamics_constraints_);
+        data_.dynamics_constraints = matrix_t::Zero(data_.num_dynamics_constraints, data_.num_decision_vars);
+        data_.dynamics_constants = vector_t::Zero(data_.num_dynamics_constraints);
 
-        data_.equality_constraints = matrix_t::Zero(equality_constraints_, decision_vars_);
-        data_.equality_constants = vector_t::Zero(equality_constraints_);
+        data_.equality_constraints = matrix_t::Zero(data_.num_equality_constraints, data_.num_decision_vars);
+        data_.equality_constants = vector_t::Zero(data_.num_equality_constraints);
 
-        data_.inequality_constraints = matrix_t::Zero(inequality_constraints_, decision_vars_);
-        data_.inequality_constants_ub = vector_t::Zero(inequality_constraints_);
-        data_.inequality_constants_lb = vector_t::Zero(inequality_constraints_);
+        data_.inequality_constraints = matrix_t::Zero(data_.num_inequality_constraints, data_.num_decision_vars);
+        data_.inequality_constants_ub = vector_t::Zero(data_.num_inequality_constraints);
+        data_.inequality_constants_lb = vector_t::Zero(data_.num_inequality_constraints);
 
-        data_.cost_quadratic = matrix_t::Zero(decision_vars_, decision_vars_);
-        data_.cost_linear = vector_t::Zero(decision_vars_);
+        data_.cost_quadratic = matrix_t::Zero(data_.num_decision_vars, data_.num_decision_vars);
+        data_.cost_linear = vector_t::Zero(data_.num_decision_vars);
     }
 
     void MPC::AddDynamicsConstraints(const vector_t& state, double time, int node) {
@@ -409,7 +237,7 @@ namespace mpc {
             }
         }
         data_.inequality_constants_ub.segment(node*(4*num_ee_ + 2*num_joints_), 4*num_ee_) = vector_t::Zero(4*num_ee_);
-        // TODO: put negative infinity in here for the lb
+        data_.inequality_constants_lb.segment(node*(4*num_ee_ + 2*num_joints_), 4*num_ee_) = -qp_solver->GetInfinity(4*num_ee_);
 
 
         // Velocity bounds
@@ -465,6 +293,15 @@ namespace mpc {
                     idx_into_poly*Spline::POLY_ORDER;
     }
 
+    int MPC::GetForceSplineIndexNoTime(int end_effector, int idx, int coord) const {
+        int num_spline_vars_before = end_effector*POS_VARS*
+                                     prev_traj_.GetInputs().GetForces().at(end_effector).at(coord).GetTotalPolyVars();
+        int idx_into_spline_vars = coord*prev_traj_.GetInputs().GetForces().at(end_effector).at(coord).GetTotalPolyVars();
+
+        return info_.num_nodes * num_states_ + num_spline_vars_before + idx_into_spline_vars +
+               idx*Spline::POLY_ORDER;
+    }
+
     int MPC::GetPositionSplineIndex(int end_effector, double time, int coord) const {
         int num_spline_vars_before = end_effector*POS_VARS*
                                      prev_traj_.GetPositions().at(end_effector).at(coord).GetTotalPolyVars();
@@ -475,12 +312,89 @@ namespace mpc {
                 + num_spline_vars_before + idx_into_spline_vars + idx_into_poly*Spline::POLY_ORDER;
     }
 
+    int MPC::GetPositionSplineIndexNoTime(int end_effector, int idx, int coord) const {
+        int num_spline_vars_before = end_effector*POS_VARS*
+                                     prev_traj_.GetPositions().at(end_effector).at(coord).GetTotalPolyVars();
+        int idx_into_spline_vars = coord*prev_traj_.GetPositions().at(end_effector).at(coord).GetTotalPolyVars();
+
+        return info_.num_nodes * num_states_ + force_spline_vars_ + info_.num_nodes*num_joints_
+               + num_spline_vars_before + idx_into_spline_vars + idx*Spline::POLY_ORDER;
+    }
+
     int MPC::GetVelocityIndex(int node) const {
         return info_.num_nodes * num_states_ + force_spline_vars_ + node*num_joints_;
     }
 
     int MPC::GetJointIndex(int node) const {
         return node * num_states_ + CentroidalModel::FLOATING_VEL_OFFSET;
+    }
+
+    Trajectory MPC::ConvertQPSolToTrajectory(const vector_t& qp_sol, const vector_t& init_state) const {
+        // Start by copying the current trajectory to keep the switching times and what not
+        Trajectory traj(prev_traj_);
+
+        // Assign all the spline information
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                std::vector<std::array<double, Spline::POLY_ORDER>> pos_vars;
+                std::vector<std::array<double, Spline::POLY_ORDER>> force_vars;
+
+                std::array<double, Spline::POLY_ORDER> pos_poly{};
+                std::array<double, Spline::POLY_ORDER> force_poly{};
+
+                // Form position spline
+                for (int sp_idx = 0; sp_idx < prev_traj_.GetPositions().at(ee).at(coord).GetTotalPoly(); sp_idx++) {
+                    // TODO: probably a better way to do this
+                    for (int poly = 0; poly < Spline::POLY_ORDER; poly++) {
+                        pos_poly.at(poly) = qp_sol.segment(GetPositionSplineIndexNoTime(ee, sp_idx, coord),
+                                                           Spline::POLY_ORDER)(poly);
+                    }
+                    pos_vars.push_back(pos_poly);
+                }
+
+                // Form force spline
+                for (int sp_idx = 0; sp_idx < prev_traj_.GetInputs().GetForces().at(ee).at(coord).GetTotalPoly(); sp_idx++) {
+                    // TODO: probably a better way to do this
+                    for (int poly = 0; poly < Spline::POLY_ORDER; poly++) {
+                        force_poly.at(poly) = qp_sol.segment(GetForceSplineIndexNoTime(ee, sp_idx, coord),
+                                                             Spline::POLY_ORDER)(poly);
+                    }
+                    force_vars.push_back(force_poly);
+                }
+
+                traj.UpdatePosition(ee, coord, pos_vars);
+                traj.UpdateForce(ee, coord, force_vars);
+            }
+        }
+
+        // Set states and joint vels
+        for (int node = 0; node < info_.num_nodes; node++) {
+            // Need to convert the state back to the manifold valued state
+            vector_t man_state = CentroidalModel::ConvertAlgebraStateToManifoldState(
+                    qp_sol.segment(node*num_states_, num_states_), init_state);
+            traj.SetState(node, man_state);
+            traj.SetInputVels(node, qp_sol.segment(GetVelocityIndex(node), num_joints_));
+        }
+
+        return traj;
+    }
+
+    void MPC::EnforceFootSlipAndForceAtADistance() {
+        // Go through each end effector
+        // Grab the polynomials that correspond to constraints
+        // Remove from the decision variables and constraints
+
+        // For now, consider just enforcing equality constraints
+        // i.e. when the ee is not in contact: f_ee(t) = {0,0,0,0}
+        // when in contact: p_ee(t) = {k,k,0,0}
+
+        // Note:
+        // - Position polynomials during contact can be collapsed to a single decision variable (i.e. pos in each coord)
+        // - z position is restricted to 0 in contact
+        // - The surrounding polynomials need to have their derivative and end points match the next ones. This is true
+        // for ALL polynomials. Can remove a lot of variables.
+        // - May want to consider enforcing a swing height constraints
+        // - During flight phase we should be able to completely remove its effect TBD on details
     }
 
 } // mpc

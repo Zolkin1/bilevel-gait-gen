@@ -107,6 +107,10 @@ namespace mpc {
         joint_vels_.at(idx) = vels;
     }
 
+    void Inputs::SetJointVelsNoTime(const mpc::vector_t& vels, int index) {
+        joint_vels_.at(index) = vels;
+    }
+
     int Inputs::GetNumInputs() const {
         return 3*forces_.size()*forces_.at(0).at(0).GetTotalPolyVars() + joint_vels_.at(0).size();
     }
@@ -158,6 +162,11 @@ namespace mpc {
 
     int Inputs::GetForcePolyIdx(double time) const {
         return forces_.at(0).at(0).GetPolyIdx(time);
+    }
+
+    void Inputs::UpdateForce(int end_effector, int coord,
+                             const std::vector<std::array<double, Spline::POLY_ORDER>>& vars) {
+        forces_.at(end_effector).at(coord).SetAllSplineVars(vars);
     }
 
 }

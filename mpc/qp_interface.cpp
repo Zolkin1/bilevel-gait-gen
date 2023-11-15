@@ -8,4 +8,10 @@ namespace mpc {
 
     QPInterface::QPInterface() {}
 
+    vector_t QPInterface::GetInfinity(int size) const {
+        vector_t infty = vector_t::Constant(size, 1e30);
+
+        return infty;
+    }
+
 } // mpc

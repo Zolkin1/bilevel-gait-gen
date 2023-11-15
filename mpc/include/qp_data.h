@@ -31,6 +31,11 @@ namespace mpc {
 
         matrix_t cost_quadratic;
         vector_t cost_linear;
+
+        int num_dynamics_constraints;
+        int num_equality_constraints;
+        int num_inequality_constraints;
+        int num_decision_vars;
     };
 } // mpc
 
