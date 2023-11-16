@@ -71,3 +71,5 @@ TEST_CASE("transformations", "[mpc][utils]") {
         REQUIRE_THAT(quat_sol(i), WithinAbs(quat(i), MARGIN));
     }
 }
+
+// TODO: Write a spline test

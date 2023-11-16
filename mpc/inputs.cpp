@@ -151,14 +151,14 @@ namespace mpc {
         return joint_vels_;
     }
 
-    Eigen::Matrix<double, 3, 4> Inputs::GetForcePolyVarsLin(int end_effector, double time) const {
-        Eigen::Matrix<double, 3, 4> vars = Eigen::Matrix<double, 3, 4>::Zero();
-        for (int coord = 0; coord < 3; coord++) {
-            vars.row(coord) = forces_.at(end_effector).at(coord).GetPolyVarsLin(time);
-        }
-
-        return vars;
-    }
+//    Eigen::Matrix<double, 3, 4> Inputs::GetForcePolyVarsLin(int end_effector, double time) const {
+//        Eigen::Matrix<double, 3, 4> vars = Eigen::Matrix<double, 3, 4>::Zero();
+//        for (int coord = 0; coord < 3; coord++) {
+//            vars.row(coord) = forces_.at(end_effector).at(coord).GetPolyVarsLin(time);
+//        }
+//
+//        return vars;
+//    }
 
     int Inputs::GetForcePolyIdx(double time) const {
         return forces_.at(0).at(0).GetPolyIdx(time);

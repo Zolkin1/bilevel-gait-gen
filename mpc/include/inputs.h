@@ -114,7 +114,7 @@ namespace mpc {
          * @param time the time to linearize at.
          * @return Matrix of linearization coefficients.
          */
-        Eigen::Matrix<double, 3, 4> GetForcePolyVarsLin(int end_effector, double time) const;
+//        Eigen::Matrix<double, 3, 4> GetForcePolyVarsLin(int end_effector, double time) const;
 
         /**
          * Gets the index of the polynomial in the force vector for a given time.

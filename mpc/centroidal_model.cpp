@@ -113,15 +113,19 @@ namespace mpc {
         //     one set of columns for each spline.
 
         B = matrix_t::Zero(num_total_states_, num_inputs);
+        // TODO: Need to index these properly so they are getting the correct dependence.
+        // TODO: Make sure to consider the overalpping variables, i.e. it shouldn't always shift
         // --- Linear momentum --- //
         // Linear in each force, and each force is linear in its coefficients at each point in time.
         int idx = input.GetForcePolyIdx(time);
-        int vars_per_spline = input.GetForces().at(0).at(0).GetTotalPolyVars();
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int coord = 0; coord < 3; coord++) {
-                Eigen::Matrix<double, 3, 4> vars_lin = input.GetForcePolyVarsLin(ee, time);
-                B.block<1, Spline::POLY_ORDER>(coord, ee*3*vars_per_spline + coord*vars_per_spline + idx*Spline::POLY_ORDER)
-                        = vars_lin.row(coord);
+                int vars_per_spline = input.GetForces().at(ee).at(coord).GetTotalPolyVars();
+
+                vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
+
+                B.block(coord, ee*3*vars_per_spline + coord*vars_per_spline + NOT RIGHT:idx*Spline::POLY_ORDER,
+                        1, vars_lin.size()) = vars_lin.transpose();
             }
         }
 
@@ -130,10 +134,13 @@ namespace mpc {
         for (int ee = 0; ee < num_ee_; ee++) {
             Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
             for (int coord = 0; coord < 3; coord++) {
-                Eigen::Matrix<double, 3, 4> vars_lin = input.GetForcePolyVarsLin(ee, time);
-                for (int poly = 0; poly < Spline::POLY_ORDER; poly++) {
-                    B.block<3, 1>(3, ee*3*vars_per_spline + coord*vars_per_spline + idx*Spline::POLY_ORDER + poly) =
-                            ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(coord, poly);
+                int vars_per_spline = input.GetForces().at(ee).at(coord).GetTotalPolyVars();
+
+                vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
+
+                for (int poly = 0; poly < vars_lin.size(); poly++) {
+                    B.block(3, ee*3*vars_per_spline + coord*vars_per_spline + NOT_RIGHT:idx*Spline::POLY_ORDER + poly,
+                            3, 1) = ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
                 }
             }
         }

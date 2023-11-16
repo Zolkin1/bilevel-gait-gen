@@ -32,6 +32,8 @@ namespace mpc {
      * If we end on a swing then that last end gets a position and derivative.
      *
      * So each spline will be made of sections of constants and polynomials.
+     *
+     * Note: assumes that the polynomials in between the constants are made up of at least 2 polynomials
      */
 
     /**
@@ -43,6 +45,16 @@ namespace mpc {
     public:
         static int constexpr POLY_ORDER = 4;    // actually a cubic
 
+        /**
+         *
+         * Note that the times is the times between constant and non-constant polynomials.
+         * Need to convert this to times for each individual polynomial. Will do this by
+         * evenly splitting the space.
+         *
+         * @param num_polys number of polynomials between each constant polynomial
+         * @param times times to switch between constant and non-constant polynomials
+         * @param start_on_poly false if we start on a constant polynomial
+         */
         Spline(int num_polys, const std::vector<double>& times, bool start_on_poly);
 
         double ValueAt(double time) const;
@@ -56,14 +68,15 @@ namespace mpc {
          * @param poly_num Index of the polynomial to modify
          * @param vars new polynomial variables
          */
-        void SetPolyVars(int poly_num, const std::array<double, POLY_ORDER>& vars);
+        void SetPolyVars(int poly_num, const std::vector<double>& vars);
 
-        void SetAllSplineVars(const std::vector<std::array<double, POLY_ORDER>>& vars);
+        void SetAllSplineVars(const std::vector<std::vector<double>>& vars);
 
         void SetPolyVar(int poly_num, int var_idx);
 
         /**
-         *
+         * Note that this function returns the minimum number of variables used to describe
+         * the spline. i.e. all the constant polynomial sections are collapsed to one variable.
          * @return The total number of scalars used to describe the spline.
          */
         int GetTotalPolyVars() const;
@@ -79,10 +92,10 @@ namespace mpc {
          * @param time the time at which to evaluate the spline for its variables
          * @return The scalar variables used to describe this portion of the spline.
          */
-        Eigen::Vector<double, POLY_ORDER> GetPolyVars(double time) const;
+        std::vector<double> GetPolyVars(double time) const;
 
         /**
-         *
+         * Note that this will return one number per constant, as opposed to the internal representation using 2.
          * @return a vector of all the scalar variables used to describe the spline.
          */
         vector_t GetAllPolyVars() const;
@@ -92,7 +105,7 @@ namespace mpc {
          * @param time to query the spline at
          * @return Vector of coefficients of the polynomial variables
          */
-        Eigen::Vector<double, POLY_ORDER> GetPolyVarsLin(double time) const;
+        vector_t GetPolyVarsLin(double time) const;
 
         /**
          * Given a time, gets the index for the associated polynomial.
@@ -100,20 +113,37 @@ namespace mpc {
          * @return index of the associated polynomial
          */
         int GetPolyIdx(double time) const;
+
     protected:
     private:
+        bool IsConstantPoly(int idx) const;
 
         // Time should be [0, DeltaT]
-        static double EvalPoly(const std::array<double, POLY_ORDER>& poly_vals, double time, double DeltaT);
+        static double EvalPoly(const std::vector<double>& vars, double time, double DeltaT);
 
-        static std::array<double, POLY_ORDER> constexpr ZERO_POLY = {0, 0, 0, 0};
+        std::vector<double> const ZERO_CONSTANT;
 
-        std::vector<std::array<double, POLY_ORDER>> poly_vars_;   // All the variables that define each polynomial
-        // The poly vals are: x0, x0dot, x1, x1dot. DeltaT is determined by the switching times
+        std::vector<double> const ZERO_POLY;
+
+        /*
+         * Holds all the information to re-construct the spline values.
+         * This has the same length as poly_times_. Each element of the out vector holds a vector of the
+         * variables that describe the polynomials. Note that constant polynomials still have two values to
+         * describe them even though they only need one.
+         */
+        std::vector<std::vector<double>> poly_vars_;   // All the variables that define each polynomial
 
         std::vector<double> poly_times_;    // The start and end of each polynomial
 
         int total_poly_;
+
+        bool start_on_constant_;
+
+        int num_constant_;
+
+        int num_polys_;
+
+        int num_all_poly_vars;
     };
 } // mpc
 
