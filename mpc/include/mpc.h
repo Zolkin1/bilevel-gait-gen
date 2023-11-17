@@ -81,16 +81,6 @@ namespace mpc {
 
         void AddInequalityConstraints(const vector_t& state, double time, int node);
 
-        int GetForceSplineIndex(int end_effector, double time, int coord) const;
-
-        // TODO: Do this better
-        int GetForceSplineIndexNoTime(int end_effector, int idx, int coord) const;
-
-        int GetPositionSplineIndex(int end_effector, double time, int coord) const;
-
-        // TODO: Do this better
-        int GetPositionSplineIndexNoTime(int end_effector, int idx, int coord) const;
-
         int GetVelocityIndex(int node) const;
 
         int GetJointIndex(int node) const;
@@ -107,9 +97,6 @@ namespace mpc {
 
         // MPC info
         const MPCInfo info_;
-
-        int force_spline_vars_;
-        int pos_spline_vars_;
 
         int num_states_;    // number of states in the MPC model, not in the underlying pinocchio model
         int num_joints_;

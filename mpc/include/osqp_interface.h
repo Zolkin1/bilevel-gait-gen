@@ -22,7 +22,6 @@ namespace mpc {
         vector_t GetInfinity(int size) const override;
     protected:
     private:
-        // TODO: write
         void ConvertDataToOSQPConstraints(const QPData& data);
 
         void ConvertDataToOSQPCost(const QPData& data);

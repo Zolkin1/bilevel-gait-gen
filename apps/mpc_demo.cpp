@@ -56,21 +56,30 @@ int main() {
     mpc::Inputs input(switching_times, config.ParseEigenVector("init_config").size() + 6 - 13,
                       info.num_nodes, info.time_horizon/info.num_nodes);
 
+    // Make the same force for each ee to ease of testing right now
     std::array<mpc::Spline, 3> forces = {mpc::Spline(2, switching_times.at(0), true), mpc::Spline(2, switching_times.at(0), true),
                                          mpc::Spline(2, switching_times.at(0), true)};
     std::array<mpc::Spline, 3> positions = {mpc::Spline(2, switching_times.at(0), false), mpc::Spline(2, switching_times.at(0), false),
                                          mpc::Spline(2, switching_times.at(0), false)};
 
     // For the test just make everything constant, non-zero
-    std::array<double, 4> vars = {1, 1, 0, 0};
-    for (int coord = 0; coord < 3; coord++) {
-        for (int poly = 0; poly < input.GetForces().at(0).at(0).GetTotalPoly(); poly++) {
-            forces.at(coord).SetPolyVars(poly, vars);
-        }
+    for (int ee = 0; ee < 4; ee++) {
+        for (int coord = 0; coord < 3; coord++) {
+            for (int poly = 0; poly < input.GetForces().at(ee).at(coord).GetNumPolyTimes(); poly++) {
+                std::vector<double> vars(input.GetForces().at(ee).at(coord).GetNumPolyVars(poly));
+                vars.at(0) = 1;
+                if (vars.size() == 2) {
+                    vars.at(1) = 0; // Constants for now
+                }
+                forces.at(coord).SetPolyVars(poly, vars);
+            }
 //        for (int poly = 0; poly < input.GetPositions().at(0).at(0).GetTotalPoly(); poly++) {
 //            positions.at(coord).SetPolyVars(poly, vars);
 //        }
+        }
     }
+
+    // TODO: might want to consider setting feet positions to something that is not all zeros (still zero in z direction)
 
     for (int ee = 0; ee < 4; ee++) {
         input.SetEndEffectorForce(ee, forces);

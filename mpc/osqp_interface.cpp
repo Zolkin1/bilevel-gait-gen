@@ -9,6 +9,9 @@ namespace mpc {
         // Set solver settings
         qp_solver_.settings()->setVerbosity(true);
         qp_solver_.settings()->setPolish(true);
+        qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
+        qp_solver_.settings()->setScaledTerimination(false);
+        qp_solver_.settings()->setMaxIteration(25);
     }
 
     void OSQPInterface::SetupQP(const mpc::QPData &data) {
@@ -21,8 +24,22 @@ namespace mpc {
         qp_solver_.data()->clearHessianMatrix();
         qp_solver_.clearSolver();
 
+        std::cout << data.equality_constraints << std::endl;
+        std::cout << data.equality_constants << "\n" << std::endl;
+
+        std::cout << data.equality_constraints.fullPivLu().solve(data.equality_constants) << std::endl;
+
         ConvertDataToOSQPConstraints(data);
         ConvertDataToOSQPCost(data);
+
+        vector_t warm_start = vector_t::Zero(data.num_decision_vars);
+        warm_start = A_.topRows(data.num_dynamics_constraints + data.num_equality_constraints).fullPivLu().solve(
+                lb_.head(data.num_dynamics_constraints + data.num_equality_constraints));
+
+        std::cout << warm_start.head(data.num_dynamics_constraints + data.num_equality_constraints) << std::endl;
+
+        vector_t temp = vector_t::Zero(data.num_dynamics_constraints + data.num_equality_constraints +
+                                       data.num_inequality_constraints);
 
         // Set solver constraints
         Eigen::SparseMatrix<double> sparseA = A_.sparseView();
@@ -41,6 +58,7 @@ namespace mpc {
         if (!qp_solver_.initSolver()) {
             throw std::runtime_error("Unable to initialize the solver.");
         }
+        std::cout << "warm start result: " << qp_solver_.setWarmStart(warm_start, temp) << std::endl;
     }
 
     vector_t OSQPInterface::Solve() {
@@ -50,6 +68,8 @@ namespace mpc {
         }
 
         vector_t qp_sol = qp_solver_.getSolution();
+
+        std::cout << "diff on uper bound: \n" << A_*qp_sol - ub_ << std::endl;
 
         return qp_sol;
     }

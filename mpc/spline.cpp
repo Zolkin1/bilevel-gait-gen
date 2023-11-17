@@ -9,9 +9,16 @@
 
 namespace mpc {
     Spline::Spline(int num_polys, const std::vector<double> &times, bool start_on_poly) :
-                    ZERO_CONSTANT(1,0), ZERO_POLY(2,0), start_on_constant_(!start_on_poly), num_polys_(num_polys) {
+                    start_on_constant_(!start_on_poly), num_polys_(num_polys) {
 
+        std::vector<double> const ZERO_CONSTANT = {0};
+        std::vector<double> const ZERO_POLY = {0, 0};
+
+        // TODO: check times
         poly_times_.push_back(0);
+        num_all_poly_vars = 0;
+        total_poly_ = 0;
+        num_constant_ = 0;
 
         for (int time_idx = 0; time_idx < times.size(); time_idx++) {
             if (start_on_constant_) {
@@ -33,6 +40,7 @@ namespace mpc {
                         num_all_poly_vars += 2;
                     }
 
+                    poly_times_.push_back(times.at(time_idx));
                 }
             } else {
                 if ((time_idx + 1) % 2 == 0) {      // On a constant
@@ -56,13 +64,25 @@ namespace mpc {
                         }
                         num_all_poly_vars += 2;
                     }
+
+                    poly_times_.push_back(times.at(time_idx));
                 }
             }
+        }
+
+        // Add final elements
+        if ((start_on_constant_ && (times.size()) % 2 == 0) || (!start_on_constant_ && (times.size()-1) % 2 == 0)) {
+//            poly_times_.push_back(times.at(times.size()-1));
+            poly_vars_.push_back(ZERO_CONSTANT);
+            num_all_poly_vars += 1;
+        } else {
+            poly_vars_.push_back(ZERO_POLY);
+            num_all_poly_vars += 2;
         }
     }
 
     double Spline::ValueAt(double time) const {
-        std::vector<double> vars = GetPolyVars(time);
+        std::array<double, POLY_ORDER> vars = GetPolyVars(time);
 
         int i = GetPolyIdx(time);
         double DeltaT = poly_times_.at(i) - poly_times_.at(i-1);
@@ -71,21 +91,33 @@ namespace mpc {
         return EvalPoly(vars, time, DeltaT);
     }
 
-    // TODO: Change to time based! Does not make sense as written!
-    void Spline::SetPolyVars(int poly_num, const std::vector<double>& vars) {
-        assert(poly_num > 0);
+    void Spline::SetPolyVars(int poly_time, const std::vector<double>& vars) {
+        assert(poly_time >= 0);
+        assert(poly_time <= poly_times_.size());
 
-        if (vars.size() != poly_vars_.at(poly_num).size()) {
+        if (vars.size() != poly_vars_.at(poly_time).size()) {
             throw std::runtime_error("Provided polynomial does not match the order of the current polynomial.");
         }
 
-        poly_vars_.at(poly_num) = vars;
+        poly_vars_.at(poly_time) = vars;
 
-        // Check for constants
-        if (poly_vars_.at(poly_num).size() == 1 && poly_vars_.at(poly_num-1).size() == 1) {
-            poly_vars_.at(poly_num-1) = vars;
-        } else if (poly_vars_.at(poly_num).size() == 1 && poly_vars_.at(poly_num+1).size() == 1) {
-            poly_vars_.at(poly_num+1) = vars;
+        if (poly_time == 0) {
+            // Don't need to check prev val
+            if (poly_vars_.at(poly_time).size() == 1 && poly_vars_.at(poly_time + 1).size() == 1) {
+                poly_vars_.at(poly_time + 1) = vars;
+            }
+        } else if (poly_time == poly_times_.size()) {
+            // Don't need to check after val
+            if (poly_vars_.at(poly_time).size() == 1 && poly_vars_.at(poly_time - 1).size() == 1) {
+                poly_vars_.at(poly_time - 1) = vars;
+            }
+        } else {
+            // Check for constants
+            if (poly_vars_.at(poly_time).size() == 1 && poly_vars_.at(poly_time - 1).size() == 1) {
+                poly_vars_.at(poly_time - 1) = vars;
+            } else if (poly_vars_.at(poly_time).size() == 1 && poly_vars_.at(poly_time + 1).size() == 1) {
+                poly_vars_.at(poly_time + 1) = vars;
+            }
         }
     }
 
@@ -104,7 +136,7 @@ namespace mpc {
     }
 
     // Time between 0 and DT
-    double Spline::EvalPoly(const std::vector<double>& vars, double time, double DeltaT) {
+    double Spline::EvalPoly(const std::array<double, POLY_ORDER>& vars, double time, double DeltaT) {
         double a2 = -(1 / pow(DeltaT, 2)) * 3 * (vars.at(0) - vars.at(1)) -
                     (1 / DeltaT) * (2 * vars.at(2) + vars.at(3));
         double a3 = (1 / pow(DeltaT, 3)) * 2 * (vars.at(0) - vars.at(1)) +
@@ -122,32 +154,32 @@ namespace mpc {
         return total_poly_;
     }
 
-    std::vector<double> Spline::GetPolyVars(double time) const {
+    std::array<double, Spline::POLY_ORDER> Spline::GetPolyVars(double time) const {
         int i = GetPolyIdx(time);
 
-        if (IsConstantPoly(i)) {
-            // Constant
-            std::vector<double> vars{poly_vars_.at(i).at(0)};
-            return vars;
-        }
+//        if (IsConstantPoly(i)) {
+//            // Constant
+//            std::vector<double> vars{poly_vars_.at(i).at(0)};
+//            return vars;
+//        }
 
         // Polynomial; gather the variables that describe it
-        std::vector<double> vars(4,0);
+        std::array<double, Spline::POLY_ORDER> vars = {0,0,0,0};
         vars.at(0) = poly_vars_.at(i-1).at(0);      // x0
         vars.at(1) = poly_vars_.at(i).at(0);        // x1
 
         // Check if the "end" point is a constant, x1dot
         if (poly_vars_.at(i).size() == 1) {
-            vars.at(4) = 0;
+            vars.at(3) = 0;
         } else {
-            vars.at(4) = poly_vars_.at(i).at(1);
+            vars.at(3) = poly_vars_.at(i).at(1);
         }
 
         // Check if the "start" point is a constant, x0dot
         if (poly_vars_.at(i-1).size() == 1) {
-            vars.at(3) = 0;
+            vars.at(2) = 0;
         } else {
-            vars.at(3) = poly_vars_.at(i).at(1);
+            vars.at(2) = poly_vars_.at(i-1).at(1);
         }
 
         return vars;
@@ -227,6 +259,52 @@ namespace mpc {
 
     bool Spline::IsConstantPoly(int idx) const {
         return (poly_vars_.at(idx).size() == 1 && poly_vars_.at(idx-1).size() == 1);
+    }
+
+    std::pair<int, int> Spline::GetVarsIndexEnd(double time) const {
+        // Given the index of the switching time, determine the start index of the (minimal) vars vector that
+        // describes this polynomial
+
+        int idx = GetPolyIdx(time);
+
+        int vars_idx = 0;
+        for (int i = 0; i < idx; i++) {
+            vars_idx += poly_vars_.at(i).size();
+            if (poly_vars_.at(i).size() == 1) {
+                i++;
+            }
+        }
+
+        vars_idx += poly_vars_.at(idx).size();      // Move index to the end of the vector
+        int num_vars_affecting = 0;
+        if (IsConstantPoly(idx)) {
+            num_vars_affecting = 1;
+        } else {
+            num_vars_affecting = poly_vars_.at(idx).size() + poly_vars_.at(idx - 1).size();
+        }
+
+        return std::make_pair(vars_idx, num_vars_affecting);
+
+    }
+
+    int Spline::GetNumPolyVars(int idx) const {
+        return poly_vars_.at(idx).size();
+    }
+
+    int Spline::GetNumPolyTimes() const {
+        return poly_times_.size();
+    }
+
+    void Spline::UpdatePolyVar(int idx, const std::vector<double>& vars) {
+        if (vars.size() != poly_vars_.at(idx).size()) {
+            throw std::runtime_error("Number of variables does not match current number of variables.");
+        }
+
+        poly_vars_.at(idx) = vars;
+    }
+
+    const std::vector<std::vector<double>>& Spline::GetPolyVars() const {
+        return poly_vars_;
     }
 
 } // mpc

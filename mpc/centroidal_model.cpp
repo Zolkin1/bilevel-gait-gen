@@ -124,8 +124,12 @@ namespace mpc {
 
                 vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
 
-                B.block(coord, ee*3*vars_per_spline + coord*vars_per_spline + NOT RIGHT:idx*Spline::POLY_ORDER,
-                        1, vars_lin.size()) = vars_lin.transpose();
+                int vars_idx, vars_affecting;
+                std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
+
+                assert(vars_affecting == vars_lin.size());
+
+                B.block(coord, vars_idx - vars_affecting, 1, vars_lin.size()) = vars_lin.transpose();
             }
         }
 
@@ -138,9 +142,12 @@ namespace mpc {
 
                 vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
 
+                int vars_idx, vars_affecting;
+                std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
+
                 for (int poly = 0; poly < vars_lin.size(); poly++) {
-                    B.block(3, ee*3*vars_per_spline + coord*vars_per_spline + NOT_RIGHT:idx*Spline::POLY_ORDER + poly,
-                            3, 1) = ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
+                    B.block(3, vars_idx-vars_affecting + poly, 3, 1) =
+                            ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
                 }
             }
         }

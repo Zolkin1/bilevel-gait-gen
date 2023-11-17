@@ -64,11 +64,11 @@ namespace mpc {
         double DerivWrtVars(double time) const;
 
         /**
-         * Sets the polynomial variables for a given polynomial in the spline.
-         * @param poly_num Index of the polynomial to modify
+         * Sets the variables at a given index.
+         * @param poly_time Index of the polynomial switching time
          * @param vars new polynomial variables
          */
-        void SetPolyVars(int poly_num, const std::vector<double>& vars);
+        void SetPolyVars(int poly_time, const std::vector<double>& vars);
 
         void SetAllSplineVars(const std::vector<std::vector<double>>& vars);
 
@@ -92,7 +92,7 @@ namespace mpc {
          * @param time the time at which to evaluate the spline for its variables
          * @return The scalar variables used to describe this portion of the spline.
          */
-        std::vector<double> GetPolyVars(double time) const;
+        std::array<double, Spline::POLY_ORDER> GetPolyVars(double time) const;
 
         /**
          * Note that this will return one number per constant, as opposed to the internal representation using 2.
@@ -114,16 +114,22 @@ namespace mpc {
          */
         int GetPolyIdx(double time) const;
 
+        std::pair<int, int> GetVarsIndexEnd(double time) const;
+
+        int GetNumPolyVars(int idx) const;
+
+        int GetNumPolyTimes() const;
+
+        void UpdatePolyVar(int idx, const std::vector<double>& vars);
+
+        const std::vector<std::vector<double>>& GetPolyVars() const;
+
     protected:
     private:
         bool IsConstantPoly(int idx) const;
 
         // Time should be [0, DeltaT]
-        static double EvalPoly(const std::vector<double>& vars, double time, double DeltaT);
-
-        std::vector<double> const ZERO_CONSTANT;
-
-        std::vector<double> const ZERO_POLY;
+        static double EvalPoly(const std::array<double, POLY_ORDER>& vars, double time, double DeltaT);
 
         /*
          * Holds all the information to re-construct the spline values.

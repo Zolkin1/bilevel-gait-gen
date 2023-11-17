@@ -109,14 +109,6 @@ namespace mpc {
         std::vector<vector_t> GetAllVels() const;
 
         /**
-         * Gets the linearized coefficients for the polynomial variables.
-         * @param end_effector the end effector to use
-         * @param time the time to linearize at.
-         * @return Matrix of linearization coefficients.
-         */
-//        Eigen::Matrix<double, 3, 4> GetForcePolyVarsLin(int end_effector, double time) const;
-
-        /**
          * Gets the index of the polynomial in the force vector for a given time.
          * @param time to query the spline at
          * @return Index of the polynomial at the given time.
@@ -124,6 +116,23 @@ namespace mpc {
         int GetForcePolyIdx(double time) const;
 
         void UpdateForce(int end_effector, int coord, const std::vector<std::array<double, Spline::POLY_ORDER>>& vars);
+
+        /**
+         * Gets the index of the end point of the variables that define the polynomial at that point in time
+         * Also returns the number of variables that define the polynomial.
+         * Does NOT return the index into the decision variable vector.
+         * @param input
+         * @param end_effector
+         * @param time
+         * @param coord
+         * @return
+         */
+        std::pair<int, int> GetForceSplineIndex(int end_effector, double time, int coord) const;
+
+        int GetTotalForceSplineVars() const;
+
+        void UpdateForcePoly(int end_effector, int coord, int idx, const vector_t& vars);
+
     protected:
     private:
         std::vector<std::array<Spline, 3>> forces_;    // We need a spline for each coordinate of each end effector
@@ -133,6 +142,9 @@ namespace mpc {
         double node_dt_;
 
         static int constexpr NUM_POLY = 2;
+        static int constexpr POS_VARS = 3;
+
+        int force_spline_vars_;
     };
 } // mpc
 

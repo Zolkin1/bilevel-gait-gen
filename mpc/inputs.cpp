@@ -20,14 +20,24 @@ namespace mpc {
         for (int i = 0; i < num_nodes; i++) {
             joint_vels_.emplace_back(vector_t::Zero(num_joints));
         }
+
+        force_spline_vars_ = 0;
+        for (const auto& force : forces_) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                force_spline_vars_ += force.at(coord).GetTotalPolyVars();
+            }
+        }
     }
 
     Inputs::Inputs(const Inputs& input) {
         const std::vector<std::array<Spline, 3>>& force = input.GetForces();
         const std::vector<std::array<Spline, 3>>& pos = input.GetPositions();
+        force_spline_vars_ = 0;
         for (int i = 0; i < force.size(); i++) {
             forces_.push_back(force.at(i));
-//            positions_.push_back(pos.at(i));
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                force_spline_vars_ += forces_.at(i).at(coord).GetTotalPolyVars();
+            }
         }
 
         joint_vels_ = input.GetAllVels();
@@ -40,11 +50,12 @@ namespace mpc {
         const std::vector<std::array<Spline, 3>>& pos = input.GetPositions();
 
         forces_.erase(forces_.begin(), forces_.end());
-//        positions_.erase(positions_.begin(), positions_.end());
-
+        force_spline_vars_ = 0;
         for (int i = 0; i < force.size(); i++) {
             forces_.push_back(force.at(i));
-//            positions_.push_back(pos.at(i));
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                force_spline_vars_ += forces_.at(i).at(coord).GetTotalPolyVars();
+            }
         }
 
         node_dt_ = input.GetNodeDt();
@@ -94,6 +105,7 @@ namespace mpc {
         return node_dt_;
     }
 
+    // TODO: Check that its valid
     void Inputs::SetEndEffectorForce(int end_effector, const std::array<Spline, 3>& force) {
         forces_.at(end_effector) = force;
     }
@@ -151,22 +163,48 @@ namespace mpc {
         return joint_vels_;
     }
 
-//    Eigen::Matrix<double, 3, 4> Inputs::GetForcePolyVarsLin(int end_effector, double time) const {
-//        Eigen::Matrix<double, 3, 4> vars = Eigen::Matrix<double, 3, 4>::Zero();
-//        for (int coord = 0; coord < 3; coord++) {
-//            vars.row(coord) = forces_.at(end_effector).at(coord).GetPolyVarsLin(time);
-//        }
-//
-//        return vars;
-//    }
-
     int Inputs::GetForcePolyIdx(double time) const {
         return forces_.at(0).at(0).GetPolyIdx(time);
     }
 
-    void Inputs::UpdateForce(int end_effector, int coord,
-                             const std::vector<std::array<double, Spline::POLY_ORDER>>& vars) {
-        forces_.at(end_effector).at(coord).SetAllSplineVars(vars);
+//    void Inputs::UpdateForce(int end_effector, int coord,
+//                             const std::vector<std::array<double, Spline::POLY_ORDER>>& vars) {
+//        forces_.at(end_effector).at(coord).SetAllSplineVars(vars);
+//    }
+
+    // Always returns the index of the end of the end point of the polynomial
+    std::pair<int, int> Inputs::GetForceSplineIndex(int end_effector, double time, int coord) const {
+        int num_spline_vars_before = 0;
+        for (int ee = 1; ee < end_effector; ee++) {
+            for (int j = 0; j < POS_VARS; j++) {
+                num_spline_vars_before += forces_.at(ee).at(j).GetTotalPolyVars();
+            }
+        }
+
+        int idx_into_ee_coord_spline_vars = 0;
+        for (int j = 0; j < coord; j++) {
+            idx_into_ee_coord_spline_vars += forces_.at(end_effector).at(j).GetTotalPolyVars();
+        }
+
+        int vars_idx, vars_affecting;
+        std::tie(vars_idx, vars_affecting) = forces_.at(end_effector).at(coord).GetVarsIndexEnd(time);
+
+        return std::make_pair(num_spline_vars_before + idx_into_ee_coord_spline_vars +
+                              vars_idx, vars_affecting);
     }
 
+    int Inputs::GetTotalForceSplineVars() const {
+        return force_spline_vars_;
+    }
+
+    void Inputs::UpdateForcePoly(int end_effector, int coord, int idx, const vector_t& vars) {
+        std::vector<double> temp(vars.size());
+
+        // TODO: how to convert eigen to std::vector
+        for (int i = 0; i < vars.size(); i++) {
+            temp.at(i) = vars(i);
+        }
+
+        forces_.at(end_effector).at(coord).UpdatePolyVar(idx, temp);
+    }
 }
