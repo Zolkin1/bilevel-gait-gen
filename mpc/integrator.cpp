@@ -6,4 +6,8 @@
 
 namespace mpc {
     Integrator::Integrator(double dt) : dt_(dt) {}
+
+    double Integrator::GetDt() const {
+        return dt_;
+    }
 }

@@ -2,6 +2,8 @@
 // Copyright (c) 2023 Zachary Olkin. All rights reserved.
 //
 
+#include <fstream>
+
 #include "include/trajectory.h"
 
 namespace mpc {
@@ -72,8 +74,10 @@ namespace mpc {
         for (int i = 0; i < inputs_.GetForces().at(end_effector).at(coord).GetNumPolyTimes(); i++) {
             int num_vars = inputs_.GetForces().at(end_effector).at(coord).GetNumPolyVars(i);
             inputs_.UpdateForcePoly(end_effector, coord, i, vars.segment(idx, num_vars));
-            if (num_vars == 1 && i+1 < end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes()) {
+            if (num_vars == 1 && i+1 < end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes() &&
+            inputs_.GetForces().at(end_effector).at(coord).GetNumPolyVars(i+1) == 1) {
                 // Set then skip the additional constant term
+                // TODO: In theory we can skip this
                 inputs_.UpdateForcePoly(end_effector, coord, i+1, vars.segment(idx, num_vars));
                 i++;
             }
@@ -92,7 +96,8 @@ namespace mpc {
             }
             end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
 
-            if (num_vars == 1 && i+1 < end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes()) {
+            if (num_vars == 1 && i+1 < end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes() &&
+            end_effector_pos_.at(end_effector).at(coord).GetNumPolyVars(i+1) == 1) {
                 // Set then skip the additional constant term
                 end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i+1, temp);
                 i++;
@@ -118,6 +123,66 @@ namespace mpc {
         std::tie(vars_idx, vars_affecting) = end_effector_pos_.at(end_effector).at(coord).GetVarsIndexEnd(time);
 
         return std::make_pair(num_spline_vars_before + idx_into_ee_coord_spline_vars + vars_idx, vars_affecting);
+    }
+
+    void Trajectory::SetPositionsForAllTime(std::vector<std::array<double, POS_VARS>> ee_pos) {
+        if (ee_pos.size() != end_effector_pos_.size()) {
+            throw std::runtime_error("Not enough provided positions for all the end effectors.");
+        }
+
+        for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                end_effector_pos_.at(ee).at(coord).SetAllPositions(ee_pos.at(ee).at(coord));
+            }
+        }
+    }
+
+    void Trajectory::PrintTrajectoryToFile(const std::string& file_name) const {
+        std::ofstream file;
+        file.open(file_name);
+
+        file << "node: [states], [joint vels]" << std::endl;
+        for (int node = 0; node < states_.size(); node++) {
+            if (node == 0) {
+                file << states_.at(node).transpose() << std::endl;
+            } else {
+                file << states_.at(node).transpose() << ", " << inputs_.GetVel(node-1).transpose() << std::endl;
+            }
+        }
+
+        file << "force spline: " << std::endl;
+        for (const auto& force : inputs_.GetForces()) {
+            for (int coord = 0; coord < 3; coord++) {
+                for (int i = 0; i < force.at(coord).GetPolyVars().size(); i++) {
+                    for (int j = 0; j < force.at(coord).GetPolyVars().at(i).size(); j++) {
+                        file << force.at(coord).GetPolyVars().at(i).at(j);
+                        if (j != force.at(coord).GetPolyVars().at(i).size()-1) {
+                            file << " ";
+                        }
+                    }
+                    file << ", ";
+                }
+                file << std::endl;
+            }
+        }
+
+        file << "position spline: " << std::endl;
+        for (const auto& pos : end_effector_pos_) {
+            for (int coord = 0; coord < 3; coord++) {
+                for (int i = 0; i < pos.at(coord).GetPolyVars().size(); i++) {
+                    for (int j = 0; j < pos.at(coord).GetPolyVars().at(i).size(); j++) {
+                        file << pos.at(coord).GetPolyVars().at(i).at(j);
+                        if (j != pos.at(coord).GetPolyVars().at(i).size()-1) {
+                            file << " ";
+                        }
+                    }
+                    file << ", ";
+                }
+                file << std::endl;
+            }
+        }
+
+        file.close();
     }
 
 } // mpc

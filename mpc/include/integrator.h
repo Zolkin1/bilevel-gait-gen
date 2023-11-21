@@ -19,7 +19,12 @@ namespace mpc {
     public:
         Integrator(double dt);
 
+        double GetDt() const;
+
         virtual vector_t CalcIntegral(const vector_t& ic, const Inputs& input, double init_time, double final_time,
+                                      const CentroidalModel& model) = 0;
+
+        virtual vector_t CalcIntegral(const vector_t& ic, const Inputs& input, double init_time, int num_steps,
                                       const CentroidalModel& model) = 0;
 
         virtual matrix_t CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx) = 0;

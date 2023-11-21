@@ -56,6 +56,8 @@ namespace mpc {
         // TODO: Use final cost!
         void SetQuadraticFinalCost(const matrix_t& Phi);
 
+        void AddQuadraticTrackingCost(const vector_t& state_des, const matrix_t& Q);
+
         // TODO: Support gauss newton on the cost. For now just accept quadratic cost
         void AddHessianApproxCost(const vector_t& state, double time, int node);
 
@@ -79,7 +81,15 @@ namespace mpc {
 
         void AddFKConstraints(const vector_t& state, double time, int node);
 
+        void AddForceConstraints();
+
+        void AddBoxConstraints(const vector_t& state, double time, int node);
+
+        void AddFrictionConeConstraints(const vector_t& state, double time, int node);
+
         void AddInequalityConstraints(const vector_t& state, double time, int node);
+
+        int GetForceSplineStartIdx() const;
 
         int GetVelocityIndex(int node) const;
 
@@ -87,7 +97,11 @@ namespace mpc {
 
         Trajectory ConvertQPSolToTrajectory(const vector_t& qp_sol, const vector_t& init_state) const;
 
-        void EnforceFootSlipAndForceAtADistance();
+
+        // Temp functions
+        void PrintDynamicsConstraints() const;
+        void PrintEqualityConstraints() const;
+        void PrintInequalityConstraints() const;
 
         // ---------------- Member Variables ---------------- //
         // Centroidal model
@@ -98,10 +112,10 @@ namespace mpc {
         // MPC info
         const MPCInfo info_;
 
+        // TODO: make const
         int num_states_;    // number of states in the MPC model, not in the underlying pinocchio model
         int num_joints_;
         int num_ee_;
-
 
         // force parameterization
 

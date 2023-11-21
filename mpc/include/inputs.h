@@ -133,6 +133,10 @@ namespace mpc {
 
         void UpdateForcePoly(int end_effector, int coord, int idx, const vector_t& vars);
 
+        int GetTotalForceConstants() const;
+
+        const vector_t& GetVel(int idx) const;
+
     protected:
     private:
         std::vector<std::array<Spline, 3>> forces_;    // We need a spline for each coordinate of each end effector
@@ -141,7 +145,7 @@ namespace mpc {
         std::vector<vector_t> joint_vels_;      // These are discrete, ZOH velocities.
         double node_dt_;
 
-        static int constexpr NUM_POLY = 2;
+//        static int constexpr NUM_POLY = 2;
         static int constexpr POS_VARS = 3;
 
         int force_spline_vars_;

@@ -29,6 +29,17 @@ namespace mpc {
         return val;
     }
 
+    vector_t EulerIntegrator::CalcIntegral(const mpc::vector_t& ic, const mpc::Inputs& input, double init_time,
+                                           int num_steps, const mpc::CentroidalModel& model) {
+        vector_t val = ic;
+        double time = init_time;
+        for (int i = 0; i < num_steps; i++) {
+            val += model.CalcDynamics(val, input, time)*dt_;
+        }
+
+        return val;
+    }
+
     matrix_t EulerIntegrator::CalcDerivWrtStateSingleStep(const mpc::vector_t &ic, const mpc::matrix_t &dfdx) {
         return dfdx*dt_ + matrix_t::Identity(ic.size() - 1, ic.size() - 1);
     }

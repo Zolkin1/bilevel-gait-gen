@@ -18,14 +18,26 @@ namespace mpc {
      */
     class QPInterface {
     public:
-        QPInterface();
+        QPInterface(int num_decision_vars);
 
+        /*
+         * Notes:
+         * I tried to get the Intel MKL library to work so I could try that solver. It did not seem to work,
+         * it always claimed it couldn't find the openmp library, which might be because it was trying to use intel
+         * openmp but I am using gnu openmp. Might be worth coming back to this to see if the multi-threaded speed up is
+         * large.
+         *
+         * OSQP eigen never seems to let me use a time limit because it doesn't set the profiling variable even though
+         * OSQP is built with profiling. Can probably fix this by either (1) opening and issue on their github, (2)
+         * modifying source, or (3) finding another work around. Might want to use this to ensure timing requirements.
+         */
         virtual void SetupQP(const QPData& data) = 0;
 
-        virtual vector_t Solve() = 0;
+        virtual vector_t Solve(const QPData& data) = 0;
 
         virtual vector_t GetInfinity(int size) const;
     protected:
+        vector_t prev_qp_sol_;
     private:
     };
 }

@@ -21,13 +21,14 @@ Eigen::Vector4d ConvertMujocoQuatToPinocchioQuat(const Eigen::Vector4d& quat) {
 }
 
 int main() {
-    std::string config_file("a1_configuration.yaml");
+    // TODO: when I make the file local via the cmake file then I only get it copied over after a compilation
+    std::string config_file("/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/apps/a1_configuration.yaml");
     utils::ConfigParser config = utils::ConfigParser(config_file);
 
     mpc::MPCInfo info;
     info.discretization_steps = config.ParseNumber<double>("discretization_steps");
     info.num_nodes = config.ParseNumber<int>("num_nodes");
-    info.time_horizon = config.ParseNumber<int>("time_horizon");
+    info.time_horizon = config.ParseNumber<double>("time_horizon");
     info.num_qp_iterations = config.ParseNumber<int>("num_qp");
     info.friction_coef = config.ParseNumber<double>("friction_coef");
     info.vel_bounds = config.ParseEigenVector("vel_bounds");
@@ -40,7 +41,7 @@ int main() {
     mpc::MPC mpc(info, config.ParseString("robot_urdf"));
 
     auto switching_times = mpc::MPC::CreateDefaultSwitchingTimes(info.num_switches, 4, info.time_horizon);
-    mpc::Trajectory traj(info.num_nodes, config.ParseEigenVector("init_config").size() + 6, 12,
+    mpc::Trajectory traj(info.num_nodes+1, config.ParseEigenVector("init_config").size() + 6, 12,
                          switching_times,
                          info.time_horizon/info.num_nodes);
 
@@ -48,7 +49,7 @@ int main() {
     standing.segment<4>(3) = ConvertMujocoQuatToPinocchioQuat(standing.segment<4>(3));
     vector_t state = vector_t::Zero(6 + standing.size());
     state.tail(standing.size()) = standing;
-    for (int i = 0; i < info.num_nodes; i++) {
+    for (int i = 0; i < info.num_nodes+1; i++) {
         state(1) += i/2.0;
         traj.SetState(i, state);
     }
@@ -80,7 +81,7 @@ int main() {
     }
 
     // TODO: might want to consider setting feet positions to something that is not all zeros (still zero in z direction)
-
+    //
     for (int ee = 0; ee < 4; ee++) {
         input.SetEndEffectorForce(ee, forces);
 //        input.SetEndEffectorPosition(ee, positions);
@@ -88,21 +89,37 @@ int main() {
 
     traj.SetInput(input);
 
+    std::vector<std::array<double, 3>> ee_pos;
+    ee_pos.push_back({0.2, 0.2, 0});
+    ee_pos.push_back({0.2, -0.2, 0});
+    ee_pos.push_back({-0.2, 0.2, 0});
+    ee_pos.push_back({-0.2, 0.2, 0});
+
+
+    traj.SetPositionsForAllTime(ee_pos);
+
     mpc.SetWarmStartTrajectory(traj);
 
-    matrix_t Q = matrix_t::Identity(24, 24);
-    vector_t w = vector_t::Zero(24);
-
-    mpc.SetLinearCostTerm(w);
-    mpc.SetQuadraticCostTerm(Q);
-    mpc.SetQuadraticFinalCost(10*Q);
-
+    // TODO: work on speed
     vector_t curr_state(6+7+12);
     curr_state << 1, 0, 0.1,
-                    0, 0, 0,
-                    0, 0, 0.35,
-                    1, 0, 0, 0,
-                    0, 0, 1, 0, 0.1, 0, 0, 0, 0.2, 0, 0, 0;
+            0, 0, 0,
+            0, 0, 0.35,
+            1, 0, 0, 0,
+            0, 0, 1, 0, 0.1, 0, 0, 0, 0.2, 0, 0, 0;
+
+    const matrix_t Q = matrix_t::Identity(24, 24);
+    const vector_t standing_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(state, curr_state);
+//    vector_t w = vector_t::Zero(24);
+    mpc.AddQuadraticTrackingCost(standing_alg, Q);
+    mpc.SetQuadraticFinalCost(10*Q);
+
     curr_state.segment<4>(9) = ConvertMujocoQuatToPinocchioQuat(curr_state.segment<4>(9));
-    mpc.Solve(curr_state);
+    mpc::Trajectory solve_traj = mpc.Solve(curr_state);
+    solve_traj.PrintTrajectoryToFile("solved_traj.txt");
+
+
+    for (int i = 0; i < 2; i++) {
+        mpc.Solve(curr_state);
+    }
 }

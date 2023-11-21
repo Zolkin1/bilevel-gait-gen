@@ -124,6 +124,16 @@ namespace mpc {
 
         const std::vector<std::vector<double>>& GetPolyVars() const;
 
+        const std::vector<double>& GetPolyTimes() const;
+
+        int GetNumConstant() const;
+
+        /**
+         * Sets all position variables to positions without touching the derivatives.
+         * @param position
+         */
+        void SetAllPositions(double position);
+
     protected:
     private:
         bool IsConstantPoly(int idx) const;

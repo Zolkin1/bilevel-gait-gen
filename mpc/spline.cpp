@@ -54,14 +54,17 @@ namespace mpc {
                 } else {        // On a polynomial
                     total_poly_ += num_polys_;
                     for (int i = 0; i < num_polys_ - 1; i++) {
-                        poly_vars_.push_back(ZERO_POLY);
-
                         if (time_idx == 0) {
                             poly_times_.push_back(times.at(time_idx)/num_polys);
+                            poly_vars_.push_back(ZERO_CONSTANT);
+                            num_all_poly_vars++;
+                            num_constant_++;
                         } else {
                             poly_times_.push_back((times.at(time_idx) - times.at(time_idx - 1))/num_polys
                                                   + times.at(time_idx - 1));
                         }
+
+                        poly_vars_.push_back(ZERO_POLY);
                         num_all_poly_vars += 2;
                     }
 
@@ -76,8 +79,8 @@ namespace mpc {
             poly_vars_.push_back(ZERO_CONSTANT);
             num_all_poly_vars += 1;
         } else {
-            poly_vars_.push_back(ZERO_POLY);
-            num_all_poly_vars += 2;
+//            poly_vars_.push_back(ZERO_POLY);
+//            num_all_poly_vars += 2;
         }
     }
 
@@ -115,7 +118,7 @@ namespace mpc {
             // Check for constants
             if (poly_vars_.at(poly_time).size() == 1 && poly_vars_.at(poly_time - 1).size() == 1) {
                 poly_vars_.at(poly_time - 1) = vars;
-            } else if (poly_vars_.at(poly_time).size() == 1 && poly_vars_.at(poly_time + 1).size() == 1) {
+            } else if (poly_time+1<poly_vars_.size() && poly_vars_.at(poly_time).size() == 1 && poly_vars_.at(poly_time + 1).size() == 1) {
                 poly_vars_.at(poly_time + 1) = vars;
             }
         }
@@ -232,9 +235,9 @@ namespace mpc {
             // Final time derivative is fixed at 0
             vector_t vars = vector_t::Zero(3);
             vars(0) = 1 - 1/pow(DeltaT, 2)*3*pow(time,2) + 1/pow(DeltaT, 3)*2*pow(time, 3);     // x0 coef
-            vars(1) = 1/pow(DeltaT, 2)*3*pow(time,2) - 1/pow(DeltaT, 3)*2*pow(time, 3);         // x1 coef
+            vars(2) = 1/pow(DeltaT, 2)*3*pow(time,2) - 1/pow(DeltaT, 3)*2*pow(time, 3);         // x1 coef
 
-            vars(2) = time - 1/DeltaT*2*pow(time, 2) + 1/pow(DeltaT, 2)*pow(time, 3);           // x0dot coef
+            vars(1) = time - 1/DeltaT*2*pow(time, 2) + 1/pow(DeltaT, 2)*pow(time, 3);           // x0dot coef
             return vars;
         } else if (poly_vars_.at(i-1).size() == 1) {
             // Initial time derivative is fixed at 0
@@ -248,9 +251,9 @@ namespace mpc {
         } else {
             vector_t vars = vector_t::Zero(4);
             vars(0) = 1 - 1/pow(DeltaT, 2)*3*pow(time,2) + 1/pow(DeltaT, 3)*2*pow(time, 3);     // x0 coef
-            vars(1) = 1/pow(DeltaT, 2)*3*pow(time,2) - 1/pow(DeltaT, 3)*2*pow(time, 3);         // x1 coef
+            vars(2) = 1/pow(DeltaT, 2)*3*pow(time,2) - 1/pow(DeltaT, 3)*2*pow(time, 3);         // x1 coef
 
-            vars(2) = time - 1/DeltaT*2*pow(time, 2) + 1/pow(DeltaT, 2)*pow(time, 3);           // x0dot coef
+            vars(1) = time - 1/DeltaT*2*pow(time, 2) + 1/pow(DeltaT, 2)*pow(time, 3);           // x0dot coef
             vars(3) = -1/DeltaT*pow(time, 2) + 1/pow(DeltaT, 2)*pow(time, 3);                   // x1dot coef
             return vars;
         }
@@ -268,14 +271,14 @@ namespace mpc {
         int idx = GetPolyIdx(time);
 
         int vars_idx = 0;
-        for (int i = 0; i < idx; i++) {
+        for (int i = 0; i <= idx; i++) {
             vars_idx += poly_vars_.at(i).size();
-            if (poly_vars_.at(i).size() == 1) {
+            if (i+1 < poly_vars_.size() && poly_vars_.at(i+1).size() == 1 && poly_vars_.at(i).size() == 1) {
                 i++;
             }
         }
 
-        vars_idx += poly_vars_.at(idx).size();      // Move index to the end of the vector
+//        vars_idx += poly_vars_.at(idx).size() - 1;      // Move index to the end of the vector
         int num_vars_affecting = 0;
         if (IsConstantPoly(idx)) {
             num_vars_affecting = 1;
@@ -305,6 +308,20 @@ namespace mpc {
 
     const std::vector<std::vector<double>>& Spline::GetPolyVars() const {
         return poly_vars_;
+    }
+
+    const std::vector<double>& Spline::GetPolyTimes() const {
+        return poly_times_;
+    }
+
+    int Spline::GetNumConstant() const {
+        return num_constant_;
+    }
+
+    void Spline::SetAllPositions(double position) {
+        for (int i = 0; i < poly_vars_.size(); i++) {
+            poly_vars_.at(i).at(0) = position;
+        }
     }
 
 } // mpc

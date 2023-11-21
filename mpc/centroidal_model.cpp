@@ -45,6 +45,8 @@ namespace mpc {
             throw std::runtime_error("Only discretization step of 1 is currently supported.");
         }
         discretization_steps_ = discretization_steps;
+
+        ref_state_ = vector_t::Zero(num_total_states_+1);
     }
 
     void CentroidalModel::GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Inputs& input,
@@ -113,15 +115,10 @@ namespace mpc {
         //     one set of columns for each spline.
 
         B = matrix_t::Zero(num_total_states_, num_inputs);
-        // TODO: Need to index these properly so they are getting the correct dependence.
-        // TODO: Make sure to consider the overalpping variables, i.e. it shouldn't always shift
         // --- Linear momentum --- //
         // Linear in each force, and each force is linear in its coefficients at each point in time.
-        int idx = input.GetForcePolyIdx(time);
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int coord = 0; coord < 3; coord++) {
-                int vars_per_spline = input.GetForces().at(ee).at(coord).GetTotalPolyVars();
-
                 vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
 
                 int vars_idx, vars_affecting;
@@ -129,7 +126,9 @@ namespace mpc {
 
                 assert(vars_affecting == vars_lin.size());
 
-                B.block(coord, vars_idx - vars_affecting, 1, vars_lin.size()) = vars_lin.transpose();
+                if (vars_affecting != 1) {
+                    B.block(coord, vars_idx - vars_affecting, 1, vars_lin.size()) = vars_lin.transpose();
+                }
             }
         }
 
@@ -138,16 +137,15 @@ namespace mpc {
         for (int ee = 0; ee < num_ee_; ee++) {
             Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
             for (int coord = 0; coord < 3; coord++) {
-                int vars_per_spline = input.GetForces().at(ee).at(coord).GetTotalPolyVars();
-
                 vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
 
                 int vars_idx, vars_affecting;
                 std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
-
-                for (int poly = 0; poly < vars_lin.size(); poly++) {
-                    B.block(3, vars_idx-vars_affecting + poly, 3, 1) =
-                            ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
+                if (vars_affecting != 1) {
+                    for (int poly = 0; poly < vars_lin.size(); poly++) {
+                        B.block(3, vars_idx - vars_affecting + poly, 3, 1) =
+                                ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
+                    }
                 }
             }
         }
@@ -165,7 +163,9 @@ namespace mpc {
         // ------------------------------------------- //
         // ---------------- Calculate C -------------- //
         // ------------------------------------------- //
-        C = CalcDynamics(state, input, time);
+        SetDynamicsRefState(ref_state);
+        vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
+        C = integrator_->CalcIntegral(state_alg, input, time, 1, *this); //CalcDynamics(state, input, time);
 
         // Discretize with the integrator
         A = integrator_->CalcDerivWrtStateSingleStep(state, A);
@@ -234,6 +234,7 @@ namespace mpc {
     }
 
     vector_t CentroidalModel::ConvertMPCStateToPinocchioState(const vector_t &state) const {
+        assert(state.size() == pin_model_.nq + 6);
         vector_t q(pin_model_.nq);
 
         q.head(POS_VARS) = state.segment<POS_VARS>(MOMENTUM_OFFSET);
@@ -285,6 +286,7 @@ namespace mpc {
     }
 
     vector_t CentroidalModel::ConvertManifoldStateToAlgebraState(const vector_t& state, const vector_t& ref_state) {
+        assert(state.size() == ref_state.size());
         vector_t alg_state(state.size()-1);
         alg_state.head<MOMENTUM_OFFSET>() = state.head<MOMENTUM_OFFSET>();
         alg_state.segment<POS_VARS>(MOMENTUM_OFFSET) = state.segment<POS_VARS>(MOMENTUM_OFFSET);
@@ -297,6 +299,7 @@ namespace mpc {
     }
 
     vector_t CentroidalModel::ConvertAlgebraStateToManifoldState(const mpc::vector_t &state, const vector_t& ref_state) {
+        assert(state.size() == ref_state.size()-1);
         vector_t man_state(state.size()+1);
         Eigen::Quaterniond quat;
         pinocchio::quaternion::exp3(state.segment<3>(MOMENTUM_OFFSET+POS_VARS), quat);
@@ -324,8 +327,19 @@ namespace mpc {
         }
     }
 
+    void CentroidalModel::SetDynamicsRefState(const vector_t& state) {
+        ref_state_ = state;
+    }
+
+    // TODO: check all the manifold stuff
     vector_t CentroidalModel::CalcDynamics(const vector_t& state, const Inputs& input, double time) const {
+        assert(state.size() == pin_model_.nv + 6);
+
+        const vector_t state_man = ConvertAlgebraStateToManifoldState(state, ref_state_);
+
         vector_t xdot = vector_t::Zero(num_total_states_);
+
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, ConvertMPCStateToPinocchioState(state_man));
 
         xdot.topRows<3>() = robot_mass_*GRAVITY;
 
@@ -334,10 +348,10 @@ namespace mpc {
 
             // Note that the input ee position can deviate from the state ee position.
             // So I use the state ee position.
-            xdot.middleRows<3>(3) += GetEndEffectorLocationCOMFrame(state, frames_.at(i)).cross(input.GetForce(i, time));
+            xdot.middleRows<3>(3) += GetEndEffectorLocationCOMFrame(state_man, frames_.at(i)).cross(input.GetForce(i, time));
         }
 
-        matrix_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, ConvertMPCStateToPinocchioState(state));
+        matrix_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, ConvertMPCStateToPinocchioState(state_man));
         matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
         matrix_t CMMj = CMM.rightCols(num_joints_);
         xdot.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) =

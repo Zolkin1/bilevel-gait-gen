@@ -13,6 +13,8 @@ namespace mpc {
     using vector_t = Eigen::VectorXd;
 
     class Trajectory {
+        static int constexpr POS_VARS = 3;
+
     public:
         Trajectory(int len, int state_size, int num_joints,
                    const std::vector<std::vector<double>>& switching_times, double node_dt);
@@ -54,6 +56,10 @@ namespace mpc {
          */
         std::pair<int, int> GetPositionSplineIndex(int end_effector, double time, int coord) const;
 
+        void SetPositionsForAllTime(std::vector<std::array<double, POS_VARS>> ee_pos);
+
+        void PrintTrajectoryToFile(const std::string& file_name) const;
+
     protected:
     private:
         std::vector<vector_t> states_;
@@ -61,8 +67,6 @@ namespace mpc {
         std::vector<std::array<Spline, 3>> end_effector_pos_;
 
         int pos_spline_vars_;
-
-        static int constexpr POS_VARS = 3;
     };
 } // mpc
 

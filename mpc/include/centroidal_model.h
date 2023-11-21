@@ -56,6 +56,8 @@ namespace mpc {
 
         int GetNumEndEffectors() const;
 
+        void SetDynamicsRefState(const vector_t& state);
+
         vector_t CalcDynamics(const vector_t& state, const Inputs& input, double time) const;
 
         static Eigen::Vector4d ConvertZYXRotToQuaternion(const Eigen::Vector3d& zyx_rot);
@@ -93,6 +95,8 @@ namespace mpc {
         int discretization_steps_;
 
         vector_t prev_fk_q_;
+
+        vector_t ref_state_;
 
         std::map<std::string, int> frame_map_;
         std::vector<std::string> frames_;

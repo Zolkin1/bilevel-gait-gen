@@ -124,7 +124,17 @@ namespace mpc {
     }
 
     int Inputs::GetNumInputs() const {
-        return 3*forces_.size()*forces_.at(0).at(0).GetTotalPolyVars() + joint_vels_.at(0).size();
+        int num_inputs = 0;
+        for (const auto& force : forces_) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                // Note that constants in the force are not decision variables (constant at 0)
+                num_inputs += force.at(coord).GetTotalPolyVars(); //- force.at(coord).GetNumConstant();
+            }
+        }
+
+        num_inputs += joint_vels_.at(0).size();
+
+        return num_inputs;
     }
 
     int Inputs::GetNumForces() const {
@@ -174,8 +184,9 @@ namespace mpc {
 
     // Always returns the index of the end of the end point of the polynomial
     std::pair<int, int> Inputs::GetForceSplineIndex(int end_effector, double time, int coord) const {
+        // TODO: remove the constants as decision variables.
         int num_spline_vars_before = 0;
-        for (int ee = 1; ee < end_effector; ee++) {
+        for (int ee = 0; ee < end_effector; ee++) {
             for (int j = 0; j < POS_VARS; j++) {
                 num_spline_vars_before += forces_.at(ee).at(j).GetTotalPolyVars();
             }
@@ -206,5 +217,20 @@ namespace mpc {
         }
 
         forces_.at(end_effector).at(coord).UpdatePolyVar(idx, temp);
+    }
+
+    int Inputs::GetTotalForceConstants() const {
+        int num_constants = 0;
+        for (const auto& force: forces_) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                num_constants += force.at(coord).GetNumConstant();
+            }
+        }
+
+        return num_constants;
+    }
+
+    const vector_t& Inputs::GetVel(int idx) const {
+        return joint_vels_.at(idx);
     }
 }

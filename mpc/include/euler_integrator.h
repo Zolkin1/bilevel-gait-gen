@@ -15,6 +15,9 @@ namespace mpc {
         vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, double final_time,
                               const CentroidalModel& model) override;
 
+        vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, int num_steps,
+                              const CentroidalModel& model) override;
+
         // Only does a single step
         matrix_t CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx) override;
 

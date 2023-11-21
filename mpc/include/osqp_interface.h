@@ -13,11 +13,12 @@
 namespace mpc {
     class OSQPInterface : public QPInterface {
     public:
-        OSQPInterface();
+        OSQPInterface(QPData data);
 
         void SetupQP(const QPData& data) override;
 
-        vector_t Solve() override;
+        // TODO: remove data
+        vector_t Solve(const QPData& data) override;
 
         vector_t GetInfinity(int size) const override;
     protected:
@@ -32,6 +33,10 @@ namespace mpc {
         // OSQP specific vectors and matricies
         matrix_t A_, P_;
         vector_t lb_, ub_, w_;
+
+        vector_t prev_dual_sol_;
+
+        int run;
     };
 } // mpc
 
