@@ -30,7 +30,7 @@ namespace mpc {
         num_joints_(model_.GetNumJoints()),
         num_states_(model_.GetPinocchioNumConfig() + 5),
         num_ee_(model_.GetNumEndEffectors()),
-        prev_traj_(info.num_nodes, num_states_, num_joints_,
+        prev_traj_(info.num_nodes+1, num_states_+1, num_joints_,
                CreateDefaultSwitchingTimes(info.num_switches, num_ee_, info.time_horizon),
                info.time_horizon/info.num_nodes) {
 
@@ -51,19 +51,26 @@ namespace mpc {
         // state vector: [lcom, kcom, qb, q0, ..., qnj]
         // input vector: [f1, ..., fnee, v0, ..., vnj]. Note each f is a set of 3 splines.
 
-        data_.num_decision_vars = (info_.num_nodes+1)*num_states_ + info_.num_nodes*num_joints_ +
-                prev_traj_.GetInputs().GetTotalForceSplineVars() + prev_traj_.GetTotalPosSplineVars();
-        data_.num_dynamics_constraints = (info_.num_nodes+1)*num_states_;
-        data_.num_equality_constraints = (info_.num_nodes+1)*POS_VARS*num_ee_ + prev_traj_.GetInputs().GetTotalForceConstants();
-        data_.num_inequality_constraints = info_.num_nodes*(4*num_ee_ + 2*num_joints_) + 4*num_ee_;
+        UpdateQPSizes();
 
         qp_solver = std::make_unique<OSQPInterface>(data_);
 
         SetFrictionPyramid();
+
+        Phi_ = matrix_t::Zero(num_states_, num_states_);
+        Phi_w_ = vector_t::Zero(num_states_);
     }
 
-    Trajectory MPC::Solve(const vector_t &centroidal_state) {
+    Trajectory MPC::Solve(const vector_t &centroidal_state, double init_time) {
         assert(centroidal_state.size() == num_states_ + 1);
+
+        prev_traj_.SetInitTime(init_time);
+
+        prev_traj_.AddPolys(info_.integrator_dt*info_.num_nodes + init_time);
+
+        prev_traj_.RemoveUnusedPolys(init_time);
+
+        UpdateQPSizes();
 
         // Reset to 0
         ResetQPMats();
@@ -78,7 +85,7 @@ namespace mpc {
         vector_t g;
         // Constraints on all the nodes BUT the first
         for (int i = 0; i < info_.num_nodes; i++) {
-            double time = i * info_.integrator_dt;
+            double time = i * info_.integrator_dt + init_time;
             // ------------------------ Dynamics ------------------------ //
             AddDynamicsConstraints(centroidal_state, time, i);
 
@@ -90,28 +97,34 @@ namespace mpc {
             AddGradientCost(centroidal_state, time, i);
         }
 
+        AddFinalCost();
+
         // Constraints on ALL the nodes
         for (int i = 0; i < info_.num_nodes+1; i++) {
-            double time = i * info_.integrator_dt;
+            double time = i * info_.integrator_dt + init_time;
             // ------------------------ FK Constraint ------------------------ //
             AddFKConstraints(centroidal_state, time, i);
 
             // ------------------------ Friction Cone Constraints ------------------------ //
             AddFrictionConeConstraints(centroidal_state, time, i);
+
+            // Positivity of z direction force
+            AddPositivityConstraints(time, i);
+
+            AddZeroPositionConstraints(i);
         }
 
-
-        // TODO: add final cost
         // TODO: instead of adding a constraint consider removing them as decision variables
         AddForceConstraints();
-//        PrintEqualityConstraints();
 
-        PrintDynamicsConstraints();
+//        PrintEqualityConstraints();
+//        PrintInequalityConstraints();
+//        PrintDynamicsConstraints();
 
         qp_solver->SetupQP(data_);
-        // TODO: is this x or dx?
-        // TODO: check the forces and dynamics. output trajectory does not seem to obeying the laws
         vector_t sol = qp_solver->Solve(data_);
+
+//        std::cout << "qp_sol: \n" << sol << std::endl;
 
         prev_traj_ = ConvertQPSolToTrajectory(sol, centroidal_state);
 
@@ -142,10 +155,18 @@ namespace mpc {
 
     void MPC::SetQuadraticFinalCost(const mpc::matrix_t& Phi) {
         if (Phi.rows() != num_states_ || Phi.cols() != num_states_) {
-            throw std::runtime_error("Wrong sized final cost.");
+            throw std::runtime_error("Wrong sized quadratic final cost.");
         }
 
         Phi_ = Phi;
+    }
+
+    void MPC::SetLinearFinalCost(const vector_t& w) {
+        if (w.size() != num_states_) {
+            throw std::runtime_error("Wrong sized linear final cost term.");
+        }
+
+        Phi_w_ = w;
     }
 
     void MPC::SetFrictionPyramid() {
@@ -205,53 +226,6 @@ namespace mpc {
                                          num_states_, force_spline_vars) = B_spline;
         data_.dynamics_constants.segment((node+1)*num_states_, num_states_) = -C;
 
-        // ----------------------------- Testing --------------------------- //
-//        std::cout << "A: \n" << A << std::endl;
-//        std::cout << "B: \n" << B << std::endl;
-//        std::cout << "C: \n" << C << std::endl;
-
-        // Modify state:
-        vector_t state_new = prev_traj_.GetStates().at(0);
-        vector_t xbar = CentroidalModel::ConvertManifoldStateToAlgebraState(state_new, state);
-        for (int i = 0; i < state_new.size(); i++) {
-            if (i < 6) {
-                state_new(i) += 0.1;
-            } else if (i > 11) {
-                state_new(i) += 0.01;
-            }
-        }
-
-        // Modify Inputs
-        auto switching_times = mpc::MPC::CreateDefaultSwitchingTimes(info_.num_switches, 4, info_.time_horizon);
-        Inputs input_new(prev_traj_.GetInputs());
-        std::array<mpc::Spline, 3> forces = {mpc::Spline(2, switching_times.at(0), true), mpc::Spline(2, switching_times.at(0), true),
-                                             mpc::Spline(2, switching_times.at(0), true)};
-
-        for (int coord = 0; coord < 3; coord++) {
-            for (int poly = 0; poly < input_new.GetForces().at(0).at(coord).GetNumPolyTimes(); poly++) {
-                std::vector<double> vars;
-                vars.push_back(1.1);
-                if (input_new.GetForces().at(0).at(coord).GetPolyVars().at(poly).size() == 2) {
-                    vars.push_back(0);
-                }
-
-                forces.at(coord).SetPolyVars(poly, vars);
-            }
-        }
-
-        for (int i = 0; i < num_ee_; i++) {
-            input_new.SetEndEffectorForce(i, forces);
-        }
-
-        vector_t joint_vels(num_joints_);
-        joint_vels << .1,0,0, 0,.2,.3, 0,.1,.1, .4,.5,.1;
-        input_new.SetJointVels(joint_vels, 0.01);
-        vector_t state_alg = CentroidalModel::ConvertManifoldStateToAlgebraState(state_new, state);
-        vector_t xdot_true = model_.CalcDynamics(state_alg, input_new, 0.01);
-        vector_t xdot_approx = A*(state_alg - xbar) +
-                               B*(input_new.GetInputVector(0.01) - prev_traj_.GetInputs().GetInputVector(0.01)) + C;
-//        std::cout << "xdot true: \n" << xdot_true << std::endl;
-//        std::cout << "xdot approx: \n" << xdot_approx << std::endl;
     }
 
 
@@ -259,11 +233,15 @@ namespace mpc {
         matrix_t G;
         vector_t g;
 
-        int spline_offset = GetForceSplineStartIdx() + info_.num_nodes*num_joints_ +
-                prev_traj_.GetInputs().GetTotalForceSplineVars() - 1;
+        int spline_offset = GetPosSplineStartIdx();
+
+        vector_t state1 = prev_traj_.GetStates().at(node);
+        if (node == 0) {
+            state1 = state;
+        }
 
         for (int ee = 0; ee < num_ee_; ee++) {
-            model_.GetFKLinearization(prev_traj_.GetStates().at(node), prev_traj_.GetInputs(), ee, G, g);
+            model_.GetFKLinearization(state1, state, prev_traj_.GetInputs(), ee, G, g);
             data_.equality_constraints.block(node * POS_VARS * num_ee_ + ee * POS_VARS,
                                              node * num_states_ + CentroidalModel::MOMENTUM_OFFSET,
                                              POS_VARS, num_joints_ + CentroidalModel::FLOATING_VEL_OFFSET) = G;
@@ -276,14 +254,11 @@ namespace mpc {
             for (int coord = 0; coord < POS_VARS; coord++) {
                 int vars_index, vars_affecting;
                 std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, time, coord);
-//                std::cout << "vars index: " << vars_index << std::endl;
-
                 data_.equality_constraints.block(node * POS_VARS * num_ee_ + ee * POS_VARS + coord,
                                                  spline_offset + vars_index - vars_affecting,
                                                  1,
                                                  vars_affecting) =
                                                          -prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose();
-//            std::cout << -prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose() << std::endl;
             }
         }
 
@@ -297,21 +272,63 @@ namespace mpc {
                 const auto& poly_vars = prev_traj_.GetInputs().GetForces().at(ee).at(coord).GetPolyVars();
                 const auto& poly_times = prev_traj_.GetInputs().GetForces().at(ee).at(coord).GetPolyTimes();
                 for (int i = 0; i < poly_times.size(); i++) {
-                    // TODO: check this
-                    if (poly_vars.at(i).size() == 1 && i < poly_times.size()-1 && poly_vars.at(i+1).size() == 1) {
+                    if ((poly_vars.at(i).size() == 1 && i < poly_times.size()-1 && poly_vars.at(i+1).size() == 1)
+                    || (i == 0 && poly_vars.at(i).size() == 1)) {
                         int vars_index, vars_affecting;
                         std::tie(vars_index, vars_affecting) = prev_traj_.GetInputs().GetForceSplineIndex(ee, poly_times.at(i), coord);
                         data_.equality_constraints(idx, force_offset + vars_index - 1) = 1;
                         data_.equality_constants(idx) = 0;
-                        idx += 1;
+                        idx++;
                         i++;
                     }
                 }
             }
         }
 
-//        std::cout << "force constraints: \n" << data_.equality_constraints.bottomRows(idx - info_.num_nodes * POS_VARS * num_ee_) << std::endl;
-//        std::cout << "force constants: \n" << data_.equality_constants.tail(idx - info_.num_nodes * POS_VARS * num_ee_) << std::endl;
+        // Need to enforce that fz is only a positive force for each end effector
+        int idx_in = data_.num_inequality_constraints - 1;
+        const int coord = 2;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            const auto& poly_vars = prev_traj_.GetInputs().GetForces().at(ee).at(coord).GetPolyVars();
+            const auto& poly_times = prev_traj_.GetInputs().GetForces().at(ee).at(coord).GetPolyTimes();
+            for (int i = 0; i < poly_times.size(); i++) {
+                if (poly_vars.at(i).size() != 1) {
+                    int vars_index, vars_affecting;
+                    std::tie(vars_index, vars_affecting) = prev_traj_.GetInputs().GetForceSplineIndex(ee, poly_times.at(i), coord);
+                    data_.inequality_constraints(idx_in, force_offset + vars_index - 2) = 1;   // TODO: will only work with POLY_ORDER=3
+                    data_.inequality_constants_lb(idx_in) = 0;
+                    data_.inequality_constants_ub(idx_in) = 5; // TODO: make not hard coded
+                    idx_in--;
+                }
+            }
+        }
+        // Check that we get everything we expect
+        assert(data_.num_inequality_constraints - idx_in - 1 == prev_traj_.GetInputs().GetNumForceValsZ());
+    }
+
+    // TODO: Consider how this works as the COM moves during traj opt
+    void MPC::AddZeroPositionConstraints(int node) {
+        // Also need to enforce that position z is zero when in contact with the ground
+        const int coord = 2;
+        int idx2 = info_.num_nodes*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + 2*(info_.num_nodes)*num_ee_;
+        int pos_offset = GetPosSplineStartIdx();
+        for (int ee = 0; ee < num_ee_; ee++) {
+            const auto& poly_vars = prev_traj_.GetPositions().at(ee).at(coord).GetPolyVars();
+            const auto& poly_times = prev_traj_.GetPositions().at(ee).at(coord).GetPolyTimes();
+            for (int i = 0; i < poly_times.size(); i++) {
+                if ((poly_vars.at(i).size() == 1 && i < poly_times.size()-1 && poly_vars.at(i+1).size() == 1)
+                    || (i == 0 && poly_vars.at(i).size() == 1) || (poly_vars.at(i).size() == 1 && i == poly_times.size()-1)) {
+                    int vars_index, vars_affecting;
+                    std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, poly_times.at(i), coord);
+                    data_.inequality_constraints(idx2, pos_offset + vars_index - 1) = 1;
+                    data_.inequality_constants_ub(idx2) = -model_.GetCOMPosition(prev_traj_.GetStates().at(node))(2) + 0.005;
+                    data_.inequality_constants_lb(idx2) = -model_.GetCOMPosition(prev_traj_.GetStates().at(node))(2) - 0.005;
+                    idx2++;
+                    i++;
+                }
+            }
+        }
+//        std::cout << "COM pos at Node #" << node << ": \n" << model_.GetCOMPosition(prev_traj_.GetStates().at(node)) << std::endl;
     }
 
     void MPC::AddFrictionConeConstraints(const vector_t& state, double time, int node) {
@@ -340,6 +357,36 @@ namespace mpc {
         data_.inequality_constants_lb.segment(node*(4*num_ee_ + 2*num_joints_), 4*num_ee_) = -qp_solver->GetInfinity(4*num_ee_);
     }
 
+    void MPC::AddPositivityConstraints(double time, int node) {
+        int idx = info_.num_nodes*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + node*num_ee_;
+        int force_offset = GetForceSplineStartIdx();
+        int coord = 2;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            int vars_index, vars_affecting;
+            std::tie(vars_index, vars_affecting) = prev_traj_.GetInputs().GetForceSplineIndex(ee, time, coord);
+            vector_t vars_lin = prev_traj_.GetInputs().GetForces().at(ee).at(coord).GetPolyVarsLin(time);
+
+            data_.inequality_constraints.block(idx, force_offset + vars_index - vars_affecting, 1, vars_affecting) = vars_lin.transpose();
+            data_.inequality_constants_lb(idx) = 0;
+            data_.inequality_constants_ub(idx) = 10; // TODO: make not hard coded
+            idx++;
+        }
+
+        // Also add positive z position constraint
+        idx = info_.num_nodes*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + (info_.num_nodes)*num_ee_;
+        int pos_offset = GetPosSplineStartIdx(); //force_offset + prev_traj_.GetInputs().GetTotalForceSplineVars() + info_.num_nodes*num_joints_ - 1;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            int vars_index, vars_affecting;
+            std::tie(vars_index, vars_affecting) = prev_traj_.GetPositions().at(ee).at(coord).GetVarsIndexEnd(time);
+            vector_t vars_lin = prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time);
+
+            data_.inequality_constraints.block(idx, pos_offset + vars_index - vars_affecting, 1, vars_affecting) = vars_lin.transpose();
+            data_.inequality_constants_lb(idx) = model_.GetCOMPosition(prev_traj_.GetStates().at(node))(2) - 0.05;
+            data_.inequality_constants_ub(idx) = 1000; // TODO: make not hard coded
+            idx++;
+        }
+    }
+
     void MPC::AddBoxConstraints(const vector_t& state, double time, int node) {
         // Velocity bounds
         data_.inequality_constants_ub.segment(node*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
@@ -360,59 +407,13 @@ namespace mpc {
                                            num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
     }
 
-//    void MPC::AddInequalityConstraints(const vector_t& state, double time, int node) {
-//        // Friction pyramid
-//        for (int ee = 0; ee < num_ee_; ee++) {
-//            std::vector<std::array<Spline, 3>> forces = prev_traj_.GetInputs().GetForces();
-//            for (int coord = 0; coord < POS_VARS; coord++) {
-//                vector_t vars_lin = prev_traj_.GetInputs().GetForces().at(ee).at(coord).GetPolyVarsLin(time);
-//
-//                int vars_index, vars_affecting;
-//                std::tie(vars_index, vars_affecting) = prev_traj_.GetInputs().GetForceSplineIndex(ee, time, coord);
-//
-//                for (int fric_con = 0; fric_con < 4; fric_con++) {
-//                    // All the friction constraints are effected by all 3 coordinates of the end effectors
-//                    data_.inequality_constraints.block(node * (4 * num_ee_ + 2 * num_joints_) + 4*ee + fric_con,
-//                                                       GetForceSplineStartIdx() + vars_index - vars_affecting,
-//                                                       1, vars_affecting) = friction_pyramid_(fric_con, coord)*vars_lin.transpose();
-//                }
-//                std::cout << "ee #" << ee << ", coord #" << coord << ", vars lin: " << vars_lin.transpose() << std::endl;
-//                std::cout << data_.inequality_constraints.block(node * (4 * num_ee_ + 2 * num_joints_) + 4*ee,
-//                                                                info_.num_nodes*num_states_ + vars_index - vars_affecting,
-//                                                                4, vars_affecting) << std::endl;
-//            }
-//        }
-//        data_.inequality_constants_ub.segment(node*(4*num_ee_ + 2*num_joints_), 4*num_ee_) = vector_t::Zero(4*num_ee_);
-//        data_.inequality_constants_lb.segment(node*(4*num_ee_ + 2*num_joints_), 4*num_ee_) = -qp_solver->GetInfinity(4*num_ee_);
-//
-//
-//        // Velocity bounds
-//        data_.inequality_constants_ub.segment(node*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
-//                                              num_joints_) = info_.vel_bounds;
-//        data_.inequality_constants_lb.segment(node*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
-//                                              num_joints_) = -info_.vel_bounds;
-//        data_.inequality_constraints.block(node*(4*num_ee_ + 2*num_joints_) + 4*num_ee_,
-//                                           GetVelocityIndex(node),
-//                                           num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
-//
-//        // Configuration bounds
-//        data_.inequality_constants_ub.segment(node*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
-//                                             num_joints_) = info_.joint_bounds;
-//        data_.inequality_constants_lb.segment(node*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
-//                                              num_joints_) = -info_.joint_bounds;
-//        data_.inequality_constraints.block(node*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ + num_joints_,
-//                                           GetJointIndex(node),
-//                                           num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
-//
-//    }
-
     void MPC::AddQuadraticTrackingCost(const vector_t& state_des, const matrix_t& Q) {
         if (Q.rows() != num_states_ || Q.cols() != num_states_) {
             throw std::runtime_error("Supplied quadratic cost term is the wrong size.");
         }
 
         Q_ = Q;
-        w_ = -2*Q*state_des;
+        w_ = -1*Q*state_des;
     }
 
     void MPC::AddHessianApproxCost(const mpc::vector_t &state, double time, int node) {
@@ -423,6 +424,13 @@ namespace mpc {
 
     void MPC::AddGradientCost(const mpc::vector_t &state, double time, int node) {
         data_.cost_linear.segment(node*num_states_, num_states_) = w_;
+    }
+
+    void MPC::AddFinalCost() {
+        data_.cost_quadratic.block(info_.num_nodes*num_states_, info_.num_nodes*num_states_,
+                                   num_states_, num_states_) = Phi_;
+
+        data_.cost_linear.segment(info_.num_nodes*num_states_, num_states_) = Phi_w_;
     }
 
     std::vector<std::vector<double>> MPC::CreateDefaultSwitchingTimes(int num_switches, int num_ee, double horizon) {
@@ -450,13 +458,17 @@ namespace mpc {
         return (node+1) * num_states_ + CentroidalModel::FLOATING_VEL_OFFSET + CentroidalModel::MOMENTUM_OFFSET;
     }
 
+    int MPC::GetPosSplineStartIdx() const {
+        return GetVelocityIndex(info_.num_nodes);
+    }
+
     Trajectory MPC::ConvertQPSolToTrajectory(const vector_t& qp_sol, const vector_t& init_state) const {
         // Start by copying the current trajectory to keep the switching times and what not
         Trajectory traj(prev_traj_);
 
         // Assign all the spline information
         int force_idx = GetForceSplineStartIdx();
-        int pos_idx = force_idx + info_.num_nodes*num_joints_ + traj.GetInputs().GetTotalForceSplineVars() - 1;
+        int pos_idx = GetPosSplineStartIdx(); //force_idx + info_.num_nodes*num_joints_ + traj.GetInputs().GetTotalForceSplineVars() - 1;
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int coord = 0; coord < POS_VARS; coord++) {
                 int vars_in_spline = traj.GetInputs().GetForces().at(ee).at(coord).GetTotalPolyVars();
@@ -513,5 +525,79 @@ namespace mpc {
         std::cout << "inequality ub: \n" << data_.inequality_constants_ub << std::endl;
         std::cout << "inequality lb: \n" << data_.inequality_constants_lb << std::endl;
     }
+
+    void MPC::UpdateQPSizes() {
+        data_.num_decision_vars = (info_.num_nodes+1)*num_states_ + info_.num_nodes*num_joints_ +
+                                  prev_traj_.GetInputs().GetTotalForceSplineVars() + prev_traj_.GetTotalPosSplineVars();
+        data_.num_dynamics_constraints = (info_.num_nodes+1)*num_states_;
+        data_.num_equality_constraints = (info_.num_nodes+1)*POS_VARS*num_ee_ + prev_traj_.GetInputs().GetTotalForceConstants();
+        data_.num_inequality_constraints = info_.num_nodes*(4*num_ee_ + 2*num_joints_) + 4*num_ee_ +
+                                           prev_traj_.GetInputs().GetNumForceValsZ() + 2*(info_.num_nodes+1)*num_ee_ +
+                                           prev_traj_.GetTotalPosConstants();
+    }
+
+    void MPC::SetDefaultGaitTrajectory(Gaits gait, int num_polys, const std::array<std::array<double, 3>, 4>& ee_pos) {
+        if (num_ee_ != 4) {
+            throw std::runtime_error("Default gaits have only been implemented for 4 end effectors!");
+        }
+
+        assert(prev_traj_.GetTotalTime() >= 0.75);  // So we have time to make the gait
+
+        std::vector<std::vector<double>> switching_times;
+
+        switch (gait) {
+            case Trot: {
+                std::vector<double> times;
+                times.push_back(0.35);
+                times.push_back(0.75);
+
+                Spline type1 = Spline(num_polys, times, true);
+                Spline type2 = Spline(num_polys, times, false);
+
+                for (int ee = 0; ee < num_ee_; ee++) {
+                    if (ee == 0 || ee == 3) {
+                        prev_traj_.SetEndEffectorSplines(ee, type1);
+                    } else {
+                        prev_traj_.SetEndEffectorSplines(ee, type2);
+                    }
+                    for (int coord = 0; coord < POS_VARS; coord++) {
+                        prev_traj_.SetPositionsForAllTime(ee, ee_pos.at(ee));
+                    }
+                }
+
+                prev_traj_.PrintTrajectoryToFile("trot_test.txt");
+                break;
+            }
+            case Amble: {
+                throw std::runtime_error("Amble not implemented yet!");
+                break;
+            }
+            case Static_Walk: {
+                throw std::runtime_error("Static Walk not implemented yet!");
+                break;
+            }
+            default:
+                throw std::runtime_error("Unsupported gait.");
+        }
+
+    }
+
+    void MPC::SetStateTrajectoryWarmStart(const std::vector<vector_t>& states) {
+        assert(states.size() == info_.num_nodes + 1 && states.at(0).size() == prev_traj_.GetStates().at(0).size());
+
+        for (int node = 0; node < info_.num_nodes + 1; node++) {
+            prev_traj_.SetState(node, states.at(node));
+        }
+    }
+
+    vector_t MPC::GetTargetConfig() const {
+        return prev_traj_.GetStates().at(1).tail(num_states_ - 5);
+    }
+
+    vector_t MPC::GetTargetVelocity() const {
+        return model_.ComputeBaseVelocities(prev_traj_.GetStates().at(1),
+                                                   prev_traj_.GetInputs().GetVel(0));
+    }
+
 
 } // mpc

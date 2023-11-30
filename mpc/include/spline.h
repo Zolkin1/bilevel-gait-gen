@@ -134,6 +134,15 @@ namespace mpc {
          */
         void SetAllPositions(double position);
 
+        int GetNumNonConstantValParams() const;
+
+        double GetTotalTime() const;
+
+        // Time gives the dt that this segment takes up, not the absolute time
+        void AddPoly(double time);
+
+        void RemoveUnused(double time);
+
     protected:
     private:
         bool IsConstantPoly(int idx) const;

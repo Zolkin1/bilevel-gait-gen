@@ -137,8 +137,30 @@ namespace mpc {
 
         const vector_t& GetVel(int idx) const;
 
+        /**
+         * Gets the number of parameters describing the non-constant force values
+         * (i.e. not the derivative values)
+         * @return
+         */
+        int GetNumForceValsZ() const;
+
+        // Returns a vector form to be multiplied by the B matrix
+        vector_t AsQPVector(double time) const;
+
+        void AddPolys(double time);
+
+        void RemoveUnusedPolys(double time);
+
+        void SetInitTime(double time);
+
+        double GetInitTime() const;
+
+        void SetForceSpline(int ee, int coord, const Spline& spline);
+
     protected:
     private:
+        void UpdateForceSplineVarsCount();
+
         std::vector<std::array<Spline, 3>> forces_;    // We need a spline for each coordinate of each end effector
         // TODO: remove positions
         std::vector<std::array<Spline, 3>> positions_;
@@ -149,6 +171,8 @@ namespace mpc {
         static int constexpr POS_VARS = 3;
 
         int force_spline_vars_;
+
+        double init_time_;
     };
 } // mpc
 

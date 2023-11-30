@@ -10,9 +10,9 @@ namespace mpc {
         for (auto & switching_time : switching_times) {
             // TODO: Clean up
             std::array<Spline, 3> end_effector_force =
-                    {Spline(2, switching_time, true), Spline(2, switching_time, true), Spline(2, switching_time, true)};
+                    {Spline(3, switching_time, true), Spline(3, switching_time, true), Spline(3, switching_time, true)};
             std::array<Spline, 3> end_effector_pos =
-                    {Spline(2, switching_time, false), Spline(2, switching_time, false), Spline(2, switching_time, false)};
+                    {Spline(3, switching_time, false), Spline(3, switching_time, false), Spline(3, switching_time, false)};
             forces_.emplace_back(end_effector_force);
 //            positions_.emplace_back(end_effector_pos);        NOTE: Removed positions from the inputs
         }
@@ -27,6 +27,8 @@ namespace mpc {
                 force_spline_vars_ += force.at(coord).GetTotalPolyVars();
             }
         }
+
+        init_time_ = 0;
     }
 
     Inputs::Inputs(const Inputs& input) {
@@ -43,6 +45,8 @@ namespace mpc {
         joint_vels_ = input.GetAllVels();
 
         node_dt_ = input.GetNodeDt();
+
+        init_time_ = input.GetInitTime();
     }
 
     Inputs Inputs::operator=(const mpc::Inputs &input) {
@@ -58,7 +62,14 @@ namespace mpc {
             }
         }
 
+        joint_vels_.erase(joint_vels_.begin(), joint_vels_.end());
+        for (int i = 0; i < input.GetAllVels().size(); i++) {
+            joint_vels_.push_back(input.GetVel(i));
+        }
+
         node_dt_ = input.GetNodeDt();
+
+        init_time_ = input.GetInitTime();
 
         return *this;
 //        Inputs inp(input);
@@ -232,5 +243,74 @@ namespace mpc {
 
     const vector_t& Inputs::GetVel(int idx) const {
         return joint_vels_.at(idx);
+    }
+
+    int Inputs::GetNumForceValsZ() const {
+        int force_vals = 0;
+        int coord = 2;
+        for (int ee = 0; ee < forces_.size(); ee++) {
+            force_vals += forces_.at(ee).at(coord).GetNumNonConstantValParams();
+        }
+
+        return force_vals;
+    }
+
+    vector_t Inputs::AsQPVector(double time) const {
+        int node = floor((time-init_time_)/node_dt_);
+        int num_joints = joint_vels_.at(node).size();
+        vector_t inp = vector_t::Zero(force_spline_vars_ + num_joints);
+        inp.segment(force_spline_vars_, num_joints) = joint_vels_.at(node);
+
+        int idx = 0;
+        for (const auto& force : forces_) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                inp.segment(idx, force.at(coord).GetTotalPolyVars()) =
+                        force.at(coord).GetAllPolyVars();
+                idx += force.at(coord).GetTotalPolyVars();
+            }
+        }
+
+        return inp;
+    }
+
+    void Inputs::AddPolys(double time) {
+        for (auto& force : forces_) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                force.at(coord).AddPoly(time);
+            }
+        }
+
+        UpdateForceSplineVarsCount();
+    }
+
+    void Inputs::RemoveUnusedPolys(double time) {
+        for (auto &force: forces_) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                force.at(coord).RemoveUnused(time);
+            }
+        }
+
+        UpdateForceSplineVarsCount();
+    }
+
+    void Inputs::UpdateForceSplineVarsCount() {
+        force_spline_vars_ = 0;
+        for (const auto& force : forces_) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                force_spline_vars_ += force.at(coord).GetTotalPolyVars();
+            }
+        }
+    }
+
+    void Inputs::SetInitTime(double time) {
+        init_time_ = time;
+    }
+
+    double Inputs::GetInitTime() const {
+        return init_time_;
+    }
+
+    void Inputs::SetForceSpline(int ee, int coord, const mpc::Spline& spline) {
+        forces_.at(ee).at(coord) = spline;
     }
 }

@@ -40,11 +40,17 @@ namespace mpc {
         MPCInfo(const MPCInfo& info);
     };
 
+    enum Gaits {
+        Trot = 0,
+        Amble = 1,
+        Static_Walk = 2
+    };
+
     class MPC final {
     public:
         MPC(const MPCInfo& info, const std::string& robot_urdf);
 
-        Trajectory Solve(const vector_t& centroidal_state);
+        Trajectory Solve(const vector_t& centroidal_state, double init_time);
 
         void SetWarmStartTrajectory(const Trajectory& trajectory);
 
@@ -53,8 +59,9 @@ namespace mpc {
 
         void SetLinearCostTerm(const vector_t& w);
 
-        // TODO: Use final cost!
         void SetQuadraticFinalCost(const matrix_t& Phi);
+
+        void SetLinearFinalCost(const vector_t& w);
 
         void AddQuadraticTrackingCost(const vector_t& state_des, const matrix_t& Q);
 
@@ -63,10 +70,23 @@ namespace mpc {
 
         void AddGradientCost(const vector_t& state, double time, int node);
 
+        void AddFinalCost();
+
         /**
          * Creates a default switching time vector for use in initialization
          */
         static std::vector<std::vector<double>> CreateDefaultSwitchingTimes(int num_switches, int num_ee, double horizon);
+
+        void SetDefaultGaitTrajectory(Gaits gait, int num_polys, const std::array<std::array<double, 3>, 4>& ee_pos);
+
+        void SetStateTrajectoryWarmStart(const std::vector<vector_t>& states);
+
+        // Gets the first target config. Assumes solve has already been called.
+        // Currently, does not return any momentum info
+        vector_t GetTargetConfig() const;
+
+        // Gets first target velocity. Gets the target body velocities and joints
+        vector_t GetTargetVelocity() const;
 
     protected:
     private:
@@ -83,7 +103,11 @@ namespace mpc {
 
         void AddForceConstraints();
 
+        void AddPositivityConstraints(double time, int node);
+
         void AddBoxConstraints(const vector_t& state, double time, int node);
+
+        void AddZeroPositionConstraints(int node);
 
         void AddFrictionConeConstraints(const vector_t& state, double time, int node);
 
@@ -95,8 +119,11 @@ namespace mpc {
 
         int GetJointIndex(int node) const;
 
+        int GetPosSplineStartIdx() const;
+
         Trajectory ConvertQPSolToTrajectory(const vector_t& qp_sol, const vector_t& init_state) const;
 
+        void UpdateQPSizes();
 
         // Temp functions
         void PrintDynamicsConstraints() const;
@@ -134,6 +161,7 @@ namespace mpc {
         matrix_t Q_;
         vector_t w_;
         matrix_t Phi_;
+        vector_t Phi_w_;
 
         // constants
         static int constexpr POS_VARS = 3;

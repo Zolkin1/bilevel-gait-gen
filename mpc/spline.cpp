@@ -31,11 +31,13 @@ namespace mpc {
 
                     poly_times_.push_back(times.at(time_idx));
                 } else {        // On a polynomial
+                    total_poly_ += num_polys_;
+
                     for (int i = 0; i < num_polys_ - 1; i++) {
                         poly_vars_.push_back(ZERO_POLY);
 
                         poly_times_.push_back((times.at(time_idx) - times.at(time_idx - 1))/num_polys
-                        + times.at(time_idx - 1));
+                        + poly_times_.at(poly_times_.size()-1));
 
                         num_all_poly_vars += 2;
                     }
@@ -53,22 +55,26 @@ namespace mpc {
                     poly_times_.push_back(times.at(time_idx));
                 } else {        // On a polynomial
                     total_poly_ += num_polys_;
+                    if (time_idx == 0) {
+                        poly_times_.push_back(times.at(time_idx)/num_polys);
+                        poly_vars_.push_back(ZERO_CONSTANT);
+                        num_all_poly_vars++;
+                        num_constant_++;
+                    }
+
                     for (int i = 0; i < num_polys_ - 1; i++) {
                         if (time_idx == 0) {
-                            poly_times_.push_back(times.at(time_idx)/num_polys);
-                            poly_vars_.push_back(ZERO_CONSTANT);
-                            num_all_poly_vars++;
-                            num_constant_++;
+                            poly_times_.push_back(times.at(time_idx)/num_polys + poly_times_.at(poly_times_.size()-1));
                         } else {
-                            poly_times_.push_back((times.at(time_idx) - times.at(time_idx - 1))/num_polys
-                                                  + times.at(time_idx - 1));
+                            poly_times_.push_back((times.at(time_idx) - times.at(time_idx - 1)) / num_polys
+                                                  + poly_times_.at(poly_times_.size()-1));
                         }
 
                         poly_vars_.push_back(ZERO_POLY);
                         num_all_poly_vars += 2;
                     }
 
-                    poly_times_.push_back(times.at(time_idx));
+//                    poly_times_.push_back(times.at(time_idx));
                 }
             }
         }
@@ -221,7 +227,7 @@ namespace mpc {
     vector_t Spline::GetPolyVarsLin(double time) const {
         int i = GetPolyIdx(time);
 
-        if (IsConstantPoly(i)) {
+        if (IsConstantPoly(i) || time == poly_times_.at(0)) {
             vector_t vars(1);
             vars << 1;
             return vars;
@@ -234,27 +240,27 @@ namespace mpc {
         if (poly_vars_.at(i).size() == 1) {
             // Final time derivative is fixed at 0
             vector_t vars = vector_t::Zero(3);
-            vars(0) = 1 - 1/pow(DeltaT, 2)*3*pow(time,2) + 1/pow(DeltaT, 3)*2*pow(time, 3);     // x0 coef
-            vars(2) = 1/pow(DeltaT, 2)*3*pow(time,2) - 1/pow(DeltaT, 3)*2*pow(time, 3);         // x1 coef
+            vars(0) = 1 - (1/pow(DeltaT, 2))*3*pow(time,2) + (1/pow(DeltaT, 3))*2*pow(time, 3);     // x0 coef
+            vars(2) = (1/pow(DeltaT, 2))*3*pow(time,2) - (1/pow(DeltaT, 3))*2*pow(time, 3);         // x1 coef
 
-            vars(1) = time - 1/DeltaT*2*pow(time, 2) + 1/pow(DeltaT, 2)*pow(time, 3);           // x0dot coef
+            vars(1) = time - (1/DeltaT)*2*pow(time, 2) + (1/pow(DeltaT, 2))*pow(time, 3);           // x0dot coef
             return vars;
         } else if (poly_vars_.at(i-1).size() == 1) {
             // Initial time derivative is fixed at 0
             vector_t vars = vector_t::Zero(3);
-            vars(0) = 1 - 1/pow(DeltaT, 2)*3*pow(time,2) + 1/pow(DeltaT, 3)*2*pow(time, 3);     // x0 coef
-            vars(1) = 1/pow(DeltaT, 2)*3*pow(time,2) - 1/pow(DeltaT, 3)*2*pow(time, 3);         // x1 coef
+            vars(0) = 1 - (1/pow(DeltaT, 2))*3*pow(time,2) + (1/pow(DeltaT, 3))*2*pow(time, 3);     // x0 coef
+            vars(1) = (1/pow(DeltaT, 2))*3*pow(time,2) - (1/pow(DeltaT, 3))*2*pow(time, 3);         // x1 coef
 
-            vars(2) = -1/DeltaT*pow(time, 2) + 1/pow(DeltaT, 2)*pow(time, 3);                   // x1dot coef
+            vars(2) = -(1/DeltaT)*pow(time, 2) + (1/pow(DeltaT, 2))*pow(time, 3);                   // x1dot coef
 
             return vars;
         } else {
             vector_t vars = vector_t::Zero(4);
-            vars(0) = 1 - 1/pow(DeltaT, 2)*3*pow(time,2) + 1/pow(DeltaT, 3)*2*pow(time, 3);     // x0 coef
-            vars(2) = 1/pow(DeltaT, 2)*3*pow(time,2) - 1/pow(DeltaT, 3)*2*pow(time, 3);         // x1 coef
+            vars(0) = 1 - (1/pow(DeltaT, 2))*3*pow(time,2) + (1/pow(DeltaT, 3))*2*pow(time, 3);     // x0 coef
+            vars(2) = (1/pow(DeltaT, 2))*3*pow(time,2) - (1/pow(DeltaT, 3))*2*pow(time, 3);         // x1 coef
 
-            vars(1) = time - 1/DeltaT*2*pow(time, 2) + 1/pow(DeltaT, 2)*pow(time, 3);           // x0dot coef
-            vars(3) = -1/DeltaT*pow(time, 2) + 1/pow(DeltaT, 2)*pow(time, 3);                   // x1dot coef
+            vars(1) = time - (1/DeltaT)*2*pow(time, 2) + (1/pow(DeltaT, 2))*pow(time, 3);           // x0dot coef
+            vars(3) = -(1/DeltaT)*pow(time, 2) + (1/pow(DeltaT, 2))*pow(time, 3);                   // x1dot coef
             return vars;
         }
 
@@ -267,6 +273,13 @@ namespace mpc {
     std::pair<int, int> Spline::GetVarsIndexEnd(double time) const {
         // Given the index of the switching time, determine the start index of the (minimal) vars vector that
         // describes this polynomial
+
+        // TODO: I will most likely have to rework a bunch of this when I move times
+        if (time == poly_times_.at(0)) {
+            int num_vars_affecting = 1;
+            int vars_idx = 1;
+            return std::pair<double, double>(vars_idx, num_vars_affecting);
+        }
 
         int idx = GetPolyIdx(time);
 
@@ -321,6 +334,51 @@ namespace mpc {
     void Spline::SetAllPositions(double position) {
         for (int i = 0; i < poly_vars_.size(); i++) {
             poly_vars_.at(i).at(0) = position;
+        }
+    }
+
+    int Spline::GetNumNonConstantValParams() const {
+        int num = 0;
+        for (const auto& poly : poly_vars_) {
+            if (poly.size() != 1) {
+                num += 1;
+            }
+        }
+
+        return num;
+    }
+
+    double Spline::GetTotalTime() const {
+        return poly_times_.at(poly_times_.size()-1);
+    }
+
+    void Spline::AddPoly(double time) {
+        int end_idx = poly_vars_.size()-1;
+        std::vector<double> const ZERO_CONSTANT = {0};
+        std::vector<double> const ZERO_POLY = {0, 0};
+
+        if ((poly_vars_.at(end_idx).size() == 1 && poly_vars_.at(end_idx-1).size() != 1)) {
+            poly_vars_.push_back(ZERO_CONSTANT);
+            total_poly_++;
+        } else if (poly_vars_.at(end_idx - num_polys_ + 1).size() == 2 && poly_vars_.at(end_idx).size() == 2) {
+            poly_vars_.push_back(ZERO_CONSTANT);
+            num_all_poly_vars++;
+            num_constant_++;
+            total_poly_++;
+        } else {
+            poly_vars_.push_back(ZERO_POLY);
+            total_poly_++;
+            num_all_poly_vars+=2;
+        }
+        poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time);
+    }
+
+    void Spline::RemoveUnused(double time) {
+        for (auto polytime = poly_times_.begin(); polytime != poly_times_.end()-1; polytime++) {
+            int i = std::distance(poly_times_.begin(), polytime);
+            if (poly_times_.at(i+1) < time && poly_times_.at(i) < time) {
+                poly_times_.erase(polytime);
+            }
         }
     }
 

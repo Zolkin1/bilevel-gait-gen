@@ -11,6 +11,7 @@
 
 namespace mpc {
     using vector_t = Eigen::VectorXd;
+    using matrix_t = Eigen::MatrixXd;
 
     class Trajectory {
         static int constexpr POS_VARS = 3;
@@ -56,12 +57,27 @@ namespace mpc {
          */
         std::pair<int, int> GetPositionSplineIndex(int end_effector, double time, int coord) const;
 
-        void SetPositionsForAllTime(std::vector<std::array<double, POS_VARS>> ee_pos);
+        void SetPositionsForAllTime(int ee, const std::array<double, POS_VARS>& ee_pos);
 
         void PrintTrajectoryToFile(const std::string& file_name) const;
 
+        int GetTotalPosConstants() const;
+
+        double GetTotalTime() const;
+
+        // Add an additional spline knot point
+        void AddPolys(double final_time);
+
+        void RemoveUnusedPolys(double init_time);
+
+        void SetInitTime(double time);
+
+        void SetEndEffectorSplines(int ee, const Spline& spline);
+
     protected:
     private:
+        void UpdatePosSplineVarsCount();
+
         std::vector<vector_t> states_;
         Inputs inputs_;
         std::vector<std::array<Spline, 3>> end_effector_pos_;

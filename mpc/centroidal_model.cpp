@@ -165,7 +165,7 @@ namespace mpc {
         // ------------------------------------------- //
         SetDynamicsRefState(ref_state);
         vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
-        C = integrator_->CalcIntegral(state_alg, input, time, 1, *this); //CalcDynamics(state, input, time);
+        C = integrator_->GetDt()*(CalcDynamics(state_alg, input, time) -A*state_alg -B*input.AsQPVector(time)); //integrator_->CalcIntegral(state_alg, input, time, 1, *this); //CalcDynamics(state, input, time);
 
         // Discretize with the integrator
         A = integrator_->CalcDerivWrtStateSingleStep(state, A);
@@ -173,7 +173,7 @@ namespace mpc {
 
     }
 
-    void CentroidalModel::GetFKLinearization(const vector_t& state, const Inputs& input, int end_effector,
+    void CentroidalModel::GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
                                                  matrix_t& A, vector_t& C) {
         vector_t q_pin = ConvertMPCStateToPinocchioState(state);
         A = matrix_t::Zero(3, pin_model_.nv);
@@ -188,7 +188,11 @@ namespace mpc {
 
         A = J.topRows<3>();
 
-        C = GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector));
+        const vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
+        C = GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector)) - A*state_alg.tail(pin_model_.nv);
+//        std::cout << "ee com frame pos: \n" << GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector)) << std::endl;
+//        std::cout << "COM position: \n" << pin_data_->com[0] << std::endl;
+//        std::cout << "C: \n" << C << std::endl;
     }
 
     matrix_t CentroidalModel::GetFKJacobianForEndEffector(const vector_t& q, const std::string& frame, bool compute_jac) {
@@ -206,7 +210,17 @@ namespace mpc {
 
     Eigen::Vector3d CentroidalModel::GetEndEffectorLocationCOMFrame(const vector_t& state, const std::string& frame) const {
         pinocchio::forwardKinematics(pin_model_, *pin_data_, ConvertMPCStateToPinocchioState(state));
-        return pin_data_->oMf.at(frame_map_.at(frame)).translation();
+        return pin_data_->oMf.at(frame_map_.at(frame)).translation() - GetCOMPosition(state);
+    }
+
+    vector_t CentroidalModel::ComputeBaseVelocities(const vector_t& state, const vector_t& vel) const {
+        vector_t q_pin = ConvertMPCStateToPinocchioState(state);
+        matrix6x_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q_pin);
+
+        matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
+        matrix_t CMMj = CMM.rightCols(num_joints_);
+        matrix_t CMMbinv = CMMb.inverse();  // TODO: maybe calc better
+        return ComputePinocchioVelocities(state, vel, CMMbinv, CMMj);
     }
 
     // Note: The MPC state is using a quaternion representation
@@ -316,6 +330,12 @@ namespace mpc {
                 state.tail(state.size()-MOMENTUM_OFFSET-FLOATING_VEL_OFFSET);
 
         return man_state;
+    }
+
+    vector_t CentroidalModel::GetCOMPosition(const vector_t& state) const {
+        assert(state.size() == pin_model_.nq + MOMENTUM_OFFSET);
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, ConvertMPCStateToPinocchioState(state));
+        return pin_data_->com[0];
     }
 
     void CentroidalModel::CreateFrameMap(const std::vector<std::string>& frames) {

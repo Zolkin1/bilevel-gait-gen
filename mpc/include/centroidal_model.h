@@ -43,7 +43,7 @@ namespace mpc {
 
         // See computeForwardKinematicsDerivatives
         // Needs to return with the frame transition built in
-        void GetFKLinearization(const vector_t& state, const Inputs& input, int end_effector,
+        void GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
                                     matrix_t& A, vector_t& C);
 
         matrix_t GetFKJacobianForEndEffector(const vector_t& state, const std::string& frame, bool compute_jac);
@@ -67,7 +67,11 @@ namespace mpc {
         static vector_t ConvertManifoldStateToAlgebraState(const vector_t& state, const vector_t& ref_state);
         static vector_t ConvertAlgebraStateToManifoldState(const vector_t& state, const vector_t& ref_state);
 
-        // conversion from full state to centroidal state
+        // Take in MPC state
+        vector_t GetCOMPosition(const vector_t& state) const;
+
+        vector_t ComputeBaseVelocities(const vector_t& state, const vector_t& vel) const;
+
     protected:
     private:
 

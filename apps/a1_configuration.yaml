@@ -1,9 +1,9 @@
 # Configurations for the robot
 
 # XML file location
-robot_xml: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/xml/a1.xml"
+robot_xml: "/home/zolkin/AmberLab/bilevel-gait-gen/models/a1_description/xml/a1.xml"
 
-robot_urdf: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/urdf/a1.urdf"
+robot_urdf: "/home/zolkin/AmberLab/bilevel-gait-gen/models/a1_description/urdf/a1.urdf"
 
 collision_frames: ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]    # for pinocchio
 collision_bodies: [4, 7, 10, 13]  # for mujoco
@@ -28,7 +28,7 @@ init_vel: [0., 0., 0., 0., 0., 0.,
            0., 0., 0.,
            0., 0., 0.]
 
-standing_config: [0., 0., 0.35, 1., 0., 0., 0.,
+standing_config: [0., 0., 0.36, 1., 0., 0., 0.,
                  -0.05, 0.2, -0.91,
                  0.05, 0.2, -0.91,
                  -0.0788, 0.6, -.91,
@@ -48,7 +48,7 @@ torque_bounds: [33.5, 33.5, 33.5,
                 33.5, 33.5, 33.5,
                 33.5, 33.5, 33.5,
                 33.5, 33.5, 33.5]
-friction_coef: 1 #0.3
+friction_coef: 0.3
 base_pos_gains: [20, 100]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
 base_ang_gains: [20, 100]  # kd_ang, kp_ang
 joint_gains: [70, 200]     # I can get these pretty high without getting close to the torque bounds
@@ -59,17 +59,17 @@ force_tracking_weight: 1
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
-num_nodes: 1
-time_horizon: 0.25
+num_nodes: 50
+time_horizon: .75
 num_qp: 1
-vel_bounds: [100, 100, 100,
-             100, 100, 100,
-             100, 100, 100,
-             100, 100, 100]
-joint_bounds: [100, 100, 100,
-               100, 100, 100,
-               100, 100, 100,
-               100, 100, 100]
+vel_bounds: [10, 10, 10,
+             10, 10, 10,
+             10, 10, 10,
+             10, 10, 10]
+joint_bounds: [10, 10, 10,
+               10, 10, 10,
+               10, 10, 10,
+               10, 10, 10]
 
 num_switches: 2
-integrator_dt: 0.02
+integrator_dt: 0.015

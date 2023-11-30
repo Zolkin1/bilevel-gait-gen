@@ -14,11 +14,11 @@ namespace mpc {
         qp_solver_.settings()->setAbsoluteTolerance(1e-3);
         qp_solver_.settings()->setRelativeTolerance(1e-3);
         qp_solver_.settings()->setScaledTerimination(false);
-        qp_solver_.settings()->setMaxIteration(4000);
+        qp_solver_.settings()->setMaxIteration(400);
 //        qp_solver_.settings()->setTimeLimit(2e-3); -- Can't do this unless I somehow recompile osqp-eigen with PROFILING=1
         qp_solver_.settings()->setRho(.01);
         qp_solver_.settings()->setAlpha(1.6);
-        qp_solver_.settings()->setWarmStart(true);
+        qp_solver_.settings()->setWarmStart(false);     // TODO: figure out warm starting with changing sizes
 
         prev_dual_sol_ = vector_t::Zero(data.num_dynamics_constraints + data.num_equality_constraints +
                 data.num_inequality_constraints);
@@ -55,7 +55,7 @@ namespace mpc {
         if (!qp_solver_.initSolver()) {
             throw std::runtime_error("Unable to initialize the solver.");
         }
-        std::cout << "warm start result: " << qp_solver_.setWarmStart(prev_qp_sol_, prev_dual_sol_) << std::endl;
+//        std::cout << "warm start result: " << qp_solver_.setWarmStart(prev_qp_sol_, prev_dual_sol_) << std::endl;
     }
 
     // TODO: remove data after debugging
@@ -71,9 +71,9 @@ namespace mpc {
         prev_dual_sol_ = qp_solver_.getDualSolution();
 
         vector_t temp = A_*qp_sol - ub_;
-        std::cout << "diff on upper bound: \n ---------- Dynamics ----------\n" << (temp).head(data.num_dynamics_constraints) <<
-                  "\n---------- Equality ----------\n" << (temp).segment(data.num_dynamics_constraints, data.num_equality_constraints) <<
-                  "\n---------- Inequality ----------\n" << (temp).tail(data.num_inequality_constraints)<< std::endl;
+//        std::cout << "diff on upper bound: \n ---------- Dynamics ----------\n" << (temp).head(data.num_dynamics_constraints) <<
+//                  "\n---------- Equality ----------\n" << (temp).segment(data.num_dynamics_constraints, data.num_equality_constraints) <<
+//                  "\n---------- Inequality ----------\n" << (temp).tail(data.num_inequality_constraints)<< std::endl;
 
         std::cout << "max diff: " << temp.maxCoeff() << std::endl;
         int ind = 0;

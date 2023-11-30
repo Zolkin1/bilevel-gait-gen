@@ -13,6 +13,7 @@
 #include "qp_control.h"
 
 namespace controller {
+    // TODO: Change the vector to be const refs
     // TODO: Need a way to update the desired forces and make sure it is using the correct number of contacts
     QPControl::QPControl(double control_rate, std::string robot_urdf, const std::string &foot_type, int nv,
                          const Eigen::VectorXd& torque_bounds, double friction_coef,

@@ -66,14 +66,17 @@ namespace controller {
     }
 
     void Controller::UpdateTargetConfig(const Eigen::VectorXd& q) {
+        assert(q.size() == config_target_.size());
         config_target_ = q;
     }
 
     void Controller::UpdateTargetVel(const Eigen::VectorXd& v) {
+        assert(v.size() == vel_target_.size());
         vel_target_ = v;
     }
 
     void Controller::UpdateTargetAcc(const Eigen::VectorXd& a) {
+        assert(a.size() == acc_target_.size());
         acc_target_ = a;
     }
 

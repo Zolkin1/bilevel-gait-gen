@@ -1,5 +1,5 @@
 # Setup Mujoco path
-set(MUJOCO_VERSION "mujoco-3.0.0" CACHE STRING "mujoco version")
+set(MUJOCO_VERSION "mujoco-3.0.1" CACHE STRING "mujoco version")
 set(MUJOCO_DIR "/home/$ENV{USER}/${MUJOCO_VERSION}" CACHE PATH "Path to Mujoco dir")
 message(STATUS "mujoco directory: ${MUJOCO_DIR}")
 

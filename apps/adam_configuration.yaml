@@ -1,10 +1,10 @@
 # Configurations for the robot
 
 # XML file location
-robot_xml: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/adam/adam.xml"
+robot_xml: "/home/zolkin/AmberLab/bilevel-gait-gen/models/adam/adam.xml"
 # note that the with feet model does not work right now and there are discrepencies between the URDF and the XML for that one.
 
-robot_urdf: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/adam/adam.urdf"
+robot_urdf: "/home/zolkin/AmberLab/bilevel-gait-gen/models/adam/adam.urdf"
 
 collision_frames: ["left_foot", "right_foot"]    # for pinocchio
 collision_bodies: [5, 9]  # for mujoco
