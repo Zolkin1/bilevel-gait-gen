@@ -61,7 +61,7 @@ namespace mpc {
 
         void PrintTrajectoryToFile(const std::string& file_name) const;
 
-        int GetTotalPosConstants() const;
+        int GetTotalPosConstantsZ() const;
 
         double GetTotalTime() const;
 
@@ -72,7 +72,8 @@ namespace mpc {
 
         void SetInitTime(double time);
 
-        void SetEndEffectorSplines(int ee, const Spline& spline);
+        void SetEndEffectorSplines(int ee, const Spline& force_spline,
+                                   const Spline& pos_spline);
 
     protected:
     private:

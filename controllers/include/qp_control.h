@@ -61,7 +61,8 @@ namespace controller {
         Eigen::VectorXd ComputeControlAction(const Eigen::VectorXd& q,
                                              const Eigen::VectorXd& v,
                                              const Eigen::VectorXd& a,
-                                             const Contact& contact) override;
+                                             const Contact& contact,
+                                             double time) override;
 
         void SetBasePosGains(double kv, double kp);
 

@@ -11,6 +11,7 @@
 #include "pinocchio/algorithm/centroidal-derivatives.hpp"
 #include "pinocchio/parsers/urdf.hpp"
 #include "pinocchio/spatial/explog-quaternion.hpp"
+#include "pinocchio/algorithm/center-of-mass.hpp"
 
 #include "centroidal_model.h"
 #include "euler_integrator.h"
@@ -34,7 +35,7 @@ namespace mpc {
         num_joints_ = pin_model_.nq - FLOATING_BASE_OFFSET;
         num_total_states_ = MOMENTUM_OFFSET + FLOATING_VEL_OFFSET + num_joints_;
 
-        robot_mass_ = pin_data_->mass[0];
+        robot_mass_ = pinocchio::computeTotalMass(pin_model_);
 
         num_ee_ = frames.size();
         frames_= frames;
@@ -124,11 +125,9 @@ namespace mpc {
                 int vars_idx, vars_affecting;
                 std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
 
-                assert(vars_affecting == vars_lin.size());
-
-                if (vars_affecting != 1) {
-                    B.block(coord, vars_idx - vars_affecting, 1, vars_lin.size()) = vars_lin.transpose();
-                }
+//                if (vars_affecting != 1) {
+                B.block(coord, vars_idx - vars_affecting, 1, vars_affecting) = vars_lin.transpose();
+//                }
             }
         }
 
@@ -380,6 +379,10 @@ namespace mpc {
         xdot.bottomRows(num_joints_) = input.GetVels(time);
 
         return xdot;
+    }
+
+    double CentroidalModel::GetMass() const {
+        return robot_mass_;
     }
 
 } // mpc

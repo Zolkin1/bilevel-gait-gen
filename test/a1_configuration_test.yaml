@@ -2,9 +2,9 @@
 # Configurations for the robot
 
 # XML file location
-robot_xml: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/xml/a1.xml"
+robot_xml: "/home/zolkin/AmberLab/bilevel-gait-gen/models/a1_description/xml/a1.xml"
 
-robot_urdf: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/urdf/a1.urdf"
+robot_urdf: "/home/zolkin/AmberLab/bilevel-gait-gen/models/a1_description/urdf/a1.urdf"
 
 collision_frames: ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]    # for pinocchio
 collision_bodies: [4, 7, 10, 13]  # for mujoco

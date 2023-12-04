@@ -50,21 +50,6 @@ int main() {
         warm_start_states.push_back(state);
     }
 
-    controller::MPCController mpc_controller (config.ParseNumber<double>("control_rate"),
-                                              config.ParseString("robot_urdf"),
-                                              config.ParseString("foot_type"),
-                                              config.ParseEigenVector("init_vel").size(),
-                                              config.ParseEigenVector("torque_bounds"),
-                                              config.ParseNumber<double>("friction_coef"),
-                                              config.ParseStdVector<double>("base_pos_gains"),
-                                              config.ParseStdVector<double>("base_ang_gains"),
-                                              config.ParseStdVector<double>("joint_gains"),
-                                              config.ParseNumber<double>("leg_tracking_weight"),
-                                              config.ParseNumber<double>("torso_tracking_weight"),
-                                              config.ParseNumber<double>("force_tracking_weight"),
-                                              info,
-                                              warm_start_states);
-
     mpc::MPC mpc(info, config.ParseString("robot_urdf"));
 
     auto switching_times = mpc::MPC::CreateDefaultSwitchingTimes(info.num_switches, 4, info.time_horizon);
@@ -97,7 +82,7 @@ int main() {
     // For the test just make everything constant, non-zero
 
     for (int ee = 0; ee < 4; ee++) {
-        traj.SetEndEffectorSplines(ee, forces1.at(0));
+        traj.SetEndEffectorSplines(ee, forces1.at(0), positions1.at(0));
 
 //        for (int coord = 0; coord < 3; coord++) {
 //            for (int poly = 0; poly < input.GetForces().at(ee).at(coord).GetNumPolyTimes(); poly++) {
@@ -170,7 +155,7 @@ int main() {
     solve_traj.PrintTrajectoryToFile("solved_traj.txt");
 
 
-    for (int i = 0; i < 1; i++) {
-        mpc.Solve(curr_state, (i+1)*info.integrator_dt);
-    }
+//    for (int i = 0; i < 1; i++) {
+//        mpc.Solve(curr_state, (i+1)*info.integrator_dt);
+//    }
 }

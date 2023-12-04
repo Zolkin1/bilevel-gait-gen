@@ -54,7 +54,8 @@ namespace controller {
     Eigen::VectorXd QPControl::ComputeControlAction(const Eigen::VectorXd& q,
                                                     const Eigen::VectorXd& v,
                                                     const Eigen::VectorXd& a,
-                                                    const Contact& contact) {
+                                                    const Contact& contact,
+                                                    double time) {
         UpdateConstraintsAndCost(q, v, a, contact);
 
         // Solve qp

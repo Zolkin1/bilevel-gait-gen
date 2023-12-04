@@ -88,6 +88,8 @@ namespace mpc {
         // Gets first target velocity. Gets the target body velocities and joints
         vector_t GetTargetVelocity() const;
 
+        const CentroidalModel& GetModel() const;
+
     protected:
     private:
         // ---------------- Private Member Functions ---------------- //
@@ -107,7 +109,7 @@ namespace mpc {
 
         void AddBoxConstraints(const vector_t& state, double time, int node);
 
-        void AddZeroPositionConstraints(int node);
+        void AddGroundIntersectConstraints();
 
         void AddFrictionConeConstraints(const vector_t& state, double time, int node);
 
@@ -162,6 +164,14 @@ namespace mpc {
         vector_t w_;
         matrix_t Phi_;
         vector_t Phi_w_;
+
+        // index helpers
+        int cone_constraint_start_;
+        int box_constraint_start_;
+        int positive_force_start_;
+        int ground_positive_start_;
+        int foot_on_ground_start_;
+
 
         // constants
         static int constexpr POS_VARS = 3;

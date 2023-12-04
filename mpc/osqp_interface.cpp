@@ -4,17 +4,17 @@
 #include "osqp_interface.h"
 
 namespace mpc {
-    OSQPInterface::OSQPInterface(QPData data) : QPInterface(data.num_decision_vars) {
+    OSQPInterface::OSQPInterface(QPData data, bool verbose) : QPInterface(data.num_decision_vars), verbose_(verbose){
 
         // Set solver settings
-        qp_solver_.settings()->setVerbosity(true);
+        qp_solver_.settings()->setVerbosity(verbose_);
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setAbsoluteTolerance(1e-3);
         qp_solver_.settings()->setRelativeTolerance(1e-3);
         qp_solver_.settings()->setScaledTerimination(false);
-        qp_solver_.settings()->setMaxIteration(400);
+        qp_solver_.settings()->setMaxIteration(4000);
 //        qp_solver_.settings()->setTimeLimit(2e-3); -- Can't do this unless I somehow recompile osqp-eigen with PROFILING=1
         qp_solver_.settings()->setRho(.01);
         qp_solver_.settings()->setAlpha(1.6);
@@ -37,6 +37,19 @@ namespace mpc {
 
         ConvertDataToOSQPConstraints(data);
         ConvertDataToOSQPCost(data);
+
+        // TODO: Remove
+        for (int i = 0; i < A_.rows(); i++) {
+            for (int j = 0; j < A_.cols(); j++) {
+                assert(!std::isnan(A_(i,j)));
+            }
+        }
+
+        for (int i = 0; i < P_.rows(); i++) {
+            for (int j = 0; j < P_.cols(); j++) {
+                assert(!std::isnan(P_(i,j)));
+            }
+        }
 
         Eigen::SparseMatrix<double> sparseA = A_.sparseView();
         Eigen::SparseMatrix<double> sparseP = P_.sparseView();
@@ -67,29 +80,39 @@ namespace mpc {
 
         vector_t qp_sol = qp_solver_.getSolution();
 
+        // TODO: Remove
+        for (int i = 0; i < qp_sol.size(); i++) {
+            assert(!std::isnan(qp_sol(i)));
+        }
+
         prev_qp_sol_ = qp_sol;
         prev_dual_sol_ = qp_solver_.getDualSolution();
 
-        vector_t temp = A_*qp_sol - ub_;
-//        std::cout << "diff on upper bound: \n ---------- Dynamics ----------\n" << (temp).head(data.num_dynamics_constraints) <<
-//                  "\n---------- Equality ----------\n" << (temp).segment(data.num_dynamics_constraints, data.num_equality_constraints) <<
-//                  "\n---------- Inequality ----------\n" << (temp).tail(data.num_inequality_constraints)<< std::endl;
+        if (verbose_) {
+            vector_t temp = A_ * qp_sol - ub_;
+//            std::cout << "diff on upper bound: \n ---------- Dynamics ----------\n"
+//                      << (temp).head(data.num_dynamics_constraints) <<
+//                      "\n---------- Equality ----------\n"
+//                      << (temp).segment(data.num_dynamics_constraints, data.num_equality_constraints) <<
+//                      "\n---------- Inequality ----------\n" << (temp).tail(data.num_inequality_constraints)
+//                      << std::endl;
 
-        std::cout << "max diff: " << temp.maxCoeff() << std::endl;
-        int ind = 0;
-        for (int i = 0; i < temp.size(); i++) {
-            if (temp(i) == temp.maxCoeff()) {
-                ind = i;
+            std::cout << "max diff: " << temp.maxCoeff() << std::endl;
+            int ind = 0;
+            for (int i = 0; i < temp.size(); i++) {
+                if (temp(i) == temp.maxCoeff()) {
+                    ind = i;
+                }
             }
+
+            std::cout << "index of max: " << ind << std::endl;
+
+            std::cout << "row of constraint mat at max: " << A_.row(ind) << std::endl;
+
+            std::cout << "num dynamics constraints: " << data.num_dynamics_constraints << std::endl;
+            std::cout << "num equality constraints: " << data.num_equality_constraints << std::endl;
+            std::cout << "num inequality constraints: " << data.num_inequality_constraints << std::endl;
         }
-
-        std::cout << "index of max: " << ind << std::endl;
-
-        std::cout << "row of constraint mat at max: " << A_.row(ind) << std::endl;
-
-        std::cout << "num dynamics constraints: " << data.num_dynamics_constraints << std::endl;
-        std::cout << "num equality constraints: " << data.num_equality_constraints << std::endl;
-        std::cout << "num inequality constraints: " << data.num_inequality_constraints << std::endl;
 
 //        std::cout << "diff on uper bound: \n" << A_*qp_sol - ub_ << std::endl;
 

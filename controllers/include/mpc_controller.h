@@ -13,6 +13,8 @@ namespace controller {
      * Class that uses MPC as a feedback controller
      */
     using vector_t = Eigen::VectorXd;
+    using matrix_t = Eigen::MatrixXd;
+
     class MPCController : public Controller {
     public:
         MPCController(double control_rate, std::string robot_urdf, const std::string& foot_type, int nv,
@@ -24,16 +26,21 @@ namespace controller {
                   double torso_weight,
                   double force_weight,
                   mpc::MPCInfo info,
-                  const std::vector<vector_t>& warm_start_states);
+                  const std::vector<vector_t>& warm_start_states,
+                  const vector_t& state_des);
 
         vector_t ComputeControlAction(const vector_t& q,
                                       const vector_t& v,
                                       const vector_t& a,
-                                      const Contact& contact) override;
+                                      const Contact& contact,
+                                      double time) override;
                                       //double time) override;
+
     protected:
     private:
         vector_t ReconstructState(const vector_t& q, const vector_t& v, const vector_t& a) const;
+
+        double prev_time_;
 
         QPControl qp_controller_;
         mpc::MPC mpc_;

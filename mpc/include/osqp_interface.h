@@ -13,7 +13,7 @@
 namespace mpc {
     class OSQPInterface : public QPInterface {
     public:
-        OSQPInterface(QPData data);
+        OSQPInterface(QPData data, bool verbose);
 
         void SetupQP(const QPData& data) override;
 
@@ -37,6 +37,8 @@ namespace mpc {
         vector_t prev_dual_sol_;
 
         int run;
+
+        bool verbose_;
     };
 } // mpc
 

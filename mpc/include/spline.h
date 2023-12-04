@@ -72,8 +72,6 @@ namespace mpc {
 
         void SetAllSplineVars(const std::vector<std::vector<double>>& vars);
 
-        void SetPolyVar(int poly_num, int var_idx);
-
         /**
          * Note that this function returns the minimum number of variables used to describe
          * the spline. i.e. all the constant polynomial sections are collapsed to one variable.
@@ -136,9 +134,11 @@ namespace mpc {
 
         int GetNumNonConstantValParams() const;
 
-        double GetTotalTime() const;
+        double GetEndTime() const;
 
         // Time gives the dt that this segment takes up, not the absolute time
+        // Note that this time is the time in between constant and non-contant,
+        // NOT the time a polynomial takes up.
         void AddPoly(double time);
 
         void RemoveUnused(double time);

@@ -14,7 +14,6 @@ namespace mpc {
         std::vector<double> const ZERO_CONSTANT = {0};
         std::vector<double> const ZERO_POLY = {0, 0};
 
-        // TODO: check times
         poly_times_.push_back(0);
         num_all_poly_vars = 0;
         total_poly_ = 0;
@@ -84,6 +83,7 @@ namespace mpc {
 //            poly_times_.push_back(times.at(times.size()-1));
             poly_vars_.push_back(ZERO_CONSTANT);
             num_all_poly_vars += 1;
+            num_constant_++;
         } else {
 //            poly_vars_.push_back(ZERO_POLY);
 //            num_all_poly_vars += 2;
@@ -150,7 +150,8 @@ namespace mpc {
                     (1 / DeltaT) * (2 * vars.at(2) + vars.at(3));
         double a3 = (1 / pow(DeltaT, 3)) * 2 * (vars.at(0) - vars.at(1)) +
                     (1 / pow(DeltaT, 2)) * (vars.at(2) + vars.at(3));
-        double val = vars.at(0) + vars.at(1) * time + a2 * pow(time, 2) + a3 * pow(time, 3);
+
+        double val = vars.at(0) + vars.at(2) * time + a2 * pow(time, 2) + a3 * pow(time, 3);
 
         return val;
     }
@@ -213,7 +214,7 @@ namespace mpc {
     }
 
     int Spline::GetPolyIdx(double time) const {
-        assert(time >= 0);
+        assert(time >= poly_times_.at(0));
         for (int i = 1; i < poly_times_.size(); i++) {     // Start at i = 1 because t = 0  at 0
             if (time <= poly_times_.at(i)) {
                 return i;
@@ -274,7 +275,6 @@ namespace mpc {
         // Given the index of the switching time, determine the start index of the (minimal) vars vector that
         // describes this polynomial
 
-        // TODO: I will most likely have to rework a bunch of this when I move times
         if (time == poly_times_.at(0)) {
             int num_vars_affecting = 1;
             int vars_idx = 1;
@@ -291,7 +291,6 @@ namespace mpc {
             }
         }
 
-//        vars_idx += poly_vars_.at(idx).size() - 1;      // Move index to the end of the vector
         int num_vars_affecting = 0;
         if (IsConstantPoly(idx)) {
             num_vars_affecting = 1;
@@ -348,7 +347,7 @@ namespace mpc {
         return num;
     }
 
-    double Spline::GetTotalTime() const {
+    double Spline::GetEndTime() const {
         return poly_times_.at(poly_times_.size()-1);
     }
 
@@ -359,25 +358,40 @@ namespace mpc {
 
         if ((poly_vars_.at(end_idx).size() == 1 && poly_vars_.at(end_idx-1).size() != 1)) {
             poly_vars_.push_back(ZERO_CONSTANT);
-            total_poly_++;
-        } else if (poly_vars_.at(end_idx - num_polys_ + 1).size() == 2 && poly_vars_.at(end_idx).size() == 2) {
+            poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time);
+        } else if (end_idx >= num_polys_ - 2 && poly_vars_.at(end_idx - num_polys_ + 2).size() == 2 &&
+                    poly_vars_.at(end_idx).size() == 2) {
             poly_vars_.push_back(ZERO_CONSTANT);
             num_all_poly_vars++;
             num_constant_++;
             total_poly_++;
+            poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time/num_polys_);
         } else {
             poly_vars_.push_back(ZERO_POLY);
             total_poly_++;
             num_all_poly_vars+=2;
+            poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time/num_polys_);
         }
-        poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time);
     }
 
     void Spline::RemoveUnused(double time) {
-        for (auto polytime = poly_times_.begin(); polytime != poly_times_.end()-1; polytime++) {
-            int i = std::distance(poly_times_.begin(), polytime);
+        for (int i = 0; i < poly_times_.size() - 1; i++) {
             if (poly_times_.at(i+1) < time && poly_times_.at(i) < time) {
-                poly_times_.erase(polytime);
+                if (IsConstantPoly(i+1)) {
+                    // Then we are getting rid of the first part of a constant, which is just an internal change
+
+                } else if (poly_vars_.at(i).size() == 1) {
+                    // Then we are removing the last part of a constant segment
+                    total_poly_--;
+                    num_constant_--;
+                    num_all_poly_vars--;
+                } else {
+                    total_poly_--;
+                    num_all_poly_vars -= 2;
+                }
+                poly_times_.erase(poly_times_.begin() + i);
+                poly_vars_.erase(poly_vars_.begin() + i);
+                i--;
             }
         }
     }

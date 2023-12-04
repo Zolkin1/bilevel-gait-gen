@@ -76,7 +76,7 @@ namespace simulator {
         UpdateContacts(data);
 
         // Compute control actions
-        Eigen::VectorXd control = low_level_controller_->ComputeControlAction(q, v, a, contact_);
+        Eigen::VectorXd control = low_level_controller_->ComputeControlAction(q, v, a, contact_, data->time);
 
         // Convert the control back to mujoco
         std::vector<mjtNum> muj_control = ConvertControlToMujoco(control);

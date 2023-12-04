@@ -103,7 +103,7 @@ namespace mpc {
 
     std::pair<int, int> Trajectory::GetPositionSplineIndex(int end_effector, double time, int coord) const {
         int num_spline_vars_before = 0;
-        for (int ee = 0; ee < end_effector; ee++) {     // TODO: start at 1 or 0?
+        for (int ee = 0; ee < end_effector; ee++) {
             for (int j = 0; j < POS_VARS; j++) {
                 num_spline_vars_before += end_effector_pos_.at(ee).at(j).GetTotalPolyVars();
             }
@@ -187,17 +187,19 @@ namespace mpc {
         file << "timings: " << std::endl;
         for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
             file << "end effector #" << ee << ": " << std::endl;
-            const auto& times = end_effector_pos_.at(ee).at(0).GetPolyTimes();
-            const auto& forces = inputs_.GetForces().at(ee).at(0).GetPolyTimes();
-            for (double time : times) {
-                file << time << ", ";
+            const auto& pos_times = end_effector_pos_.at(ee).at(0).GetPolyTimes();
+            const auto& force_times = inputs_.GetForces().at(ee).at(0).GetPolyTimes();
+            file << "force: ";
+            for (double force_time : force_times) {
+                file << force_time << ", ";
             }
             file << std::endl;
 
-            // Sanity check that they are the same
-            for (int i = 0; i < times.size(); i++) {
-                assert(times.at(i) == forces.at(i));
+            file << "positions: ";
+            for (double pos_time : pos_times) {
+                file << pos_time << ", ";
             }
+            file << std::endl;
         }
 
         file << "input joint vels: " << std::endl;
@@ -206,20 +208,18 @@ namespace mpc {
         file.close();
     }
 
-    int Trajectory::GetTotalPosConstants() const {
+    int Trajectory::GetTotalPosConstantsZ() const {
         int num_constants = 0;
         for (const auto& pos: end_effector_pos_) {
-            for (int coord = 0; coord < POS_VARS; coord++) {
-                num_constants += pos.at(coord).GetNumConstant();
-            }
+            num_constants += pos.at(2).GetNumConstant();
         }
 
         return num_constants;
     }
 
     double Trajectory::GetTotalTime() const {
-        assert(end_effector_pos_.at(0).at(0).GetTotalTime() == inputs_.GetForces().at(0).at(0).GetTotalTime());
-        return end_effector_pos_.at(0).at(0).GetTotalTime();
+        assert(end_effector_pos_.at(0).at(0).GetEndTime() == inputs_.GetForces().at(0).at(0).GetEndTime());
+        return end_effector_pos_.at(0).at(0).GetEndTime();
     }
 
     void Trajectory::AddPolys(double final_time) {
@@ -260,10 +260,10 @@ namespace mpc {
         }
     }
 
-    void Trajectory::SetEndEffectorSplines(int ee, const Spline& spline) {
+    void Trajectory::SetEndEffectorSplines(int ee, const Spline& force_spline, const Spline& pos_spline) {
         for (int coord = 0; coord < POS_VARS; coord++) {
-            end_effector_pos_.at(ee).at(coord) = spline;
-            inputs_.SetForceSpline(ee, coord, spline);
+            end_effector_pos_.at(ee).at(coord) = pos_spline;
+            inputs_.SetForceSpline(ee, coord, force_spline);
         }
     }
 

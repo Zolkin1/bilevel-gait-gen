@@ -39,7 +39,8 @@ namespace controller {
         virtual Eigen::VectorXd ComputeControlAction(const Eigen::VectorXd& q,
                                                      const Eigen::VectorXd& v,
                                                      const Eigen::VectorXd& a,
-                                                     const Contact& contact) = 0;
+                                                     const Contact& contact,
+                                                     double time) = 0;
 
         void UpdateTargetConfig(const Eigen::VectorXd& q);
         void UpdateTargetVel(const Eigen::VectorXd& v);

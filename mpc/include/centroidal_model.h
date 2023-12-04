@@ -72,6 +72,8 @@ namespace mpc {
 
         vector_t ComputeBaseVelocities(const vector_t& state, const vector_t& vel) const;
 
+        double GetMass() const;
+
     protected:
     private:
 

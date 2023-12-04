@@ -95,9 +95,9 @@ namespace mpc {
 
     vector_t Inputs::GetVels(double time) const {
         assert(time >= 0);
-        assert(time <= joint_vels_.size()*node_dt_);
+        assert(time <= joint_vels_.size()*node_dt_ + init_time_);
 
-        int idx = floor(time/node_dt_); // TODO: Check
+        int idx = floor((time - init_time_)/node_dt_);
         if (idx == joint_vels_.size()) {
             idx -= 1;
         }
