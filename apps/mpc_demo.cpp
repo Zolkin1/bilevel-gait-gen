@@ -141,6 +141,9 @@ int main() {
 
     matrix_t Q = matrix_t::Identity(24, 24);
     Q.topLeftCorner<6,6>() = matrix_t::Zero(6,6);
+    Q(6,6) = 10;
+    Q(7,7) = 10;
+    Q(8,8) = 30;
 
     const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(state_des, standing_state);
     std::cout << des_alg << std::endl;
@@ -155,7 +158,7 @@ int main() {
     solve_traj.PrintTrajectoryToFile("solved_traj.txt");
 
 
-//    for (int i = 0; i < 1; i++) {
-//        mpc.Solve(curr_state, (i+1)*info.integrator_dt);
-//    }
+    for (int i = 0; i < 10; i++) {
+        mpc.Solve(curr_state, 0);
+    }
 }

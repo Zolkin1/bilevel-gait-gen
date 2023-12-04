@@ -127,6 +127,8 @@ namespace mpc {
 
         void UpdateQPSizes();
 
+        double LineSearch(const vector_t& direction);
+
         // Temp functions
         void PrintDynamicsConstraints() const;
         void PrintEqualityConstraints() const;
@@ -172,6 +174,7 @@ namespace mpc {
         int ground_positive_start_;
         int foot_on_ground_start_;
 
+        vector_t prev_qp_sol;
 
         // constants
         static int constexpr POS_VARS = 3;

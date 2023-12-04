@@ -59,7 +59,7 @@ force_tracking_weight: 1
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
-num_nodes: 50
+num_nodes: 2
 time_horizon: .75
 num_qp: 1
 vel_bounds: [10, 10, 10,

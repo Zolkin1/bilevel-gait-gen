@@ -217,9 +217,10 @@ namespace mpc {
         return num_constants;
     }
 
+    // TODO: think about this more
     double Trajectory::GetTotalTime() const {
-        assert(end_effector_pos_.at(0).at(0).GetEndTime() == inputs_.GetForces().at(0).at(0).GetEndTime());
-        return end_effector_pos_.at(0).at(0).GetEndTime();
+//        assert(end_effector_pos_.at(0).at(0).GetEndTime() == inputs_.GetForces().at(0).at(0).GetEndTime());
+        return std::max(end_effector_pos_.at(0).at(0).GetEndTime(), inputs_.GetForces().at(0).at(0).GetEndTime());
     }
 
     void Trajectory::AddPolys(double final_time) {
