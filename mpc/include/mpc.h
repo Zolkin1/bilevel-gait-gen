@@ -127,7 +127,18 @@ namespace mpc {
 
         void UpdateQPSizes();
 
-        double LineSearch(const vector_t& direction);
+        double LineSearch(const vector_t& direction, const vector_t& init_state);
+
+        double GetMeritValue(const vector_t& x, double mu, const vector_t& init_state) const;
+
+        double GetCostValue(const vector_t& x) const;
+
+        vector_t GetEqualityConstraintValues(const Trajectory& traj, const vector_t& init_state) const;
+
+        // Gets the time at a node
+        double GetTime(int node) const;
+
+        double GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state) const;
 
         // Temp functions
         void PrintDynamicsConstraints() const;
@@ -175,6 +186,8 @@ namespace mpc {
         int foot_on_ground_start_;
 
         vector_t prev_qp_sol;
+
+        double init_time_;
 
         // constants
         static int constexpr POS_VARS = 3;

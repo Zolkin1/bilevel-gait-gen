@@ -4,7 +4,8 @@
 
 #include <fstream>
 
-#include "include/trajectory.h"
+#include "trajectory.h"
+#include "centroidal_model.h"
 
 namespace mpc {
 
@@ -266,6 +267,50 @@ namespace mpc {
             end_effector_pos_.at(ee).at(coord) = pos_spline;
             inputs_.SetForceSpline(ee, coord, force_spline);
         }
+    }
+
+    vector_t Trajectory::ConvertToQPVector() const {
+        vector_t qp_vec = vector_t::Zero(pos_spline_vars_ + inputs_.GetTotalForceSplineVars()
+                + inputs_.GetAllVels().at(0).size()*inputs_.GetAllVels().size()
+                + (states_.at(0).size()-1)*states_.size());
+
+        for (int i = 0; i < states_.size(); i++) {
+            qp_vec.segment(i*(states_.at(0).size()-1), states_.at(i).size()-1) =
+                    CentroidalModel::ConvertManifoldStateToAlgebraState(states_.at(i), states_.at(0));
+        }
+
+        qp_vec.segment( (states_.at(0).size()-1)*states_.size(), inputs_.GetTotalForceSplineVars()
+                            + inputs_.GetAllVels().at(0).size()*inputs_.GetAllVels().size()) = inputs_.AsQPVector();
+        qp_vec.tail(pos_spline_vars_) = PositionAsQPVector();
+
+        return qp_vec;
+    }
+
+    vector_t Trajectory::PositionAsQPVector() const {
+        vector_t pos_vec = vector_t::Zero(pos_spline_vars_);
+        int idx = 0;
+        for (const auto& pos : end_effector_pos_) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                pos_vec.segment(idx, pos.at(coord).GetTotalPolyVars()) =
+                        pos.at(coord).GetAllPolyVars();
+                idx += pos.at(coord).GetTotalPolyVars();
+            }
+        }
+
+        return pos_vec;
+    }
+
+    vector_t Trajectory::GetState(int node) const {
+        return states_.at(node);
+    }
+
+    Eigen::Vector3d Trajectory::GetPosition(int ee, double time) const {
+        Eigen::Vector3d position;
+        for (int coord = 0; coord < POS_VARS; coord++) {
+            position(coord) = end_effector_pos_.at(ee).at(coord).ValueAt(time);
+        }
+
+        return position;
     }
 
 } // mpc

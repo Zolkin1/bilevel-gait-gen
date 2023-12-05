@@ -313,4 +313,24 @@ namespace mpc {
     void Inputs::SetForceSpline(int ee, int coord, const mpc::Spline& spline) {
         forces_.at(ee).at(coord) = spline;
     }
+
+    vector_t Inputs::AsQPVector() const {
+        int num_joints = joint_vels_.at(0).size()*joint_vels_.size();
+
+        vector_t inp = vector_t::Zero(force_spline_vars_ + num_joints);
+        for (int i = 0; i < joint_vels_.size(); i++) {
+            inp.segment(force_spline_vars_ + joint_vels_.at(0).size()*i, joint_vels_.at(i).size()) = joint_vels_.at(i);
+        }
+
+        int idx = 0;
+        for (const auto& force : forces_) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                inp.segment(idx, force.at(coord).GetTotalPolyVars()) =
+                        force.at(coord).GetAllPolyVars();
+                idx += force.at(coord).GetTotalPolyVars();
+            }
+        }
+
+        return inp;
+    }
 }

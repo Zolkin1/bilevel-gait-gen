@@ -205,7 +205,7 @@ namespace mpc {
             idx += poly_vars_.at(poly).size();
 
             // Constants are always followed by redundant constants
-            if (poly_vars_.at(poly).size() == 1) {
+            if (poly_vars_.at(poly).size() == 1 && poly < poly_vars_.size()-1 && poly_vars_.at(poly+1).size() == 1) {
                 poly++;
             }
         }

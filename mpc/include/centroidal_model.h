@@ -74,6 +74,10 @@ namespace mpc {
 
         double GetMass() const;
 
+        vector_t GetDiscreteDynamics(const vector_t& state, const Inputs& input, double time) const;
+
+        const std::string& GetEndEffectorFrame(int ee) const;
+
     protected:
     private:
 

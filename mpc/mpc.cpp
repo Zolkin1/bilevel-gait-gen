@@ -61,11 +61,14 @@ namespace mpc {
         Phi_w_ = vector_t::Zero(num_states_);
 
         prev_qp_sol = vector_t::Zero(data_.num_decision_vars);
+
+        init_time_ = 0;
     }
 
     Trajectory MPC::Solve(const vector_t &centroidal_state, double init_time) {
         assert(centroidal_state.size() == num_states_ + 1);
 
+        init_time_ = init_time;
 
         prev_traj_.SetInitTime(init_time);
 
@@ -77,6 +80,9 @@ namespace mpc {
 
         // Reset to 0
         ResetQPMats();
+
+        prev_traj_.SetState(0, centroidal_state);
+        prev_qp_sol = prev_traj_.ConvertToQPVector();   // TODO: Needs to be more accuarate. - actually should not be needed
 
         // initial condition
         data_.dynamics_constraints.topLeftCorner(num_states_, num_states_) = -matrix_t::Identity(num_states_, num_states_);
@@ -109,7 +115,7 @@ namespace mpc {
         vector_t g;
         // Constraints on all the nodes BUT the first
         for (int i = 0; i < info_.num_nodes; i++) {
-            double time = i * info_.integrator_dt + init_time;
+            double time = GetTime(i);
             // ------------------------ Dynamics ------------------------ //
             AddDynamicsConstraints(centroidal_state, time, i);
 
@@ -121,7 +127,7 @@ namespace mpc {
 
         // Constraints on ALL the nodes
         for (int i = 0; i < info_.num_nodes+1; i++) {
-            double time = i * info_.integrator_dt + init_time;
+            double time = GetTime(i);
             // ------------------------ FK Constraint ------------------------ //
             AddFKConstraints(centroidal_state, time, i);
 
@@ -147,19 +153,34 @@ namespace mpc {
         qp_solver->SetupQP(data_);
         vector_t sol = qp_solver->Solve(data_);
 
-        std::cout << "norm: \n" << (sol - prev_qp_sol).norm() << std::endl;
+        double alpha = 1;
+        if (sol.size() == prev_qp_sol.size()) {
+            vector_t p = sol - prev_qp_sol;
+            std::cout << "norm: \n" << p.norm() << std::endl;
+            alpha = LineSearch(p, centroidal_state);
+        }
 
-        LineSearch(sol - prev_qp_sol);
-
-        prev_qp_sol = sol;
+        prev_qp_sol = alpha * (sol - prev_qp_sol) + prev_qp_sol;
 
 //        std::cout << "positive force product: \n" << data_.positive_force_constraints_*sol << std::endl;
 
 
 //        std::cout << "qp_sol: \n" << sol << std::endl;
 
-        prev_traj_ = ConvertQPSolToTrajectory(sol, centroidal_state);
+        prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, centroidal_state);
 
+        vector_t temp = prev_traj_.ConvertToQPVector();
+//        std::cout << "temp: \n" << temp << std::endl;
+//        std::cout << "prev_qp_sol: \n" << prev_qp_sol << std::endl;
+
+        for (int i  = 0; i < prev_qp_sol.size(); i++) {
+            if (std::abs(prev_qp_sol(i) - temp(i)) > 1e-1) {
+                std::cout << "i: " << i << std::endl;
+                std::cout << "prev_qp_sol: " << prev_qp_sol(i) << std::endl;
+                std::cout << "temp: " << temp(i) << std::endl;
+            }
+            //assert(std::abs(prev_qp_sol(i) - temp(i)) <= 1e-3);
+        }
 
         prev_traj_.PrintTrajectoryToFile("prev_traj_after_solve.txt");
 
@@ -168,6 +189,8 @@ namespace mpc {
 
     void MPC::SetWarmStartTrajectory(const mpc::Trajectory &trajectory) {
         prev_traj_ = trajectory;
+
+        prev_qp_sol = prev_traj_.ConvertToQPVector();
     }
 
     void MPC::SetQuadraticCostTerm(const matrix_t& Q) {
@@ -707,22 +730,82 @@ namespace mpc {
         return model_;
     }
 
-    double MPC::LineSearch(const vector_t& direction) {
+    // TODO: Consider removing the init state somehow
+    double MPC::LineSearch(const vector_t& direction, const vector_t& init_state) {
         double alpha = 1;
-        vector_t step_cost = (alpha*direction + prev_qp_sol).transpose()*(data_.cost_quadratic*(alpha*direction + prev_qp_sol))
-                + data_.cost_linear.transpose()*(alpha*direction + prev_qp_sol);
-        vector_t cost = (prev_qp_sol).transpose()*(data_.cost_quadratic*(prev_qp_sol)) + data_.cost_linear.transpose()*(prev_qp_sol);
-        const vector_t m = ((data_.cost_quadratic*prev_qp_sol) + data_.cost_linear).transpose() * direction;
-        while (cost(0) - step_cost(0) < alpha * m(0)) {
-            alpha *= 0.5;
-            step_cost = (alpha*direction + prev_qp_sol).transpose()*(data_.cost_quadratic*(alpha*direction + prev_qp_sol))
-                                 + data_.cost_linear.transpose()*(alpha*direction + prev_qp_sol);
-            cost = (prev_qp_sol).transpose()*(data_.cost_quadratic*(prev_qp_sol)) + data_.cost_linear.transpose()*(prev_qp_sol);
-        }
+        double mu = 10; // TODO: Check this value
 
-        std::cout << "final cost difference: " << cost(0) - step_cost(0) << std::endl;
+        // Note: for now just using the equality constraints on the merit function
+        double merit = GetMeritValue(prev_qp_sol, mu, init_state);
+        double merit_step = GetMeritValue(alpha*direction + prev_qp_sol, mu, init_state);
+        double merit_directional = GetMeritGradient(prev_qp_sol, direction, mu, init_state);
+
+        std::cout << "merit directional derivative: " << merit_directional << std::endl;
+        std::cout << "merit value: " << merit << std::endl;
+        std::cout << "starting merit with the step: " << merit_step << std::endl;
+
+//        int i = 0;
+//        while ((merit - merit_step) < -0.25 * alpha * merit_directional && i < 10) {
+//            alpha *= 0.5;
+//            merit_step = GetMeritValue(alpha*direction + prev_qp_sol, mu, init_state);
+//            i++;
+//        }
+
+        // TODO: I would expect alpha = 1 to be the most common value
+
+        std::cout << "final merit decrease: " << merit - merit_step << std::endl;
+        std::cout << "final alpha: " << alpha << std::endl;
 
         return alpha;
+    }
+
+    double MPC::GetMeritValue(const vector_t& x, double mu, const vector_t& init_state) const {
+        // TODO: Do more efficiently
+        const Trajectory temp_traj = ConvertQPSolToTrajectory(x, init_state);
+        temp_traj.PrintTrajectoryToFile("temp_traj.txt");
+
+        return GetCostValue(x) + mu*GetEqualityConstraintValues(temp_traj, init_state).lpNorm<1>();
+    }
+
+    double MPC::GetCostValue(const vector_t& x) const {
+        return x.dot(data_.cost_quadratic*(x)) + data_.cost_linear.dot(x);
+    }
+
+    // TODO: Something is very weird here. My QP solutions don't seem to satisfy this very well.
+    // Given I am solving to completition, I would expect this to to be smaller on the QP solutions
+    vector_t MPC::GetEqualityConstraintValues(const Trajectory& traj, const vector_t& init_state) const {
+        vector_t eq_constraints = vector_t::Zero(data_.num_fk_constraints_ + data_.num_dynamics_constraints);
+
+        for (int node = 0; node < info_.num_nodes; node++) {
+            eq_constraints.segment(node*num_states_, num_states_) =
+                    CentroidalModel::ConvertManifoldStateToAlgebraState(traj.GetState(node+1), init_state)
+                    - model_.GetDiscreteDynamics(CentroidalModel::ConvertManifoldStateToAlgebraState(traj.GetState(node), init_state),
+                            traj.GetInputs(), GetTime(node));
+
+            for (int ee = 0; ee < num_ee_; ee++) {
+                eq_constraints.segment(info_.num_nodes*num_states_ + node*3*num_ee_ + 3*ee, 3) =
+                        model_.GetEndEffectorLocationCOMFrame(traj.GetState(node), model_.GetEndEffectorFrame(ee))
+                        - traj.GetPosition(ee,GetTime(node));
+            }
+        }
+
+//        std::cout << "equality constraint violation: \n";
+//        std::cout << "dynamics: " << eq_constraints.head(data_.num_dynamics_constraints).lpNorm<1>() << std::endl;
+//        std::cout << "FK: " << eq_constraints.tail(data_.num_fk_constraints_).lpNorm<1>() << std::endl;
+
+        return eq_constraints;
+    }
+
+    double MPC::GetTime(int node) const {
+        return node * info_.integrator_dt + init_time_;
+    }
+
+    double MPC::GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state) const {
+        // TODO: Do more efficiently
+        const Trajectory temp_traj = ConvertQPSolToTrajectory(x, init_state);
+
+        return (data_.cost_quadratic*x + data_.cost_linear).dot(p)
+        - mu * GetEqualityConstraintValues(temp_traj, init_state).lpNorm<1>();
     }
 
 

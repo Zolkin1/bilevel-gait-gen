@@ -75,6 +75,14 @@ namespace mpc {
         void SetEndEffectorSplines(int ee, const Spline& force_spline,
                                    const Spline& pos_spline);
 
+        vector_t ConvertToQPVector() const;
+
+        vector_t PositionAsQPVector() const;
+
+        vector_t GetState(int node) const;
+
+        Eigen::Vector3d GetPosition(int ee, double time) const;
+
     protected:
     private:
         void UpdatePosSplineVarsCount();

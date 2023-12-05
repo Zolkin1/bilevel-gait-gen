@@ -59,7 +59,7 @@ int main() {
 
     vector_t standing_state = state;
     for (int i = 0; i < info.num_nodes+1; i++) {
-        state(1) += 0; //i/2.0;
+        state(1) += i/2.0;
         traj.SetState(i, state);
     }
 
@@ -129,6 +129,7 @@ int main() {
     // TODO: work on speed
     vector_t curr_state(6+7+12);
     curr_state = standing_state;
+    curr_state(7) += 0.5;
     //    curr_state << 1, 0, 0.1,
 //            0, 0, 0,
 //            0, 0, 0.35,
@@ -138,12 +139,14 @@ int main() {
     vector_t state_des = vector_t::Zero(6+7+12);
 //    state_des(11) = 1;
     state_des = standing_state;
+    state_des(7) = 1;
+    state_des(6) = 1;
 
     matrix_t Q = matrix_t::Identity(24, 24);
     Q.topLeftCorner<6,6>() = matrix_t::Zero(6,6);
-    Q(6,6) = 10;
-    Q(7,7) = 10;
-    Q(8,8) = 30;
+    Q(6,6) = 30;
+    Q(7,7) = 30;
+    Q(8,8) = 10;
 
     const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(state_des, standing_state);
     std::cout << des_alg << std::endl;
@@ -158,7 +161,7 @@ int main() {
     solve_traj.PrintTrajectoryToFile("solved_traj.txt");
 
 
-    for (int i = 0; i < 10; i++) {
-        mpc.Solve(curr_state, 0);
+    for (int i = 0; i < 3; i++) {
+        mpc.Solve(curr_state, 0);//(i+1)*info.integrator_dt);
     }
 }

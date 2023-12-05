@@ -14,7 +14,7 @@ namespace mpc {
         qp_solver_.settings()->setAbsoluteTolerance(1e-3);
         qp_solver_.settings()->setRelativeTolerance(1e-3);
         qp_solver_.settings()->setScaledTerimination(false);
-        qp_solver_.settings()->setMaxIteration(4000);
+        qp_solver_.settings()->setMaxIteration(5000);
 //        qp_solver_.settings()->setTimeLimit(2e-3); -- Can't do this unless I somehow recompile osqp-eigen with PROFILING=1
         qp_solver_.settings()->setRho(.01);
         qp_solver_.settings()->setAlpha(1.6);

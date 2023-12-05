@@ -77,7 +77,7 @@ namespace mpc {
 
         /**
          *
-         * @return the total number of scalar parameters used to describe the input
+         * @return the total number of scalar parameters used to describe the input at one time
          */
         int GetNumInputs() const;
 
@@ -156,6 +156,8 @@ namespace mpc {
         double GetInitTime() const;
 
         void SetForceSpline(int ee, int coord, const Spline& spline);
+
+        vector_t AsQPVector() const;
 
     protected:
     private:
