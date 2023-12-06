@@ -56,9 +56,10 @@ namespace mpc {
 
         int GetNumEndEffectors() const;
 
-        void SetDynamicsRefState(const vector_t& state);
+//        void SetDynamicsRefState(const vector_t& state);
 
-        vector_t CalcDynamics(const vector_t& state, const Inputs& input, double time) const;
+        vector_t CalcDynamics(const vector_t& state, const Inputs& input, double time,
+                              const vector_t& ref_state) const;
 
         static Eigen::Vector4d ConvertZYXRotToQuaternion(const Eigen::Vector3d& zyx_rot);
         static Eigen::Vector3d ConvertQuaternionToZYXRot(const Eigen::Vector4d& quat);
@@ -68,13 +69,14 @@ namespace mpc {
         static vector_t ConvertAlgebraStateToManifoldState(const vector_t& state, const vector_t& ref_state);
 
         // Take in MPC state
-        vector_t GetCOMPosition(const vector_t& state) const;
+        Eigen::Vector3d GetCOMPosition(const vector_t& state) const;
 
         vector_t ComputeBaseVelocities(const vector_t& state, const vector_t& vel) const;
 
         double GetMass() const;
 
-        vector_t GetDiscreteDynamics(const vector_t& state, const Inputs& input, double time) const;
+        vector_t GetDiscreteDynamics(const vector_t& state, const Inputs& input, double time,
+                                     const vector_t& ref_state) const;
 
         const std::string& GetEndEffectorFrame(int ee) const;
 
@@ -106,7 +108,7 @@ namespace mpc {
 
         vector_t prev_fk_q_;
 
-        vector_t ref_state_;
+//        vector_t ref_state_;
 
         std::map<std::string, int> frame_map_;
         std::vector<std::string> frames_;

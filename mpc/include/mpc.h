@@ -191,6 +191,12 @@ namespace mpc {
 
         // constants
         static int constexpr POS_VARS = 3;
+
+        bool first_run_;
+
+        vector_t line_search_res_;
+
+        double last_merit_value_;
     };
 } // mpc
 

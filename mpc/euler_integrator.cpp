@@ -23,7 +23,7 @@ namespace mpc {
         vector_t val = ic;
         double time = init_time;
         for (int i = 0; i < num_iters; i++) {
-            val += model.CalcDynamics(val, input, time)*dt_;
+            val += model.CalcDynamics(val, input, time, ic)*dt_;
         }
 
         return val;
@@ -34,7 +34,7 @@ namespace mpc {
         vector_t val = ic;
         double time = init_time;
         for (int i = 0; i < num_steps; i++) {
-            val += model.CalcDynamics(val, input, time)*dt_;
+            val += model.CalcDynamics(val, input, time, ic)*dt_;
         }
 
         return val;

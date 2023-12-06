@@ -63,6 +63,9 @@ namespace mpc {
         prev_qp_sol = vector_t::Zero(data_.num_decision_vars);
 
         init_time_ = 0;
+        first_run_ = true;
+
+        line_search_res_ = vector_t::Zero(data_.num_decision_vars);
     }
 
     Trajectory MPC::Solve(const vector_t &centroidal_state, double init_time) {
@@ -82,7 +85,7 @@ namespace mpc {
         ResetQPMats();
 
         prev_traj_.SetState(0, centroidal_state);
-        prev_qp_sol = prev_traj_.ConvertToQPVector();   // TODO: Needs to be more accuarate. - actually should not be needed
+//        prev_qp_sol = prev_traj_.ConvertToQPVector();
 
         // initial condition
         data_.dynamics_constraints.topLeftCorner(num_states_, num_states_) = -matrix_t::Identity(num_states_, num_states_);
@@ -110,6 +113,7 @@ namespace mpc {
         // the changed cost funciton
         // 12/4 at 11:30am: dynamics, box, positivity, cone work @50 nodes
         // 12/4 at 11:41am: I kind of think it might be working
+        // 12/5 todo: investigate why my merit function is always so large for alpha = 1, i would expect it to be smaller.
 
         matrix_t G;
         vector_t g;
@@ -153,10 +157,25 @@ namespace mpc {
         qp_solver->SetupQP(data_);
         vector_t sol = qp_solver->Solve(data_);
 
+
+        std::cout << "dynamics linearization violations norm: " << (data_.dynamics_constraints*sol - data_.dynamics_constants).lpNorm<1>() << std::endl;
+        Trajectory sol_traj = ConvertQPSolToTrajectory(sol, centroidal_state);
+        const double constraint_violation = GetEqualityConstraintValues(sol_traj, centroidal_state).lpNorm<1>();
+        std::cout << "dynamics violation norm: " << constraint_violation << std::endl;
+//        std::cout << "state at node 0: \n" << sol_traj.GetState(0) << std::endl;
+//        std::cout << "joint vel 0: \n" << sol_traj.GetInputs().GetVels(0.0) << std::endl;
+//        std::cout << "Discrete dynamics for node 5: \n" <<
+//            model_.GetDiscreteDynamics(CentroidalModel::ConvertManifoldStateToAlgebraState(sol_traj.GetState(5),
+//                                   centroidal_state), sol_traj.GetInputs(), 5*0.015, centroidal_state) << std::endl;
+//        std::cout << "Linear discrete dynamics for node 1: \n" << (data_.dynamics_constraints*sol - data_.dynamics_constants).segment(num_states_, num_states_) + sol.segment(2*num_states_, num_states_) << std::endl;
+//        std::cout << "Generated state at node 6: \n" << sol.segment(6*num_states_, num_states_) << std::endl;
+
+        // TODO: Fixed most of the angular momentum but there still may be an issue
+
         double alpha = 1;
         if (sol.size() == prev_qp_sol.size()) {
             vector_t p = sol - prev_qp_sol;
-            std::cout << "norm: \n" << p.norm() << std::endl;
+            std::cout << "dx norm: " << p.norm() << std::endl;
             alpha = LineSearch(p, centroidal_state);
         }
 
@@ -174,10 +193,11 @@ namespace mpc {
 //        std::cout << "prev_qp_sol: \n" << prev_qp_sol << std::endl;
 
         for (int i  = 0; i < prev_qp_sol.size(); i++) {
-            if (std::abs(prev_qp_sol(i) - temp(i)) > 1e-1) {
-                std::cout << "i: " << i << std::endl;
-                std::cout << "prev_qp_sol: " << prev_qp_sol(i) << std::endl;
-                std::cout << "temp: " << temp(i) << std::endl;
+            if (std::abs(prev_qp_sol(i) - temp(i)) > 1e-4) {
+//                std::cout << "---------------" << std::endl;
+//                std::cout << "i: " << i << std::endl;
+//                std::cout << "prev_qp_sol: " << prev_qp_sol(i) << std::endl;
+//                std::cout << "temp: " << temp(i) << std::endl;
             }
             //assert(std::abs(prev_qp_sol(i) - temp(i)) <= 1e-3);
         }
@@ -294,9 +314,8 @@ namespace mpc {
 
 //        std::cout << "node: " << node << ", Bpsline: \n" << B_spline << std::endl;
 
-// TODO: update indexing
         data_.dynamics_constraints.block((node+1)*num_states_,
-                                         node*num_joints_ + GetForceSplineStartIdx() + force_spline_vars - 1,
+                                         GetVelocityIndex(node),
                                          num_states_, num_joints_) = B_vels;
         data_.dynamics_constraints.block((node+1)*num_states_,
                                          GetForceSplineStartIdx(),
@@ -735,26 +754,47 @@ namespace mpc {
         double alpha = 1;
         double mu = 10; // TODO: Check this value
 
-        // Note: for now just using the equality constraints on the merit function
+       // Note: for now just using the equality constraints on the merit function
         double merit = GetMeritValue(prev_qp_sol, mu, init_state);
+        vector_t temp = alpha*direction + prev_qp_sol;
         double merit_step = GetMeritValue(alpha*direction + prev_qp_sol, mu, init_state);
+//        double merit_prev = GetMeritValue(line_search_res_, mu, init_state);
         double merit_directional = GetMeritGradient(prev_qp_sol, direction, mu, init_state);
 
         std::cout << "merit directional derivative: " << merit_directional << std::endl;
         std::cout << "merit value: " << merit << std::endl;
+//        std::cout << "merit from last line search: " << merit_prev << std::endl;
         std::cout << "starting merit with the step: " << merit_step << std::endl;
 
-//        int i = 0;
-//        while ((merit - merit_step) < -0.25 * alpha * merit_directional && i < 10) {
-//            alpha *= 0.5;
-//            merit_step = GetMeritValue(alpha*direction + prev_qp_sol, mu, init_state);
-//            i++;
+//        if (!first_run_) {
+            int i = 0;
+            while ((merit - merit_step) < -0.25 * alpha * merit_directional && i < 10) {
+                alpha *= 0.5;
+                merit_step = GetMeritValue(alpha * direction + prev_qp_sol, mu, init_state);
+                i++;
+            }
+//            assert(last_merit_value_ == GetMeritValue(line_search_res_, mu, init_state));
 //        }
+//
+//        if (first_run_) {
+//            first_run_ = false;
+//        }
+
+//        line_search_res_ = alpha*direction + prev_qp_sol;
+//        last_merit_value_ = GetMeritValue(line_search_res_, mu, init_state);
+//        assert(line_search_res_ == alpha*direction + prev_qp_sol);
+//        assert(GetCostValue(line_search_res_) == GetCostValue(alpha*direction + prev_qp_sol));
+//        assert(merit_step == GetMeritValue(alpha*direction + prev_qp_sol, mu, init_state));
+//        assert(merit_step == GetMeritValue(alpha*direction + prev_qp_sol, mu, init_state));
+//        assert(merit_step == GetMeritValue(alpha*direction + prev_qp_sol, mu, init_state));
 
         // TODO: I would expect alpha = 1 to be the most common value
 
         std::cout << "final merit decrease: " << merit - merit_step << std::endl;
         std::cout << "final alpha: " << alpha << std::endl;
+        std::cout << "new merit value: " << merit_step << std::endl;
+
+        std::cout << std::endl;
 
         return alpha;
     }
@@ -768,30 +808,36 @@ namespace mpc {
     }
 
     double MPC::GetCostValue(const vector_t& x) const {
-        return x.dot(data_.cost_quadratic*(x)) + data_.cost_linear.dot(x);
+        return 0.5*x.dot(data_.cost_quadratic*(x)) + data_.cost_linear.dot(x);
     }
 
     // TODO: Something is very weird here. My QP solutions don't seem to satisfy this very well.
-    // Given I am solving to completition, I would expect this to to be smaller on the QP solutions
+    // Given I am solving to completion, I would expect this to to be smaller on the QP solutions
     vector_t MPC::GetEqualityConstraintValues(const Trajectory& traj, const vector_t& init_state) const {
-        vector_t eq_constraints = vector_t::Zero(data_.num_fk_constraints_ + data_.num_dynamics_constraints);
+        vector_t eq_constraints = vector_t::Zero(data_.num_dynamics_constraints - num_states_);
 
         for (int node = 0; node < info_.num_nodes; node++) {
             eq_constraints.segment(node*num_states_, num_states_) =
                     CentroidalModel::ConvertManifoldStateToAlgebraState(traj.GetState(node+1), init_state)
                     - model_.GetDiscreteDynamics(CentroidalModel::ConvertManifoldStateToAlgebraState(traj.GetState(node), init_state),
-                            traj.GetInputs(), GetTime(node));
+                            traj.GetInputs(), GetTime(node), init_state);
+//            eq_constraints.segment(node*num_states_ + 3, 3) = Eigen::Vector3d::Zero();
 
-            for (int ee = 0; ee < num_ee_; ee++) {
-                eq_constraints.segment(info_.num_nodes*num_states_ + node*3*num_ee_ + 3*ee, 3) =
-                        model_.GetEndEffectorLocationCOMFrame(traj.GetState(node), model_.GetEndEffectorFrame(ee))
-                        - traj.GetPosition(ee,GetTime(node));
-            }
+//            std::cout << "dynamics: \n" << model_.GetDiscreteDynamics(CentroidalModel::ConvertManifoldStateToAlgebraState(traj.GetState(node), init_state),
+//                                                                      traj.GetInputs(), GetTime(node)) << std::endl;
+//            std::cout << "trajectory: \n" << CentroidalModel::ConvertManifoldStateToAlgebraState(traj.GetState(node+1), init_state) << std::endl;
+
+//            for (int ee = 0; ee < num_ee_; ee++) {
+//                eq_constraints.segment(info_.num_nodes*num_states_ + node*3*num_ee_ + 3*ee, 3) =
+//                        model_.GetEndEffectorLocationCOMFrame(traj.GetState(node), model_.GetEndEffectorFrame(ee))
+//                        - traj.GetPosition(ee,GetTime(node));
+//            }
         }
 
 //        std::cout << "equality constraint violation: \n";
-//        std::cout << "dynamics: " << eq_constraints.head(data_.num_dynamics_constraints).lpNorm<1>() << std::endl;
+//        std::cout << "dynamics: " << eq_constraints.head(data_.num_dynamics_constraints - num_states_).lpNorm<1>() << std::endl;
 //        std::cout << "FK: " << eq_constraints.tail(data_.num_fk_constraints_).lpNorm<1>() << std::endl;
+//        std::cout << std::endl;
 
         return eq_constraints;
     }

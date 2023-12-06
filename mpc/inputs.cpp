@@ -259,7 +259,7 @@ namespace mpc {
         int node = floor((time-init_time_)/node_dt_);
         int num_joints = joint_vels_.at(node).size();
         vector_t inp = vector_t::Zero(force_spline_vars_ + num_joints);
-        inp.segment(force_spline_vars_, num_joints) = joint_vels_.at(node);
+        inp.segment(force_spline_vars_, num_joints) = GetVels(time); //joint_vels_.at(node);
 
         int idx = 0;
         for (const auto& force : forces_) {

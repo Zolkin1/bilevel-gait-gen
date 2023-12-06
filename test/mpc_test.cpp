@@ -10,6 +10,7 @@
 #include "mpc.h"
 #include "config_parser.h"
 #include "spline.h"
+#include "centroidal_model.h"
 
 TEST_CASE("basic mpc", "[mpc]") {
 
@@ -70,6 +71,17 @@ TEST_CASE("transformations", "[mpc][utils]") {
     quat_sol = mpc::CentroidalModel::ConvertZYXRotToQuaternion(rot);
     for (int i = 0; i < quat_sol.size(); i++) {
         REQUIRE_THAT(quat_sol(i), WithinAbs(quat(i), MARGIN));
+    }
+
+    Eigen::VectorXd state(25);
+    Eigen::VectorXd ref_state(25);
+    state << 1, 2, 3, 4, 5, 6, 7, 8, 9, 0.1968, 0.1958, 0.0811, 0.9573, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25;
+    ref_state << 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 1, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24;
+
+    for (int i = 0; i < state.size(); i++) {
+        REQUIRE_THAT(state(i) - mpc::CentroidalModel::ConvertAlgebraStateToManifoldState(
+                mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(state, ref_state), ref_state)(i),
+                     WithinAbs(0, MARGIN));
     }
 }
 

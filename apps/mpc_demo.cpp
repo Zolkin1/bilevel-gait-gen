@@ -161,7 +161,7 @@ int main() {
     solve_traj.PrintTrajectoryToFile("solved_traj.txt");
 
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 5; i++) {
         mpc.Solve(curr_state, 0);//(i+1)*info.integrator_dt);
     }
 }
