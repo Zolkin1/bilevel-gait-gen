@@ -11,8 +11,9 @@
 #include "pinocchio/multibody/data.hpp"
 #include "pinocchio/parsers/urdf.hpp"
 
-#include "integrator.h"
+//#include "integrator.h"
 #include "inputs.h"
+#include "rk_integrator.h"
 
 namespace mpc {
     using vector_t = Eigen::VectorXd;
@@ -114,7 +115,7 @@ namespace mpc {
         std::vector<std::string> frames_;
 
         // integrator to be used
-        std::unique_ptr<Integrator> integrator_;
+        std::unique_ptr<RKIntegrator> integrator_;
 
         const Eigen::Vector3d GRAVITY;
     };

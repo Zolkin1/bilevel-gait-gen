@@ -16,13 +16,14 @@ namespace mpc {
                               const CentroidalModel& model) override;
 
         vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, int num_steps,
-                              const CentroidalModel& model) override;
+                              const CentroidalModel& model, const vector_t& ref_state) override;
 
         // Only does a single step
         matrix_t CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx) override;
 
         // Only does a single step
-        matrix_t CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu) override;
+        matrix_t CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu,
+                                             const matrix_t& dfdx) override;
     protected:
     private:
     };

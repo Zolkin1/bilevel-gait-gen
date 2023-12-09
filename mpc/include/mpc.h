@@ -25,7 +25,6 @@ namespace mpc {
 
     struct MPCInfo {
         int num_nodes;
-        double time_horizon;
         int num_qp_iterations;
         int num_contacts;
         double friction_coef;
@@ -35,6 +34,7 @@ namespace mpc {
         int discretization_steps;
         int num_switches;
         double integrator_dt;
+        double force_bound;
 
         MPCInfo();
         MPCInfo(const MPCInfo& info);
@@ -66,9 +66,10 @@ namespace mpc {
         void AddQuadraticTrackingCost(const vector_t& state_des, const matrix_t& Q);
 
         // TODO: Support gauss newton on the cost. For now just accept quadratic cost
-        void AddHessianApproxCost(const vector_t& state, double time, int node);
+        // TODO: Make private
+        void AddHessianApproxCost();
 
-        void AddGradientCost(const vector_t& state, double time, int node);
+        void AddGradientCost();
 
         void AddFinalCost();
 
@@ -90,6 +91,10 @@ namespace mpc {
 
         const CentroidalModel& GetModel() const;
 
+        void AddForceCost(double weight);
+
+        void PrintStats();
+
     protected:
     private:
         // ---------------- Private Member Functions ---------------- //
@@ -108,6 +113,8 @@ namespace mpc {
         void AddPositivityConstraints(double time, int node);
 
         void AddBoxConstraints(const vector_t& state, double time, int node);
+
+        void AddForceBoxConstraints(double time, int node);
 
         void AddGroundIntersectConstraints();
 
@@ -139,6 +146,9 @@ namespace mpc {
         double GetTime(int node) const;
 
         double GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state) const;
+
+        void RecordStats(double alpha, const vector_t& direction, const std::string& solve_type,
+                         const vector_t& ref_state);
 
         // Temp functions
         void PrintDynamicsConstraints() const;
@@ -178,6 +188,8 @@ namespace mpc {
         matrix_t Phi_;
         vector_t Phi_w_;
 
+        matrix_t Q_forces_;
+
         // index helpers
         int cone_constraint_start_;
         int box_constraint_start_;
@@ -192,11 +204,25 @@ namespace mpc {
         // constants
         static int constexpr POS_VARS = 3;
 
-        bool first_run_;
+
+        int run_num_;
 
         vector_t line_search_res_;
 
         double last_merit_value_;
+
+        vector_t prev_dual_sol_;
+
+        double mu_;
+
+        std::vector<double> equality_constraint_violations_;
+        std::vector<double> step_norm_;
+        std::vector<double> alpha_;
+        std::vector<double> cost_result_;
+        std::vector<double> merit_result_;
+        std::vector<double> merit_directional_deriv_;
+        std::vector<std::string> solve_type_;
+        std::vector<vector_t> ref_state_;
     };
 } // mpc
 

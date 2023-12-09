@@ -20,17 +20,16 @@ namespace mpc {
         Integrator(double dt);
 
         double GetDt() const;
-
-        virtual vector_t CalcIntegral(const vector_t& ic, const Inputs& input, double init_time, double final_time,
-                                      const CentroidalModel& model) = 0;
+        virtual vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, double final_time,
+                              const CentroidalModel& model) = 0;
 
         virtual vector_t CalcIntegral(const vector_t& ic, const Inputs& input, double init_time, int num_steps,
-                                      const CentroidalModel& model) = 0;
+                                      const CentroidalModel& model, const vector_t& ref_state) = 0;
 
         virtual matrix_t CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx) = 0;
 
-        virtual matrix_t CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu) = 0;
-
+        virtual matrix_t CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu,
+                                                     const matrix_t& dfdx) = 0;
     protected:
         double dt_;
 

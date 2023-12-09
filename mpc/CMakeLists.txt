@@ -8,7 +8,8 @@ set(MPC_HEADER_LIST "include/mpc.h"
         "include/inputs.h"
         "include/euler_integrator.h"
         "include/qp_data.h"
-        "include/osqp_interface.h")
+        "include/osqp_interface.h"
+        "include/rk_integrator.h")
 
 add_library(mpc mpc.cpp
         qp_interface.cpp
@@ -19,6 +20,7 @@ add_library(mpc mpc.cpp
         inputs.cpp
         euler_integrator.cpp
         osqp_interface.cpp
+        rk_integrator.cpp
         ${MPC_HEADER_LIST})
 target_include_directories(mpc PUBLIC include)
 

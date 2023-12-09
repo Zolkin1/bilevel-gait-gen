@@ -29,7 +29,6 @@ int main() {
     mpc::MPCInfo info;
     info.discretization_steps = config.ParseNumber<double>("discretization_steps");
     info.num_nodes = config.ParseNumber<int>("num_nodes");
-    info.time_horizon = config.ParseNumber<double>("time_horizon");
     info.num_qp_iterations = config.ParseNumber<int>("num_qp");
     info.friction_coef = config.ParseNumber<double>("friction_coef");
     info.vel_bounds = config.ParseEigenVector("vel_bounds");
@@ -38,7 +37,7 @@ int main() {
     info.num_switches = config.ParseNumber<int>("num_switches");
     info.integrator_dt = config.ParseNumber<double>("integrator_dt");
     info.num_contacts = info.ee_frames.size();
-
+    info.force_bound = config.ParseNumber<double>("force_bound");
 
     vector_t standing = config.ParseEigenVector("standing_config");
     standing.segment<4>(3) = ConvertMujocoQuatToPinocchioQuat(standing.segment<4>(3));
@@ -52,24 +51,32 @@ int main() {
 
     mpc::MPC mpc(info, config.ParseString("robot_urdf"));
 
-    auto switching_times = mpc::MPC::CreateDefaultSwitchingTimes(info.num_switches, 4, info.time_horizon);
+    auto switching_times = mpc::MPC::CreateDefaultSwitchingTimes(info.num_switches, 4, info.integrator_dt*(info.num_nodes));
     mpc::Trajectory traj(info.num_nodes+1, config.ParseEigenVector("init_config").size() + 6, 12,
                          switching_times,
-                         info.time_horizon/info.num_nodes);
+                         info.integrator_dt);
 
     vector_t standing_state = state;
     for (int i = 0; i < info.num_nodes+1; i++) {
-        state(1) += i/2.0;
+        //state(1) += i/2.0;
         traj.SetState(i, state);
     }
 
     mpc::Inputs input(switching_times, config.ParseEigenVector("init_config").size() + 6 - 13,
-                      info.num_nodes, info.time_horizon/info.num_nodes);
+                      info.num_nodes, info.integrator_dt);
 
     // Make the same force for each ee to ease of testing right now
     std::array<mpc::Spline, 3> forces1 = {mpc::Spline(3, switching_times.at(0), true),
                                          mpc::Spline(3, switching_times.at(0), true),
                                          mpc::Spline(3, switching_times.at(0), true)};
+//    forces1.at(0).SetPolyVars(0, {2});
+//    forces1.at(1).SetPolyVars(0, {1});
+//    forces1.at(2).SetPolyVars(0, {3.5});
+//    forces1.at(0).SetPolyVars(1, {20, 100});
+//    forces1.at(1).SetPolyVars(1, {40, 10});
+//    forces1.at(2).SetPolyVars(1, {20, 100});
+
+
     std::array<mpc::Spline, 3> forces2 = {mpc::Spline(3, switching_times.at(0), true),
                                           mpc::Spline(3, switching_times.at(0), true),
                                           mpc::Spline(3, switching_times.at(0), true)};
@@ -149,10 +156,11 @@ int main() {
     Q(8,8) = 10;
 
     const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(state_des, standing_state);
-    std::cout << des_alg << std::endl;
+//    std::cout << des_alg << std::endl;
 
 //    vector_t w = vector_t::Zero(24);
     mpc.AddQuadraticTrackingCost(des_alg, Q);
+    mpc.AddForceCost(0.01);
 //    mpc.SetQuadraticFinalCost(10*Q);
 //    mpc.SetLinearFinalCost(-10*Q*des_alg);
 
@@ -161,7 +169,9 @@ int main() {
     solve_traj.PrintTrajectoryToFile("solved_traj.txt");
 
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 20; i++) {
         mpc.Solve(curr_state, 0);//(i+1)*info.integrator_dt);
     }
+
+    mpc.PrintStats();
 }

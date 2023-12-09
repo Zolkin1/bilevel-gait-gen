@@ -15,7 +15,7 @@
 
 #include "centroidal_model.h"
 #include "euler_integrator.h"
-
+#include "rk_integrator.h"
 
 namespace mpc {
     using matrix6x_t = Eigen::Matrix<double, 6, Eigen::Dynamic>;
@@ -24,7 +24,7 @@ namespace mpc {
                                      int discretization_steps, double dt) :
             GRAVITY(0., 0., -9.81) {
 
-        integrator_ = std::make_unique<EulerIntegrator>(dt);
+        integrator_ = std::make_unique<RKIntegrator>(dt);
 
         // create the pinocchio model - always a free flyer
         pinocchio::urdf::buildModel(robot_urdf, pinocchio::JointModelFreeFlyer(), pin_model_, false);
@@ -60,7 +60,7 @@ namespace mpc {
         // ------------------------------------------- //
         // --------------- Calculate A --------------- //
         // ------------------------------------------- //
-        A = matrix_t::Zero(num_total_states_, num_total_states_);
+        matrix_t Ac = matrix_t::Zero(num_total_states_, num_total_states_);
 
         pinocchio::computeJointJacobians(pin_model_, *pin_data_, q_pin);
         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin);
@@ -75,7 +75,7 @@ namespace mpc {
                 cross_sum.col(j) += static_cast<Eigen::Vector3d>(J.col(j)).cross(force);    // TODO: Is there a negative?
             }
         }
-        A.block(3, MOMENTUM_OFFSET, cross_sum.rows(), cross_sum.cols()) = cross_sum;
+        Ac.block(3, MOMENTUM_OFFSET, cross_sum.rows(), cross_sum.cols()) = cross_sum;
 
 //        std::cout << "A: \n" << A << std::endl;
 
@@ -99,8 +99,9 @@ namespace mpc {
                                                         dhdq, dhdotdq, dhdotdv, CMM);
 
         // TODO: Check dhdq
-        A.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << CMMbinv, CMMbinv * dhdq; // TODO: Check negative sign
+        Ac.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << CMMbinv, CMMbinv * dhdq; // TODO: Check negative sign
 
+//        assert(std::abs(A(8, 2) - 1/robot_mass_) <= 1e-2);
 
         // TODO: For now I'm just assuming the CMM has no partial wrt q. Will need to come back and change this.
         // I need the partial w.r.t to each configuration variable
@@ -117,7 +118,7 @@ namespace mpc {
         //     Given a specific time, we only need to look at one pj (polynomial j) and thus
         //     one set of columns for each spline.
 
-        B = matrix_t::Zero(num_total_states_, num_inputs);
+        matrix_t Bc = matrix_t::Zero(num_total_states_, num_inputs);
         // --- Linear momentum --- //
         // Linear in each force, and each force is linear in its coefficients at each point in time.
         for (int ee = 0; ee < num_ee_; ee++) {
@@ -128,7 +129,7 @@ namespace mpc {
                 std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
 
 //                if (vars_affecting != 1) {
-                B.block(coord, vars_idx - vars_affecting, 1, vars_affecting) = vars_lin.transpose();
+                Bc.block(coord, vars_idx - vars_affecting, 1, vars_affecting) = vars_lin.transpose();
 //                }
             }
         }
@@ -176,7 +177,7 @@ namespace mpc {
                 vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
 
                 for (int poly = 0; poly < vars_lin.size(); poly++) {
-                    B.block(3, vars_idx - vars_affecting + poly, 3, 1) =
+                    Bc.block(3, vars_idx - vars_affecting + poly, 3, 1) =
                             ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
                 }
 
@@ -186,12 +187,12 @@ namespace mpc {
 //        std::cout << "B: \n" << B << std::endl;
 
         // --- Base velocity --- //
-        B.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) <<
+        Bc.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) <<
                 matrix_t::Zero(FLOATING_VEL_OFFSET, num_inputs - num_joints_),
                 -CMMbinv*CMMj*matrix_t::Identity(num_joints_, num_joints_);
 
         // --- Joint velocity --- //
-        B.bottomRows(num_joints_) << matrix_t::Zero(num_joints_, num_inputs - num_joints_),
+        Bc.bottomRows(num_joints_) << matrix_t::Zero(num_joints_, num_inputs - num_joints_),
                 matrix_t::Identity(num_joints_, num_joints_);
 
 
@@ -199,12 +200,15 @@ namespace mpc {
         // ---------------- Calculate C -------------- //
         // ------------------------------------------- //
         vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
-        C = integrator_->GetDt()*(CalcDynamics(state_alg, input, time, ref_state) -A*state_alg -B*input.AsQPVector(time)); //integrator_->CalcIntegral(state_alg, input, time, 1, *this); //CalcDynamics(state, input, time);
+        // TODO: move this to an integrator function
+        vector_t Cc = CalcDynamics(state_alg, input, time, ref_state) -Ac*state_alg -Bc*input.AsQPVector(time);
+        vector_t Cc2 = CalcDynamics(state_alg, input, time + integrator_->GetDt()/2, ref_state)
+                -Ac*state_alg -Bc*input.AsQPVector(time+ integrator_->GetDt()/2);
 
         // Discretize with the integrator
-        A = integrator_->CalcDerivWrtStateSingleStep(state, A);
-        B = integrator_->CalcDerivWrtInputSingleStep(state, B);
-
+        A = integrator_->CalcDerivWrtStateSingleStep(state, Ac);
+        B = integrator_->CalcDerivWrtInputSingleStep(state, Bc, Ac);    // TODO: Technically this Ac should be evaluated at a different time
+        C = integrator_->CalcLinearTermDiscretization(Cc, Cc2, Ac);
     }
 
     void CentroidalModel::GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
@@ -432,7 +436,7 @@ namespace mpc {
     vector_t CentroidalModel::GetDiscreteDynamics(const vector_t& state, const Inputs& input, double time,
                                                   const vector_t& ref_state) const {
         // TODO: Change to a different integrator
-        vector_t xkp1 = state + integrator_->GetDt()*CalcDynamics(state, input, time, ref_state);
+        vector_t xkp1 = integrator_->CalcIntegral(state, input, time, 1, *this, ref_state); //state + integrator_->GetDt()*CalcDynamics(state, input, time, ref_state);
         return xkp1;
     }
 

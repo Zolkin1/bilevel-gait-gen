@@ -21,6 +21,11 @@ namespace mpc {
         vector_t Solve(const QPData& data) override;
 
         vector_t GetInfinity(int size) const override;
+
+        std::string GetSolveQuality() const override;
+
+        vector_t GetDualSolution() const override;
+
     protected:
     private:
         void ConvertDataToOSQPConstraints(const QPData& data);

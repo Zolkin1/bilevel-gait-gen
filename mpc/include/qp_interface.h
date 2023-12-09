@@ -36,6 +36,11 @@ namespace mpc {
         virtual vector_t Solve(const QPData& data) = 0;
 
         virtual vector_t GetInfinity(int size) const;
+
+        virtual std::string GetSolveQuality() const = 0;
+
+        virtual vector_t GetDualSolution() const = 0;
+
     protected:
         vector_t prev_qp_sol_;
     private:
