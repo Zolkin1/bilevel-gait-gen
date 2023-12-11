@@ -149,27 +149,27 @@ int main() {
     state_des(7) = 1;
     state_des(6) = 1;
 
-    matrix_t Q = matrix_t::Identity(24, 24);
+    matrix_t Q = matrix_t::Zero(24, 24);
     Q.topLeftCorner<6,6>() = matrix_t::Zero(6,6);
-    Q(6,6) = 30;
-    Q(7,7) = 30;
-    Q(8,8) = 10;
+    Q(6,6) = 30; //30;
+    Q(7,7) = 30; //30;
+    Q(8,8) = 30; //10;
 
     const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(state_des, standing_state);
-//    std::cout << des_alg << std::endl;
+    std::cout << des_alg << std::endl;
 
 //    vector_t w = vector_t::Zero(24);
     mpc.AddQuadraticTrackingCost(des_alg, Q);
-    mpc.AddForceCost(0.01);
-//    mpc.SetQuadraticFinalCost(10*Q);
-//    mpc.SetLinearFinalCost(-10*Q*des_alg);
+    mpc.AddForceCost(0.05);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
+    mpc.SetQuadraticFinalCost(50*Q);
+    mpc.SetLinearFinalCost(-50*Q*des_alg);
 
 //    curr_state.segment<4>(9) = ConvertMujocoQuatToPinocchioQuat(curr_state.segment<4>(9));
     mpc::Trajectory solve_traj = mpc.Solve(curr_state, 0);
     solve_traj.PrintTrajectoryToFile("solved_traj.txt");
 
 
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 10; i++) {
         mpc.Solve(curr_state, 0);//(i+1)*info.integrator_dt);
     }
 

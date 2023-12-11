@@ -99,7 +99,9 @@ namespace mpc {
                                                         dhdq, dhdotdq, dhdotdv, CMM);
 
         // TODO: Check dhdq
-        Ac.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << CMMbinv, CMMbinv * dhdq; // TODO: Check negative sign
+//        Ac.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << CMMbinv, CMMbinv * dhdq; // TODO: Check negative sign
+        Ac.block(MOMENTUM_OFFSET, 0, POS_VARS, POS_VARS) = matrix_t::Identity(POS_VARS, POS_VARS)/robot_mass_;
+        Ac.block(MOMENTUM_OFFSET + 3, 3, POS_VARS, POS_VARS) = matrix_t::Identity(POS_VARS, POS_VARS)/robot_mass_;
 
 //        assert(std::abs(A(8, 2) - 1/robot_mass_) <= 1e-2);
 
@@ -187,9 +189,9 @@ namespace mpc {
 //        std::cout << "B: \n" << B << std::endl;
 
         // --- Base velocity --- //
-        Bc.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) <<
-                matrix_t::Zero(FLOATING_VEL_OFFSET, num_inputs - num_joints_),
-                -CMMbinv*CMMj*matrix_t::Identity(num_joints_, num_joints_);
+//        Bc.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) <<
+//                matrix_t::Zero(FLOATING_VEL_OFFSET, num_inputs - num_joints_),
+//                -CMMbinv*CMMj*matrix_t::Identity(num_joints_, num_joints_);
 
         // --- Joint velocity --- //
         Bc.bottomRows(num_joints_) << matrix_t::Zero(num_joints_, num_inputs - num_joints_),
@@ -208,7 +210,7 @@ namespace mpc {
         // Discretize with the integrator
         A = integrator_->CalcDerivWrtStateSingleStep(state, Ac);
         B = integrator_->CalcDerivWrtInputSingleStep(state, Bc, Ac);    // TODO: Technically this Ac should be evaluated at a different time
-        C = integrator_->CalcLinearTermDiscretization(Cc, Cc2, Ac);
+        C = integrator_->CalcLinearTermDiscretization(Cc, Cc2, Ac); //GetDt()*Cc;
     }
 
     void CentroidalModel::GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
@@ -418,8 +420,10 @@ namespace mpc {
         matrix_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, ConvertMPCStateToPinocchioState(state_man));
         matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
         matrix_t CMMj = CMM.rightCols(num_joints_);
-        xdot.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) =
-                CMMb.householderQr().solve(state.head<MOMENTUM_OFFSET>() - CMMj*input.GetVels(time));
+//        xdot.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) =
+//                CMMb.householderQr().solve(state.head<MOMENTUM_OFFSET>() - CMMj*input.GetVels(time));
+        xdot.segment<POS_VARS>(MOMENTUM_OFFSET) = state.segment<POS_VARS>(0)/robot_mass_;
+        xdot.segment<POS_VARS>(MOMENTUM_OFFSET + POS_VARS) = state.segment<POS_VARS>(POS_VARS)/robot_mass_;
 
 //        std::cout << "hcom: \n" << state.head<MOMENTUM_OFFSET>() << std::endl;
 //        std::cout << "qbdot: \n" << xdot.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << std::endl;

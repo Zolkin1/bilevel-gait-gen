@@ -97,7 +97,8 @@ namespace mpc {
         // TODO: Current problems:
         // 12/8 6:09pm: Dynamics lin violation on prev point != Dynamics violation on prev point, but it should
         // - looks like an issue with both discretizers. Small for euler
-        // Why is the joint box constraint so critical? Seems wrong... <--- IMPORTANT
+        // Why is the joint box constraint so critical? - Something related to the CMM
+        // 12/11/23 2:02pm: RK integrator is definitely wrong. Euler gives generally as expected but RK does not. - Fixed
 
 
         matrix_t G;
@@ -127,20 +128,20 @@ namespace mpc {
         for (int i = 0; i < info_.num_nodes+1; i++) {
             double time = GetTime(i);
             // ------------------------ FK Constraint ------------------------ //
-//            AddFKConstraints(centroidal_state, time, i);
+            AddFKConstraints(centroidal_state, time, i);
 
             // ------------------------ Friction Cone Constraints ------------------------ //
-//            AddFrictionConeConstraints(centroidal_state, time, i);
+            AddFrictionConeConstraints(centroidal_state, time, i);
 
             // Positivity of z direction force
-//            AddPositivityConstraints(time, i);
+            AddPositivityConstraints(time, i);
 
-//            AddForceBoxConstraints(time, i);
+            AddForceBoxConstraints(time, i);
         }
 
         // TODO: instead of adding a constraint consider removing them as decision variables
-//        AddForceConstraints();
-//        AddGroundIntersectConstraints();
+        AddForceConstraints();
+        AddGroundIntersectConstraints();
 
 //        PrintEqualityConstraints();
 //        PrintInequalityConstraints();
@@ -157,13 +158,13 @@ namespace mpc {
 //        Trajectory sol_traj = ConvertQPSolToTrajectory(sol, centroidal_state);
 //        const double constraint_violation = GetEqualityConstraintValues(sol_traj, centroidal_state).lpNorm<1>();
 //        std::cout << "dynamics violation norm: " << constraint_violation << std::endl;
-//        std::cout << "state at node 7: \n" << sol_traj.GetState(7) << std::endl;
+//        std::cout << "state at node 31: \n" << sol_traj.GetState(31) << std::endl;
 //        std::cout << "joint vel 0: \n" << sol_traj.GetInputs().GetVels(0.0) << std::endl;
-//        std::cout << "Discrete dynamics for node 7: \n" <<
-//            model_.GetDiscreteDynamics(CentroidalModel::ConvertManifoldStateToAlgebraState(sol_traj.GetState(7),
-//                                   centroidal_state), sol_traj.GetInputs(), 7*info_.integrator_dt, centroidal_state) << std::endl;
+//        std::cout << "Discrete dynamics for node 31: \n" <<
+//            model_.GetDiscreteDynamics(CentroidalModel::ConvertManifoldStateToAlgebraState(sol_traj.GetState(31),
+//                                   centroidal_state), sol_traj.GetInputs(), 31*info_.integrator_dt, centroidal_state) << std::endl;
 //        std::cout << "Linear discrete dynamics for node 1: \n" << (data_.dynamics_constraints*sol - data_.dynamics_constants).segment(num_states_, num_states_) + sol.segment(2*num_states_, num_states_) << std::endl;
-//        std::cout << "Generated state at node 8: \n" << sol.segment(8*num_states_, num_states_) << std::endl;
+//        std::cout << "Generated state at node 32: \n" << sol.segment(32*num_states_, num_states_) << std::endl;
 
         // TODO: Fixed most of the angular momentum but there still may be an issue
 
@@ -571,7 +572,7 @@ namespace mpc {
     }
 
     void MPC::AddHessianApproxCost() {
-        for (int node = 0; node < info_.num_nodes+1; node++) {
+        for (int node = 0; node < info_.num_nodes; node++) {
             data_.cost_quadratic.block(node*num_states_,
                                    node*num_states_,
                                    num_states_, num_states_) = Q_;
@@ -583,7 +584,7 @@ namespace mpc {
     }
 
     void MPC::AddGradientCost() {
-        for (int node = 0; node < info_.num_nodes+1; node++) {
+        for (int node = 0; node < info_.num_nodes; node++) {
             data_.cost_linear.segment(node * num_states_, num_states_) = w_;
         }
     }

@@ -9,14 +9,14 @@ namespace mpc {
     OSQPInterface::OSQPInterface(QPData data, bool verbose) : QPInterface(data.num_decision_vars), verbose_(verbose){
 
         // Set solver settings
-        qp_solver_.settings()->setVerbosity(verbose_);
+        qp_solver_.settings()->setVerbosity(true);
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setAbsoluteTolerance(1e-5);
         qp_solver_.settings()->setRelativeTolerance(1e-5);
         qp_solver_.settings()->setScaledTerimination(false);
-        qp_solver_.settings()->setMaxIteration(5000);
+        qp_solver_.settings()->setMaxIteration(50);
 //        qp_solver_.settings()->setTimeLimit(2e-3); -- Can't do this unless I somehow recompile osqp-eigen with PROFILING=1
         qp_solver_.settings()->setRho(.01);
 //        qp_solver_.settings()->setAlpha(1.6);
@@ -176,6 +176,12 @@ namespace mpc {
                 break;
             case OsqpEigen::Status::DualInfeasibleInaccurate:
                 return "Dual Infeasible Inaccurate";
+                break;
+            case OsqpEigen::Status::MaxIterReached:
+                return "Max Iter Reached";
+                break;
+            case OsqpEigen::Status::Unsolved:
+                return "Unsolved";
                 break;
             default:
                 return "Other";

@@ -24,7 +24,7 @@ namespace mpc {
     }
 
     matrix_t RKIntegrator::CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx) {
-        return matrix_t::Identity(dfdx.rows(), dfdx.cols()) + (dt_*dt_/2)*(dfdx + dfdx*dfdx);
+        return matrix_t::Identity(dfdx.rows(), dfdx.cols()) + (dt_*dt_/2)*(dfdx*dfdx) + dt_*dfdx;
     }
 
     matrix_t RKIntegrator::CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu, const matrix_t& dfdx) {

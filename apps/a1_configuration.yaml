@@ -59,13 +59,17 @@ force_tracking_weight: 1
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
-num_nodes: 35
-integrator_dt: 0.01
+num_nodes: 40
+integrator_dt: 0.025
 num_qp: 1
 vel_bounds: [1, 1, 1,
              1, 1, 1,
              1, 1, 1,
              1, 1, 1]
+#vel_bounds: [10, 10, 10,
+#             10, 10, 10,
+#             10, 10, 10,
+#             10, 10, 10]
 joint_bounds: [10, 10, 10,
                10, 10, 10,
                10, 10, 10,
