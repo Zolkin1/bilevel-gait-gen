@@ -22,8 +22,10 @@ namespace controller {
                          std::vector<double> joint_gains,
                          double leg_weight,
                          double torso_weight,
-                         double force_weight) :
-                         Controller(control_rate, robot_urdf, foot_type), num_vel_(nv), friction_coef_(friction_coef) {
+                         double force_weight,
+                         int num_contacts) :
+                         Controller(control_rate, robot_urdf, foot_type), num_vel_(nv),
+                         friction_coef_(friction_coef), des_contact_(num_contacts) {
 
         torque_bounds_ = torque_bounds;
 
@@ -91,6 +93,10 @@ namespace controller {
     void QPControl::SetJointGains(double kv, double kp) {
         kv_joint_ = kv;
         kp_joint_ = kp;
+    }
+
+    void QPControl::UpdateDesiredContacts(const Contact& contact) {
+        des_contact_ = contact;
     }
 
     void QPControl::ComputeDynamicsTerms(const Eigen::VectorXd& q, const Eigen::VectorXd& v, const Contact& contact) {
@@ -329,7 +335,7 @@ namespace controller {
 
         int j = 0;
         for (int i = 0; i < contact.contact_frames_.size(); i++) {
-            if (contact.in_contact_.at(i)) {
+            if (contact.in_contact_.at(i) && des_contact_.in_contact_.at(i)) {
                 int frame_id = static_cast<int>(pin_model_.getFrameId(pin_model_.frames.at(contact.contact_frames_.at(i)).name,
                                                      pin_model_.frames.at(contact.contact_frames_.at(i)).type));
 
@@ -355,7 +361,7 @@ namespace controller {
 
         int j = 0;
         for (int i = 0; i < contact.contact_frames_.size(); i++) {
-            if (contact.in_contact_.at(i)) {
+            if (contact.in_contact_.at(i) && des_contact_.in_contact_.at(i)) {
                 int frame_id = static_cast<int>(pin_model_.getFrameId(pin_model_.frames.at(contact.contact_frames_.at(i)).name,
                                                      pin_model_.frames.at(contact.contact_frames_.at(i)).type));
 

@@ -121,22 +121,25 @@ int main() {
 
     traj.SetInput(input);
 
-    std::vector<std::array<double, 3>> ee_pos;
-    ee_pos.push_back({0.2, 0.2, 0});
-    ee_pos.push_back({0.2, -0.2, 0});
-    ee_pos.push_back({-0.2, 0.2, 0});
-    ee_pos.push_back({-0.2, 0.2, 0});
+    std::array<std::array<double, 3>, 4> ee_pos;
+    ee_pos.at(0) = {0.2, 0.2, 0};
+    ee_pos.at(1) = {0.2, -0.2, 0};
+    ee_pos.at(2) = {-0.2, 0.2, 0};
+    ee_pos.at(3) = {-0.2, -0.2, 0};
 
     for (int ee = 0; ee < 4; ee++) {
         traj.SetPositionsForAllTime(ee, ee_pos.at(ee));
     }
 
-    mpc.SetWarmStartTrajectory(traj);
+//    mpc.SetWarmStartTrajectory(traj);
 
-    // TODO: work on speed
+    mpc.SetDefaultGaitTrajectory(mpc::Gaits::Trot, 2, ee_pos);
+    std::vector<vector_t> warm_start(info.num_nodes+1, state);
+    mpc.SetStateTrajectoryWarmStart(warm_start);
+
     vector_t curr_state(6+7+12);
     curr_state = standing_state;
-    curr_state(7) += 0.5;
+    curr_state(7) += 0.0;
     //    curr_state << 1, 0, 0.1,
 //            0, 0, 0,
 //            0, 0, 0.35,
@@ -160,17 +163,19 @@ int main() {
 
 //    vector_t w = vector_t::Zero(24);
     mpc.AddQuadraticTrackingCost(des_alg, Q);
-    mpc.AddForceCost(0.05);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
+    mpc.AddForceCost(0.02);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
     mpc.SetQuadraticFinalCost(50*Q);
     mpc.SetLinearFinalCost(-50*Q*des_alg);
 
 //    curr_state.segment<4>(9) = ConvertMujocoQuatToPinocchioQuat(curr_state.segment<4>(9));
-    mpc::Trajectory solve_traj = mpc.Solve(curr_state, 0);
+    mpc::Trajectory solve_traj = mpc.Solve(curr_state, 0.004);
     solve_traj.PrintTrajectoryToFile("solved_traj.txt");
 
 
-    for (int i = 0; i < 10; i++) {
-        mpc.Solve(curr_state, 0);//(i+1)*info.integrator_dt);
+    for (int i = 0; i < 0; i++) {
+        mpc.Solve(curr_state, (i+1)*info.integrator_dt);
+        curr_state(0) += 0.2;
+        curr_state(3) += 0.1;
     }
 
     mpc.PrintStats();

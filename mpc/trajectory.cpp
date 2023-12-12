@@ -70,7 +70,7 @@ namespace mpc {
         for (int i = 0; i < inputs_.GetForces().at(end_effector).at(coord).GetNumPolyTimes(); i++) {
             int num_vars = inputs_.GetForces().at(end_effector).at(coord).GetNumPolyVars(i);
             inputs_.UpdateForcePoly(end_effector, coord, i, vars.segment(idx, num_vars));
-            if (num_vars == 1 && i+1 < end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes() &&
+            if (num_vars == 1 && i+1 < inputs_.GetForces().at(end_effector).at(coord).GetNumPolyTimes() &&
             inputs_.GetForces().at(end_effector).at(coord).GetNumPolyVars(i+1) == 1) {
                 // Set then skip the additional constant term
                 // TODO: In theory we can skip this
@@ -221,14 +221,14 @@ namespace mpc {
     // TODO: think about this more
     double Trajectory::GetTotalTime() const {
 //        assert(end_effector_pos_.at(0).at(0).GetEndTime() == inputs_.GetForces().at(0).at(0).GetEndTime());
-        return std::max(end_effector_pos_.at(0).at(0).GetEndTime(), inputs_.GetForces().at(0).at(0).GetEndTime());
+        return std::min(end_effector_pos_.at(0).at(0).GetEndTime(), inputs_.GetForces().at(0).at(0).GetEndTime());
     }
 
     void Trajectory::AddPolys(double final_time) {
         if (GetTotalTime() < final_time) {
-            for (auto &end_effector_po: end_effector_pos_) {
+            for (auto &end_effector_pos: end_effector_pos_) {
                 for (int coord = 0; coord < POS_VARS; coord++) {
-                    end_effector_po.at(coord).AddPoly(0.5);
+                    end_effector_pos.at(coord).AddPoly(0.5);
                 }
             }
             inputs_.AddPolys(0.5);
@@ -255,9 +255,9 @@ namespace mpc {
 
     void Trajectory::UpdatePosSplineVarsCount() {
         pos_spline_vars_ = 0;
-        for (const auto& end_effector_po : end_effector_pos_) {
+        for (const auto& end_effector_pos : end_effector_pos_) {
             for (int coord = 0; coord < 3; coord++) {
-                pos_spline_vars_ += end_effector_po.at(coord).GetTotalPolyVars();
+                pos_spline_vars_ += end_effector_pos.at(coord).GetTotalPolyVars();
             }
         }
     }
@@ -271,7 +271,7 @@ namespace mpc {
 
     vector_t Trajectory::ConvertToQPVector() const {
         vector_t qp_vec = vector_t::Zero(pos_spline_vars_ + inputs_.GetTotalForceSplineVars()
-                + inputs_.GetAllVels().at(0).size()*inputs_.GetAllVels().size()
+                + inputs_.GetAllVels().at(0).size()*(inputs_.GetAllVels().size()-1) // TODO: Why?
                 + (states_.at(0).size()-1)*states_.size());
 
         for (int i = 0; i < states_.size(); i++) {
@@ -311,6 +311,23 @@ namespace mpc {
         }
 
         return position;
+    }
+
+    std::vector<bool> Trajectory::GetContacts(double time) const {
+        std::vector<bool> in_contact(end_effector_pos_.size());
+        for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                int vars_index, vars_affecting;
+                std::tie(vars_index, vars_affecting) = end_effector_pos_.at(ee).at(coord).GetVarsIndexEnd(time);
+                if (vars_affecting == 1) {
+                    in_contact.at(ee) = true;
+                } else {
+                    in_contact.at(ee) = false;
+                }
+            }
+        }
+
+        return in_contact;
     }
 
 } // mpc

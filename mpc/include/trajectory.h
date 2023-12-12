@@ -83,6 +83,8 @@ namespace mpc {
 
         Eigen::Vector3d GetPosition(int ee, double time) const;
 
+        std::vector<bool> GetContacts(double time) const;
+
     protected:
     private:
         void UpdatePosSplineVarsCount();

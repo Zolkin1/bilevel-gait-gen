@@ -30,7 +30,7 @@ int main() {
     mpc::MPCInfo info;
     info.discretization_steps = config.ParseNumber<double>("discretization_steps");
     info.num_nodes = config.ParseNumber<int>("num_nodes");
-    info.time_horizon = config.ParseNumber<double>("time_horizon");
+//    info.time_horizon = config.ParseNumber<double>("time_horizon");
     info.num_qp_iterations = config.ParseNumber<int>("num_qp");
     info.friction_coef = config.ParseNumber<double>("friction_coef");
     info.vel_bounds = config.ParseEigenVector("vel_bounds");
@@ -39,6 +39,8 @@ int main() {
     info.num_switches = config.ParseNumber<int>("num_switches");
     info.integrator_dt = config.ParseNumber<double>("integrator_dt");
     info.num_contacts = info.ee_frames.size();
+    info.force_bound = config.ParseNumber<double>("force_bound");
+
 
 
     vector_t standing = config.ParseEigenVector("standing_config");
@@ -50,6 +52,8 @@ int main() {
     for (int i = 0; i < info.num_nodes+1; i++) {
         warm_start_states.push_back(state);
     }
+
+    state.segment<2>(6) << 1, 1;
 
     // TODO: Won't work until the MPC is more robust (numerically)
     std::unique_ptr<controller::Controller> mpc_controller;

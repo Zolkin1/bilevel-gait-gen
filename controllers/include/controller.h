@@ -16,6 +16,10 @@ namespace controller {
         std::vector<bool> in_contact_;          // if each frame is in contact
         std::vector<int> contact_frames_;       // frames potentially in contact
 
+        Contact();
+
+        Contact(int num_contacts);
+
         int GetNumContacts() const;
     };
 

@@ -15,7 +15,7 @@ namespace mpc {
     public:
         OSQPInterface(QPData data, bool verbose);
 
-        void SetupQP(const QPData& data) override;
+        void SetupQP(const QPData& data, const vector_t& warm_start) override;
 
         // TODO: remove data
         vector_t Solve(const QPData& data) override;

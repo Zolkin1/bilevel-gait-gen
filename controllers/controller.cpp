@@ -91,4 +91,9 @@ namespace controller {
             control(i) = vel_target_(i - num_inputs_ + FLOATING_VEL_OFFSET);
         }
     }
+
+    Contact::Contact() {}
+
+    Contact::Contact(int num_contacts) : in_contact_(num_contacts, true), contact_frames_(num_contacts, 0) {}
+
 } // controller

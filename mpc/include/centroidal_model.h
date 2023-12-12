@@ -81,6 +81,8 @@ namespace mpc {
 
         const std::string& GetEndEffectorFrame(int ee) const;
 
+        std::vector<int> GetContactFrames() const;
+
     protected:
     private:
 

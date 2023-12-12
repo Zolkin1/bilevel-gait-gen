@@ -56,7 +56,8 @@ namespace controller {
                   std::vector<double> joint_gains,
                   double leg_weight,
                   double torso_weight,
-                  double force_weight);
+                  double force_weight,
+                  int num_contacts);
 
         Eigen::VectorXd ComputeControlAction(const Eigen::VectorXd& q,
                                              const Eigen::VectorXd& v,
@@ -74,6 +75,8 @@ namespace controller {
          * @param kp
          */
         void SetJointGains(double kv, double kp);
+
+        void UpdateDesiredContacts(const Contact& contact);
 
     protected:
     private:
@@ -186,6 +189,8 @@ namespace controller {
         double friction_coef_;
 
         Eigen::VectorXd force_target_;
+
+        Contact des_contact_;
     };
 }   // controller
 

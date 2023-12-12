@@ -31,7 +31,7 @@ namespace mpc {
          * OSQP is built with profiling. Can probably fix this by either (1) opening and issue on their github, (2)
          * modifying source, or (3) finding another work around. Might want to use this to ensure timing requirements.
          */
-        virtual void SetupQP(const QPData& data) = 0;
+        virtual void SetupQP(const QPData& data, const vector_t& warm_start) = 0;
 
         virtual vector_t Solve(const QPData& data) = 0;
 

@@ -44,6 +44,7 @@ namespace controller {
 
         QPControl qp_controller_;
         mpc::MPC mpc_;
+        bool computed_;
     };
 } // controller
 

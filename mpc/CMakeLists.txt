@@ -41,6 +41,9 @@ find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
 target_link_libraries(mpc PUBLIC osqp::osqp OsqpEigen::OsqpEigen)
 
+# Controller
+target_link_libraries(mpc PUBLIC controller)
+
 # MKL and OpenMP
 #find_package(OpenMP)
 #target_link_libraries(mpc PUBLIC OpenMP::OpenMP_CXX)

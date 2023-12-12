@@ -13,6 +13,7 @@
 #include "qp_interface.h"
 #include "trajectory.h"
 #include "qp_data.h"
+#include "controller.h"
 
 namespace mpc {
     /**
@@ -94,6 +95,8 @@ namespace mpc {
         void AddForceCost(double weight);
 
         void PrintStats();
+
+        controller::Contact GetDesiredContacts(double time) const;
 
     protected:
     private:

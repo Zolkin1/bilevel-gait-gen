@@ -100,6 +100,7 @@ namespace mpc {
 
         // TODO: Check dhdq
 //        Ac.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << CMMbinv, CMMbinv * dhdq; // TODO: Check negative sign
+        // TODO: Note CMM has been removed
         Ac.block(MOMENTUM_OFFSET, 0, POS_VARS, POS_VARS) = matrix_t::Identity(POS_VARS, POS_VARS)/robot_mass_;
         Ac.block(MOMENTUM_OFFSET + 3, 3, POS_VARS, POS_VARS) = matrix_t::Identity(POS_VARS, POS_VARS)/robot_mass_;
 
@@ -204,13 +205,13 @@ namespace mpc {
         vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
         // TODO: move this to an integrator function
         vector_t Cc = CalcDynamics(state_alg, input, time, ref_state) -Ac*state_alg -Bc*input.AsQPVector(time);
-        vector_t Cc2 = CalcDynamics(state_alg, input, time + integrator_->GetDt()/2, ref_state)
-                -Ac*state_alg -Bc*input.AsQPVector(time+ integrator_->GetDt()/2);
+//        vector_t Cc2 = CalcDynamics(state_alg, input, time + integrator_->GetDt()/2, ref_state)
+//                -Ac*state_alg -Bc*input.AsQPVector(time+ integrator_->GetDt()/2);
 
         // Discretize with the integrator
         A = integrator_->CalcDerivWrtStateSingleStep(state, Ac);
         B = integrator_->CalcDerivWrtInputSingleStep(state, Bc, Ac);    // TODO: Technically this Ac should be evaluated at a different time
-        C = integrator_->CalcLinearTermDiscretization(Cc, Cc2, Ac); //GetDt()*Cc;
+        C = integrator_->CalcLinearTermDiscretization(Cc, Cc, Ac); //GetDt()*Cc;
     }
 
     void CentroidalModel::GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
@@ -446,6 +447,15 @@ namespace mpc {
 
     const std::string& CentroidalModel::GetEndEffectorFrame(int ee) const {
         return frames_.at(ee);
+    }
+
+    std::vector<int> CentroidalModel::GetContactFrames() const {
+        std::vector<int> frames;
+        for (const auto& frame : frames_) {
+            frames.push_back(frame_map_.at(frame));
+        }
+
+        return frames;
     }
 
 } // mpc
