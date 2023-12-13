@@ -14,12 +14,16 @@ foot_type: "POINT_FEET"
 ## ----------------------- Configurations ----------------------- ##
 # initial joint config
 # xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
+#init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
+#              -0.02, 0.144, -0.976,     # front right
+#              0.02, 0.2, -0.977,      # front left
+#              -0.08, 0.45, -1.03,       # rear right
+#              0.08, 0.45, -1.03]        # rear left
 init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
-              -0.02, 0.144, -0.976,     # front right
-              0.02, 0.2, -0.977,      # front left
-              -0.08, 0.45, -1.03,       # rear right
-              0.08, 0.45, -1.03]        # rear left
-
+              -0.02, 0.2, -0.977,     # front right
+              0.02, 0.524, -1.63,      # front left
+              -0.08, 0.498, -1.57,       # rear right
+              0.08, 0.45, -1.03]
 # initial joint velocity
 # xv, yv, zv, angle rates, v0, ..., v11
 init_vel: [0., 0., 0., 0., 0., 0.,
@@ -44,18 +48,20 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
 control_rate: 400  # Hz
-torque_bounds: [33.5, 33.5, 33.5,
-                33.5, 33.5, 33.5,
-                33.5, 33.5, 33.5,
-                33.5, 33.5, 33.5]
+torque_bounds: [100, 100, 100,
+                100, 100, 100,
+                100, 100, 100,
+                00, 100, 100] # 33.5
 friction_coef: 0.3
-base_pos_gains: [20, 100]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
-base_ang_gains: [20, 100]  # kd_ang, kp_ang
-joint_gains: [70, 200]     # I can get these pretty high without getting close to the torque bounds
+base_pos_gains: [400, 400]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
+base_ang_gains: [0, 0]  # kd_ang, kp_ang
+joint_gains: [400, 1000]     # I can get these pretty high without getting close to the torque bounds
 
-leg_tracking_weight: 100
-torso_tracking_weight: 10
-force_tracking_weight: 1
+# 400, 400, 0, 0, 400, 1000
+
+leg_tracking_weight: 10
+torso_tracking_weight: 1000
+force_tracking_weight: 0.0
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
@@ -70,10 +76,17 @@ vel_bounds: [1, 1, 1,
 #             10, 10, 10,
 #             10, 10, 10,
 #             10, 10, 10]
-joint_bounds: [10, 10, 10,
-               10, 10, 10,
-               10, 10, 10,
-               10, 10, 10]
+joint_bounds_lb: [-0.802851, -1.0472, -2.69653,
+                  -0.802851, -1.0472, -2.69653,
+                  -0.802851, -1.0472, -2.69653,
+                  -0.802851, -1.0472, -2.69653]
+joint_bounds_ub: [0.802851, 4.18879, -0.916298,
+                  0.802851, 4.18879, -0.916298,
+                  0.802851, 4.18879, -0.916298,
+                  0.802851, 4.18879, -0.916298]
 
 num_switches: 2
 force_bound: 150
+
+## --- Temp --- ##
+viz_rate: 0.1

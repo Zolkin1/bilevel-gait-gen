@@ -45,7 +45,7 @@ namespace controller {
         std::cout << "Desired state: \n" << des_alg << std::endl;
 
         mpc_.AddQuadraticTrackingCost(des_alg, Q);
-        mpc_.AddForceCost(0.02);
+        mpc_.AddForceCost(0.01);
         mpc_.SetQuadraticFinalCost(50*Q);
         mpc_.SetLinearFinalCost(-50*Q*des_alg);
         prev_time_ = 0;
@@ -56,17 +56,19 @@ namespace controller {
                                                  const vector_t& a, const controller::Contact& contact,
                                                  double time) { //, double time) {
         vector_t state = ReconstructState(q, v, a);
-//        if ((time - prev_time_ > 0.025 || time == 0)) {
+//        if ((time - prev_time_ > 0.1 || time == 0)) {
         if (!computed_) {
-            mpc_.Solve(state, time);
-
+            for (int i = 0; i < 1; i++) {
+                mpc_.Solve(state, time);
+            }
             prev_time_ = time;
             computed_ = true;
-//            mpc_.PrintStats();
+            mpc_.PrintStats();
         }
         if (time < 1) {
-            qp_controller_.UpdateTargetConfig(mpc_.GetTargetConfig());
-            qp_controller_.UpdateTargetVel(mpc_.GetTargetVelocity());
+            qp_controller_.UpdateTargetConfig(mpc_.GetTargetConfig(time));
+            qp_controller_.UpdateTargetVel(mpc_.GetTargetVelocity(time));
+            qp_controller_.UpdateTargetAcc(mpc_.GetTargetAcc(time));
 //          qp_controller_.UpdateTargetForce(mpc_.GetTargetForce());
             qp_controller_.UpdateDesiredContacts(mpc_.GetDesiredContacts(time));
         }
@@ -76,12 +78,25 @@ namespace controller {
 
     vector_t MPCController::ReconstructState(const controller::vector_t& q, const controller::vector_t& v,
                                              const controller::vector_t& a) const {
+
         vector_t state = vector_t::Zero(q.size() + 6);
         state.head<3>() = v.head<3>() * mpc_.GetModel().GetMass();
 
-        // TODO: Need to get angular momentum
+        state.segment<3>(3) = v.segment<3>(3) * mpc_.GetModel().GetMass();
 
-        state.tail(q.size()) = q;
+        Eigen::Quaterniond quat(static_cast<Eigen::Vector4d>(q.segment<4>(3)));
+        // Note the warning on the pinocchio function!
+        pinocchio::quaternion::firstOrderNormalize(quat);
+        state(9) = quat.x();
+        state(10) = quat.y();
+        state(11) = quat.z();
+        state(12) = quat.w();
+
+        state.segment<mpc::CentroidalModel::POS_VARS>(mpc::CentroidalModel::MOMENTUM_OFFSET) = q.head<mpc::CentroidalModel::POS_VARS>();
+
+        state.tail(q.size() - mpc::CentroidalModel::FLOATING_VEL_OFFSET) =
+                q.tail(q.size() - mpc::CentroidalModel::FLOATING_VEL_OFFSET);
+
         return state;
     }
 

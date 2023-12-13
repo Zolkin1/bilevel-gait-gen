@@ -66,7 +66,7 @@ namespace controller {
     }
 
     void Controller::UpdateTargetConfig(const Eigen::VectorXd& q) {
-        assert(q.size() == config_target_.size());
+        assert(q.size() == num_inputs_ + FLOATING_BASE_OFFSET);
         config_target_ = q;
     }
 

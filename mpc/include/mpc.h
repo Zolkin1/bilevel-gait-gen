@@ -30,7 +30,8 @@ namespace mpc {
         int num_contacts;
         double friction_coef;
         vector_t vel_bounds;
-        vector_t joint_bounds;
+        vector_t joint_bounds_lb;
+        vector_t joint_bounds_ub;
         std::vector<std::string> ee_frames;
         int discretization_steps;
         int num_switches;
@@ -85,10 +86,13 @@ namespace mpc {
 
         // Gets the first target config. Assumes solve has already been called.
         // Currently, does not return any momentum info
-        vector_t GetTargetConfig() const;
+        vector_t GetTargetConfig(double time) const;
 
         // Gets first target velocity. Gets the target body velocities and joints
-        vector_t GetTargetVelocity() const;
+        vector_t GetTargetVelocity(double time) const;
+
+        // Computes an approximate target acceleration
+        vector_t GetTargetAcc(double time) const;
 
         const CentroidalModel& GetModel() const;
 

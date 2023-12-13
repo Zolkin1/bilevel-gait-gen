@@ -59,6 +59,7 @@ namespace simulator {
         return low_level_controller_.get();
     }
 
+    // TODO: make data const again
     void SimulationRobot::GetControlAction(const mjData* data, mjtNum* cntrl) {
         // Check that the dimensions allign
         if (muj_model_->nu != 3 * low_level_controller_->GetNumInputs()) {
@@ -261,7 +262,7 @@ namespace simulator {
 
 
     // ---------------------- Pinocchio to Mujoco Converters ---------------------- //
-    Eigen::VectorXd SimulationRobot::ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints) {
+    Eigen::VectorXd SimulationRobot::ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints) const {
         Eigen::VectorXd mujoco_joints(joints.size());
 
         for (int i = 0; i < mujoco_joint_keys_.size(); i++) {
@@ -271,7 +272,7 @@ namespace simulator {
         return mujoco_joints;
     }
 
-    Eigen::VectorXd SimulationRobot::ConvertPinocchioVelToMujoco(const Eigen::VectorXd& v) {
+    Eigen::VectorXd SimulationRobot::ConvertPinocchioVelToMujoco(const Eigen::VectorXd& v) const {
         Eigen::VectorXd mujoco_vel(v.size());
         // floating base
         for (int i = 0; i < FLOATING_VEL_OFFSET; i++) {
@@ -284,7 +285,21 @@ namespace simulator {
         return mujoco_vel;
     }
 
-    std::vector<mjtNum> SimulationRobot::ConvertControlToMujoco(const Eigen::VectorXd& control) {
+    Eigen::VectorXd SimulationRobot::ConvertPinocchioConfigToMujoco(const Eigen::VectorXd& q) const{
+        Eigen::VectorXd muj_q(q.size());
+        muj_q.tail(muj_model_->nv - FLOATING_VEL_OFFSET) =
+                ConvertPinocchioJointToMujoco(q.tail(muj_model_->nv - FLOATING_VEL_OFFSET));
+        muj_q.head(3) = q.head(3);
+
+        // floating base quaternion, note pinocchio uses (x,y,z,w_) and mujoco uses (w_,x,y,z)
+        muj_q(3) = q(6);
+        muj_q(5) = q(4);
+        muj_q(6) = q(5);
+        muj_q(4) = q(3);
+        return muj_q;
+    }
+
+    std::vector<mjtNum> SimulationRobot::ConvertControlToMujoco(const Eigen::VectorXd& control) const {
         std::vector<mjtNum> muj_control(3*control.size());
         for (int i = 0; i < 3; i++) {
             Eigen::VectorXd control_part = ConvertPinocchioJointToMujoco(control.segment(i*num_inputs_, num_inputs_));

@@ -58,7 +58,10 @@ namespace controller {
                                                     const Eigen::VectorXd& a,
                                                     const Contact& contact,
                                                     double time) {
-        UpdateConstraintsAndCost(q, v, a, contact);
+        Contact contact2(4);
+        contact2.in_contact_ = {true, true, true, true};
+        contact2.contact_frames_ = contact.contact_frames_;
+        UpdateConstraintsAndCost(q, v, a, contact2);
 
         // Solve qp
         if (qp_solver_.solveProblem() != OsqpEigen::ErrorExitFlag::NoError) {
@@ -71,7 +74,7 @@ namespace controller {
 
         Eigen::VectorXd control_action = Eigen::VectorXd::Zero(3*num_inputs_);
 
-        RecoverControlInputs(qp_sol, v, control_action, contact);
+        RecoverControlInputs(qp_sol, v, control_action, contact2);
 
         // since I am passing to a PID controller, I still need to pass the configuration and velocity
         AssignPositionControl(control_action);
@@ -133,9 +136,9 @@ namespace controller {
         A_.topLeftCorner(FLOATING_VEL_OFFSET, num_vel_) =
                 pin_data_->M.topLeftCorner(FLOATING_VEL_OFFSET, num_vel_);
 
-        A_.topRightCorner(FLOATING_VEL_OFFSET, CONSTRAINT_PER_FOOT*contact.GetNumContacts()) =
+//        A_.topRightCorner(FLOATING_VEL_OFFSET, CONSTRAINT_PER_FOOT*GetNumBothContacts(contact, des_contact_)) =
+          A_.block(0, num_vel_, FLOATING_VEL_OFFSET, CONSTRAINT_PER_FOOT* GetNumBothContacts(contact, des_contact_)) =
                 -Js_.transpose().topLeftCorner(FLOATING_VEL_OFFSET, Js_.rows());
-
     }
 
     void QPControl::AddContactMotionConstraints(const Eigen::VectorXd& v) {
@@ -150,7 +153,7 @@ namespace controller {
     }
 
     void QPControl::AddTorqueConstraints(const Eigen::VectorXd& v, const Contact& contact) {
-        int num_contacts = contact.GetNumContacts();
+        int num_contacts = GetNumBothContacts(contact, des_contact_);
         if (Js_.size() > 0) {
             A_.block(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT * num_contacts, 0,
                      num_actuators_, num_decision_vars_) <<
@@ -173,9 +176,10 @@ namespace controller {
         Eigen::Vector3d l = {0, 1, 0};
         Eigen::Vector3d n = {0, 0, 1};
 
-        int num_contacts = contact.GetNumContacts();
+        int num_contacts = GetNumBothContacts(contact, des_contact_);
         for (int i = 0; i < num_contacts; i++) {
-            A_.block(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*i, num_vel_ + 3*i, 4, 3) <<
+            A_.block(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*i,
+                     num_vel_ + 3*i, 4, 3) <<
                     (h - n*friction_coef_).transpose(),
                     -(h + n*friction_coef_).transpose(),
                     (l - n*friction_coef_).transpose(),
@@ -185,50 +189,47 @@ namespace controller {
             lb_.segment(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*i, 4) =
                     Eigen::Vector4d::Ones() * -OsqpEigen::INFTY;
         }
-
     }
 
-    // TODO: Examine 2's in the cost function
     // TODO: Make the leg tracking able to only track subset's of legs (i.e. swing legs)
     void QPControl::AddLegTrackingCost(const Eigen::VectorXd& q, const Eigen::VectorXd& v) {
         // For now, just make all the joint accelerations go to 0.
         P_.block(FLOATING_VEL_OFFSET, FLOATING_VEL_OFFSET, num_inputs_, num_inputs_) =
-                P_.block(FLOATING_VEL_OFFSET, FLOATING_VEL_OFFSET, num_inputs_, num_inputs_) + leg_tracking_weight_ *
-                2*Eigen::MatrixXd::Identity(num_inputs_, num_inputs_);
+                 leg_tracking_weight_ * 2*Eigen::MatrixXd::Identity(num_inputs_, num_inputs_);
 
         Eigen::VectorXd target = acc_target_.tail(num_inputs_) +
                                  kv_joint_*(vel_target_.tail(num_inputs_) - v.tail(num_inputs_)) +
                                  kp_joint_*(config_target_.tail(num_inputs_) - q.tail(num_inputs_));
 
-        w_.segment(FLOATING_VEL_OFFSET, num_inputs_) = w_.segment(FLOATING_VEL_OFFSET, num_inputs_) +
-                -2*target*leg_tracking_weight_;
+        w_.segment(FLOATING_VEL_OFFSET, num_inputs_) = -2*target*leg_tracking_weight_;
     }
 
     void QPControl::AddTorsoCost(const Eigen::VectorXd& q, const Eigen::VectorXd& v) {
         // Add the position costs
-        P_.topLeftCorner(POS_VARS, POS_VARS) = P_.topLeftCorner(POS_VARS, POS_VARS) +
+        P_.topLeftCorner(POS_VARS, POS_VARS) =
                 torso_tracking_weight_*2*Eigen::MatrixXd::Identity(POS_VARS, POS_VARS);
 
         Eigen::VectorXd target = acc_target_.head(POS_VARS) + kv_pos_ * (vel_target_.head(POS_VARS) - v.head(POS_VARS)) +
                 kp_pos_*(config_target_.head(POS_VARS) - q.head(POS_VARS));
 
-        w_.head(POS_VARS) = w_.head(POS_VARS) -2*target*torso_tracking_weight_;
+        w_.head(POS_VARS) = -2*target*torso_tracking_weight_;
 
         // Add the orientation costs
-        P_.block(POS_VARS, POS_VARS, 3, 3) = P_.block(POS_VARS, 0, 3, 3) + torso_tracking_weight_*2*Eigen::MatrixXd::Identity(3,3);
+        P_.block(POS_VARS, POS_VARS, 3, 3) =
+                torso_tracking_weight_*2*Eigen::MatrixXd::Identity(3,3);
 
         Eigen::Quaternion<double> orientation(static_cast<Eigen::Vector4d>(q.segment(POS_VARS, 4)));
         Eigen::Quaternion<double> des_orientation(static_cast<Eigen::Vector4d>(config_target_.segment(POS_VARS, 4)));
         Eigen::VectorXd angle_target = kv_ang_*(vel_target_.segment(POS_VARS, 3) - v.segment(POS_VARS, 3)) +
                 kp_ang_*pinocchio::quaternion::log3(orientation.inverse()*des_orientation);
-        w_.segment(POS_VARS, 3) = w_.segment(POS_VARS, 3) - 2*angle_target*torso_tracking_weight_;
+        w_.segment(POS_VARS, 3) = -2*angle_target*torso_tracking_weight_;
     }
 
     void QPControl::AddForceTrackingCost(const Contact& contact) {
-        int num_contacts = contact.GetNumContacts();
+        int num_contacts = GetNumBothContacts(contact, des_contact_);
         P_.block(FLOATING_VEL_OFFSET + num_inputs_, num_vel_,
                  CONSTRAINT_PER_FOOT*num_contacts, CONSTRAINT_PER_FOOT*num_contacts) =
-                         2*Eigen::MatrixXd::Identity(CONSTRAINT_PER_FOOT*num_contacts, CONSTRAINT_PER_FOOT*num_contacts);
+                         force_tracking_weight_*2*Eigen::MatrixXd::Identity(CONSTRAINT_PER_FOOT*num_contacts, CONSTRAINT_PER_FOOT*num_contacts);
 
         Eigen::VectorXd target = force_target_;
 
@@ -239,12 +240,12 @@ namespace controller {
                                              const Eigen::VectorXd& v,
                                              const Eigen::VectorXd& a,
                                              const Contact& contact) {
-        int num_contacts = contact.GetNumContacts();
+        int num_contacts = GetNumBothContacts(contact, des_contact_);
         num_decision_vars_ = num_vel_ + CONSTRAINT_PER_FOOT*num_contacts;
 
         qp_solver_.data()->setNumberOfVariables(num_decision_vars_);
 
-        num_constraints_ = num_vel_ + 7*num_contacts + num_actuators_;
+        num_constraints_ = FLOATING_VEL_OFFSET + 7*num_contacts + num_actuators_;
         qp_solver_.data()->setNumberOfConstraints(num_constraints_);
 
         A_ = Eigen::MatrixXd::Zero(num_constraints_, num_decision_vars_);
@@ -255,7 +256,7 @@ namespace controller {
         w_ = Eigen::VectorXd::Zero(num_decision_vars_);
 
         // TODO: Change. For now assuming we are always trying to apply 0 contact force
-        force_target_ = Eigen::VectorXd::Zero(3*num_contacts);
+        force_target_ = Eigen::VectorXd::Constant(3*num_contacts, 0);
 
         // Add the constraints to the matricies
         ComputeDynamicsTerms(q, v, contact);
@@ -268,6 +269,12 @@ namespace controller {
         AddLegTrackingCost(q, v);
         AddTorsoCost(q, v);
         AddForceTrackingCost(contact);
+
+//        std::cout << "Constraints: \n" << A_ << std::endl;
+//        std::cout << "ub: \n" << ub_ << std::endl;
+//        std::cout << "lb: \n" <<  lb_ << std::endl;
+//        std::cout << "Quadratic cost: \n" << P_ << std::endl;
+//        std::cout << "Linear cost: \n" << w_ << std::endl;
 
         // Check if the sparsity pattern changed
         if (num_contacts != prev_num_contacts_) {
@@ -314,7 +321,8 @@ namespace controller {
                                          Eigen::VectorXd& control, const Contact& contact) {
         // Recover torques using ID
         Eigen::VectorXd tau =
-                (pin_data_->M*qp_sol.head(num_vel_) - Js_.transpose()*qp_sol.tail(CONSTRAINT_PER_FOOT*contact.GetNumContacts())
+                (pin_data_->M*qp_sol.head(num_vel_) - Js_.transpose()*qp_sol.tail(CONSTRAINT_PER_FOOT*
+                                                              GetNumBothContacts(contact, des_contact_))
                                                       + pin_data_->C*v + pin_data_->g).tail(num_inputs_);
 
         for (int i = 2*num_inputs_; i < 3*num_inputs_; i++) {
@@ -329,7 +337,7 @@ namespace controller {
         // Js is the "support Jacobian". Js \in R^{constraint_per_foot*ncontacts x nv}
         // Js = [Jc^T ... Jc^T]^T, Jc \in R^{nv x constraint_per_foot}
 
-        int num_contacts = contact.GetNumContacts();
+        int num_contacts = GetNumBothContacts(contact, des_contact_);
         Eigen::MatrixXd Js = Eigen::MatrixXd::Zero(CONSTRAINT_PER_FOOT*num_contacts, num_vel_);
         Eigen::MatrixXd J = Eigen::MatrixXd::Zero(FLOATING_VEL_OFFSET, num_vel_);
 
@@ -355,7 +363,7 @@ namespace controller {
         pinocchio::computeJointJacobiansTimeVariation(pin_model_, *pin_data_, q, v);
         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);  // might not need this
 
-        int num_contacts = contact.GetNumContacts();
+        int num_contacts = GetNumBothContacts(contact, des_contact_);
         Eigen::MatrixXd Jsdot = Eigen::MatrixXd::Zero(CONSTRAINT_PER_FOOT*num_contacts, num_vel_);
         Eigen::MatrixXd Jdot = Eigen::MatrixXd::Zero(FLOATING_VEL_OFFSET, num_vel_);
 
@@ -375,6 +383,17 @@ namespace controller {
         }
 
         return Jsdot;
+    }
+
+    int QPControl::GetNumBothContacts(const Contact& contact1, const Contact& contact2) const {
+        assert(contact1.in_contact_.size() == contact2.in_contact_.size());
+        int num_contacts = 0;
+        for (int i = 0; i < contact1.in_contact_.size(); i++) {
+            if (contact1.in_contact_.at(i) && contact2.in_contact_.at(i)) {
+                num_contacts++;
+            }
+        }
+        return num_contacts;
     }
 
 } // controller

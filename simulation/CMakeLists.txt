@@ -28,7 +28,8 @@ set(SIM_HEADER_LIST "include/simulator.h"
                     "include/glfw_dispatch.h"
                     "include/platform_ui_adapter.h"
                     "include/simulate.h"
-                    "../controllers/include/qp_control.h")
+                    "../controllers/include/qp_control.h"
+                    "include/visualization.h")
 
 add_library(simulator mujoco_sim/simulator.cpp
                       simulation_robot.cpp
@@ -36,6 +37,7 @@ add_library(simulator mujoco_sim/simulator.cpp
         mujoco_sim/glfw_dispatch.cc
         mujoco_sim/platform_ui_adapter.cc
         mujoco_sim/simulate.cc
+        visualization.cpp
         ${SIM_HEADER_LIST})
 
 target_include_directories(simulator PUBLIC include)

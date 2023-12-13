@@ -148,6 +148,8 @@ namespace controller {
         Eigen::MatrixXd GetConstraintJacobianDerivative(const Eigen::VectorXd& q, const Eigen::VectorXd& v,
                                                              const Contact& contact);
 
+        int GetNumBothContacts(const Contact& contact1, const Contact& contact2) const;
+
         // QP Solver
         OsqpEigen::Solver qp_solver_;
 

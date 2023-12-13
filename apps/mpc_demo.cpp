@@ -7,6 +7,8 @@
 #include "inputs.h"
 #include "spline.h"
 #include "mpc_controller.h"
+#include "visualization.h"
+#include "simulation_robot.h"
 
 using vector_t = Eigen::VectorXd;
 using matrix_t = Eigen::MatrixXd;
@@ -32,151 +34,96 @@ int main() {
     info.num_qp_iterations = config.ParseNumber<int>("num_qp");
     info.friction_coef = config.ParseNumber<double>("friction_coef");
     info.vel_bounds = config.ParseEigenVector("vel_bounds");
-    info.joint_bounds = config.ParseEigenVector("joint_bounds");
+    info.joint_bounds_lb = config.ParseEigenVector("joint_bounds_lb");
+    info.joint_bounds_ub = config.ParseEigenVector("joint_bounds_ub");
     info.ee_frames = config.ParseStdVector<std::string>("collision_frames");
     info.num_switches = config.ParseNumber<int>("num_switches");
     info.integrator_dt = config.ParseNumber<double>("integrator_dt");
     info.num_contacts = info.ee_frames.size();
     info.force_bound = config.ParseNumber<double>("force_bound");
 
-    vector_t standing = config.ParseEigenVector("standing_config");
-    standing.segment<4>(3) = ConvertMujocoQuatToPinocchioQuat(standing.segment<4>(3));
-    vector_t state = vector_t::Zero(6 + standing.size());
-    state.tail(standing.size()) = standing;
-
-    std::vector<vector_t> warm_start_states;
-    for (int i = 0; i < info.num_nodes+1; i++) {
-        warm_start_states.push_back(state);
-    }
-
     mpc::MPC mpc(info, config.ParseString("robot_urdf"));
 
-    auto switching_times = mpc::MPC::CreateDefaultSwitchingTimes(info.num_switches, 4, info.integrator_dt*(info.num_nodes));
-    mpc::Trajectory traj(info.num_nodes+1, config.ParseEigenVector("init_config").size() + 6, 12,
-                         switching_times,
-                         info.integrator_dt);
 
-    vector_t standing_state = state;
-    for (int i = 0; i < info.num_nodes+1; i++) {
-        //state(1) += i/2.0;
-        traj.SetState(i, state);
-    }
+    // Read in the inital config and parse it for MPC.
+    vector_t standing = config.ParseEigenVector("init_config");
+    standing.segment<4>(3) = ConvertMujocoQuatToPinocchioQuat(standing.segment<4>(3));
+    vector_t init_state = vector_t::Zero(6 + standing.size());
+    init_state.tail(standing.size()) = standing;
 
-    mpc::Inputs input(switching_times, config.ParseEigenVector("init_config").size() + 6 - 13,
-                      info.num_nodes, info.integrator_dt);
+    // Create the warm start
+    std::vector<vector_t> warm_start(info.num_nodes+1, init_state);
 
-    // Make the same force for each ee to ease of testing right now
-    std::array<mpc::Spline, 3> forces1 = {mpc::Spline(3, switching_times.at(0), true),
-                                         mpc::Spline(3, switching_times.at(0), true),
-                                         mpc::Spline(3, switching_times.at(0), true)};
-//    forces1.at(0).SetPolyVars(0, {2});
-//    forces1.at(1).SetPolyVars(0, {1});
-//    forces1.at(2).SetPolyVars(0, {3.5});
-//    forces1.at(0).SetPolyVars(1, {20, 100});
-//    forces1.at(1).SetPolyVars(1, {40, 10});
-//    forces1.at(2).SetPolyVars(1, {20, 100});
+    // Create the goal state
+    vector_t mpc_des_state = init_state;
+    mpc_des_state.segment<2>(6) << 1, 0;
 
-
-    std::array<mpc::Spline, 3> forces2 = {mpc::Spline(3, switching_times.at(0), true),
-                                          mpc::Spline(3, switching_times.at(0), true),
-                                          mpc::Spline(3, switching_times.at(0), true)};
-    std::array<mpc::Spline, 3> positions1 = {mpc::Spline(3, switching_times.at(0), false),
-                                            mpc::Spline(3, switching_times.at(0), false),
-                                         mpc::Spline(3, switching_times.at(0), false)};
-    std::array<mpc::Spline, 3> positions2 = {mpc::Spline(3, switching_times.at(0), false),
-                                            mpc::Spline(3, switching_times.at(0), false),
-                                            mpc::Spline(3, switching_times.at(0), false)};
-    // For the test just make everything constant, non-zero
-
-    for (int ee = 0; ee < 4; ee++) {
-        traj.SetEndEffectorSplines(ee, forces1.at(0), positions1.at(0));
-
-//        for (int coord = 0; coord < 3; coord++) {
-//            for (int poly = 0; poly < input.GetForces().at(ee).at(coord).GetNumPolyTimes(); poly++) {
-//                std::vector<double> vars(input.GetForces().at(ee).at(coord).GetNumPolyVars(poly));
-//                vars.at(0) = 1;
-//                if (vars.size() == 2) {
-//                    vars.at(1) = 0; // Constants for now
-//                }
-//                if (ee%2 == 0) {
-//                    forces1.at(coord).SetPolyVars(poly, vars);
-//                } else {
-//                    forces2.at(coord).SetPolyVars(poly, vars);
-//                }
-//            }
-//        for (int poly = 0; poly < input.GetPositions().at(0).at(0).GetTotalPoly(); poly++) {
-//            positions.at(coord).SetPolyVars(poly, vars);
-//        }
-//        }
-    }
-
-    for (int ee = 0; ee < 4; ee++) {
-        if (ee%2 == 0) {
-            input.SetEndEffectorForce(ee, forces1);
-        } else {
-            input.SetEndEffectorForce(ee, forces2);
-        }
-//        input.SetEndEffectorPosition(ee, positions);
-    }
-
-    traj.SetInput(input);
-
-    std::array<std::array<double, 3>, 4> ee_pos;
+    // Inital guess end effector positions
+    std::array<std::array<double, 3>, 4> ee_pos{};
     ee_pos.at(0) = {0.2, 0.2, 0};
     ee_pos.at(1) = {0.2, -0.2, 0};
     ee_pos.at(2) = {-0.2, 0.2, 0};
     ee_pos.at(3) = {-0.2, -0.2, 0};
 
-    for (int ee = 0; ee < 4; ee++) {
-        traj.SetPositionsForAllTime(ee, ee_pos.at(ee));
-    }
-
-//    mpc.SetWarmStartTrajectory(traj);
-
+    // Set warm starts and defaults
     mpc.SetDefaultGaitTrajectory(mpc::Gaits::Trot, 2, ee_pos);
-    std::vector<vector_t> warm_start(info.num_nodes+1, state);
     mpc.SetStateTrajectoryWarmStart(warm_start);
 
-    vector_t curr_state(6+7+12);
-    curr_state = standing_state;
-    curr_state(7) += 0.0;
-    //    curr_state << 1, 0, 0.1,
-//            0, 0, 0,
-//            0, 0, 0.35,
-//            1, 0, 0, 0,
-//            0, 0, 1, 0, 0.1, 0, 0, 0, 0.2, 0, 0, 0;
-
-    vector_t state_des = vector_t::Zero(6+7+12);
-//    state_des(11) = 1;
-    state_des = standing_state;
-    state_des(7) = 1;
-    state_des(6) = 1;
-
+    // Create weights
     matrix_t Q = matrix_t::Zero(24, 24);
     Q.topLeftCorner<6,6>() = matrix_t::Zero(6,6);
     Q(6,6) = 30; //30;
     Q(7,7) = 30; //30;
     Q(8,8) = 30; //10;
 
-    const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(state_des, standing_state);
+    // Desried state in the lie algebra
+    const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(mpc_des_state, init_state);
     std::cout << des_alg << std::endl;
 
-//    vector_t w = vector_t::Zero(24);
+    // Add in costs
     mpc.AddQuadraticTrackingCost(des_alg, Q);
     mpc.AddForceCost(0.02);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
     mpc.SetQuadraticFinalCost(50*Q);
     mpc.SetLinearFinalCost(-50*Q*des_alg);
 
-//    curr_state.segment<4>(9) = ConvertMujocoQuatToPinocchioQuat(curr_state.segment<4>(9));
-    mpc::Trajectory solve_traj = mpc.Solve(curr_state, 0.004);
-    solve_traj.PrintTrajectoryToFile("solved_traj.txt");
+    // Create the MPC controller (only used here for the visualizer)
+    std::unique_ptr<controller::Controller> mpc_controller;
+    mpc_controller = std::make_unique<controller::MPCController>(config.ParseNumber<double>("control_rate"),
+                                                                 config.ParseString("robot_urdf"),
+                                                                 config.ParseString("foot_type"),
+                                                                 config.ParseEigenVector("init_vel").size(),
+                                                                 config.ParseEigenVector("torque_bounds"),
+                                                                 config.ParseNumber<double>("friction_coef"),
+                                                                 config.ParseStdVector<double>("base_pos_gains"),
+                                                                 config.ParseStdVector<double>("base_ang_gains"),
+                                                                 config.ParseStdVector<double>("joint_gains"),
+                                                                 config.ParseNumber<double>("leg_tracking_weight"),
+                                                                 config.ParseNumber<double>("torso_tracking_weight"),
+                                                                 config.ParseNumber<double>("force_tracking_weight"),
+                                                                 info,
+                                                                 warm_start,
+                                                                 mpc_des_state);
 
+    // Make the robot for visualization
+    auto robot_file = config.ParseString("robot_xml");
+    std::unique_ptr<simulator::SimulationRobot> robot = std::make_unique<simulator::SimulationRobot>(robot_file, mpc_controller);
 
-    for (int i = 0; i < 0; i++) {
-        mpc.Solve(curr_state, (i+1)*info.integrator_dt);
-        curr_state(0) += 0.2;
-        curr_state(3) += 0.1;
+    mpc.Solve(init_state, 0);
+
+    // Visualize results
+    simulation::Visualizer viz(config.ParseString("robot_xml"));
+    robot->SetSimModel(viz.GetModel());
+    for (int i = 0; i < info.num_nodes+1; i++) {
+        viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
+        viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
     }
+
+    // Solve multiple times
+//    for (int i = 0; i < 10; i++) {
+//        mpc.Solve(curr_state, (i+1)*info.integrator_dt);
+//        curr_state(0) += 0.2;
+//        curr_state(3) += 0.1;
+//    }
 
     mpc.PrintStats();
 }

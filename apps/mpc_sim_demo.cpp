@@ -34,7 +34,8 @@ int main() {
     info.num_qp_iterations = config.ParseNumber<int>("num_qp");
     info.friction_coef = config.ParseNumber<double>("friction_coef");
     info.vel_bounds = config.ParseEigenVector("vel_bounds");
-    info.joint_bounds = config.ParseEigenVector("joint_bounds");
+    info.joint_bounds_lb = config.ParseEigenVector("joint_bounds_lb");
+    info.joint_bounds_ub = config.ParseEigenVector("joint_bounds_ub");
     info.ee_frames = config.ParseStdVector<std::string>("collision_frames");
     info.num_switches = config.ParseNumber<int>("num_switches");
     info.integrator_dt = config.ParseNumber<double>("integrator_dt");
@@ -43,19 +44,15 @@ int main() {
 
 
 
-    vector_t standing = config.ParseEigenVector("standing_config");
+    vector_t standing = config.ParseEigenVector("init_config");
     standing.segment<4>(3) = ConvertMujocoQuatToPinocchioQuat(standing.segment<4>(3));
-    vector_t state = vector_t::Zero(6 + standing.size());
-    state.tail(standing.size()) = standing;
+    vector_t mpc_des_state = vector_t::Zero(6 + standing.size());
+    mpc_des_state.tail(standing.size()) = standing;
 
-    std::vector<vector_t> warm_start_states;
-    for (int i = 0; i < info.num_nodes+1; i++) {
-        warm_start_states.push_back(state);
-    }
+    std::vector<vector_t> warm_start_states(info.num_nodes+1, mpc_des_state);
 
-    state.segment<2>(6) << 1, 1;
+    mpc_des_state.segment<2>(6) << 1, 0;
 
-    // TODO: Won't work until the MPC is more robust (numerically)
     std::unique_ptr<controller::Controller> mpc_controller;
     mpc_controller = std::make_unique<controller::MPCController>(config.ParseNumber<double>("control_rate"),
                                               config.ParseString("robot_urdf"),
@@ -71,7 +68,7 @@ int main() {
                                               config.ParseNumber<double>("force_tracking_weight"),
                                               info,
                                               warm_start_states,
-                                              state);
+                                              mpc_des_state);
 
     // Make the robot for simulation
     auto robot_file = config.ParseString("robot_xml");

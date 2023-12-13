@@ -73,9 +73,10 @@ namespace simulator {
         Eigen::VectorXd ConvertMujocoVecConfigToPinocchio(const Eigen::VectorXd& q) const;
         Eigen::VectorXd ConvertMujocoVecVelLikeToPinocchio(const Eigen::VectorXd& v) const;
 
-        Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints);
-        Eigen::VectorXd ConvertPinocchioVelToMujoco(const Eigen::VectorXd& v);
-        std::vector<mjtNum> ConvertControlToMujoco(const Eigen::VectorXd& control);
+        Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints) const;
+        Eigen::VectorXd ConvertPinocchioVelToMujoco(const Eigen::VectorXd& v) const;
+        std::vector<mjtNum> ConvertControlToMujoco(const Eigen::VectorXd& control) const;
+        Eigen::VectorXd ConvertPinocchioConfigToMujoco(const Eigen::VectorXd& q) const;
 
     private:
         std::string robot_xml_path_;

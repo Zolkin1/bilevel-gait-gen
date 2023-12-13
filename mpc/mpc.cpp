@@ -16,7 +16,8 @@ namespace mpc {
         num_contacts = info.num_contacts;
         friction_coef = info.friction_coef;
         vel_bounds = info.vel_bounds;
-        joint_bounds = info.joint_bounds;
+        joint_bounds_lb = info.joint_bounds_lb;
+        joint_bounds_ub = info.joint_bounds_ub;
         ee_frames = info.ee_frames;
         discretization_steps = info.discretization_steps;
         num_switches = info.num_switches;
@@ -36,7 +37,8 @@ namespace mpc {
 
         assert(info_.ee_frames.size() == num_ee_);
 
-        if (info_.vel_bounds.size() != num_joints_ || info_.joint_bounds.size() != num_joints_) {
+        if (info_.vel_bounds.size() != num_joints_ || info_.joint_bounds_lb.size() != num_joints_
+        || info_.joint_bounds_ub.size() != num_joints_) {
             throw std::runtime_error("Velocity or joint bounds do not match the number of joints on the robot.");
         }
 
@@ -432,8 +434,8 @@ namespace mpc {
                         data_.foot_on_ground_ub_(idx+1) = 0.05;
 
 //                                -model_.GetCOMPosition(prev_traj_.GetStates().at(node))(2) + 0.05;
-                        data_.foot_on_ground_lb_(idx) = -0.05;
-                        data_.foot_on_ground_lb_(idx+1) = -0.05;
+                        data_.foot_on_ground_lb_(idx) = -0.0;
+                        data_.foot_on_ground_lb_(idx+1) = -0.0;
 
 //                                -model_.GetCOMPosition(prev_traj_.GetStates().at(node))(2) - 0.05;
 
@@ -530,8 +532,8 @@ namespace mpc {
                                            num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
 
         // Configuration bounds
-        data_.box_ub_.segment(idx + num_joints_,num_joints_) = info_.joint_bounds;
-        data_.box_lb_.segment(idx + num_joints_,num_joints_) = -info_.joint_bounds;
+        data_.box_ub_.segment(idx + num_joints_,num_joints_) = info_.joint_bounds_ub;
+        data_.box_lb_.segment(idx + num_joints_,num_joints_) = info_.joint_bounds_lb;
         data_.box_constraints_.block(idx + num_joints_,
                                            GetJointIndex(node),
                                            num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
@@ -773,13 +775,24 @@ namespace mpc {
         }
     }
 
-    vector_t MPC::GetTargetConfig() const {
-        return prev_traj_.GetStates().at(1).tail(num_states_ - 5);
+    vector_t MPC::GetTargetConfig(double time) const {
+        int node = floor((time - init_time_)/info_.integrator_dt);
+        return prev_traj_.GetStates().at(node).tail(num_states_ - 5);
     }
 
-    vector_t MPC::GetTargetVelocity() const {
-        return model_.ComputeBaseVelocities(prev_traj_.GetStates().at(1),
-                                                   prev_traj_.GetInputs().GetVel(0));
+    vector_t MPC::GetTargetVelocity(double time) const {
+        int node = floor((time - init_time_)/info_.integrator_dt);
+        return model_.ComputeBaseVelocities(prev_traj_.GetStates().at(node),
+                                                   prev_traj_.GetInputs().GetVels(time));
+    }
+
+    // TODO: Check/think about this
+    vector_t MPC::GetTargetAcc(double time) const {
+        int node = floor((time - init_time_)/info_.integrator_dt);
+        return (model_.ComputeBaseVelocities(prev_traj_.GetStates().at(node),
+                                            prev_traj_.GetInputs().GetVels(time)) -
+                model_.ComputeBaseVelocities(prev_traj_.GetStates().at(node+1),
+                                             prev_traj_.GetInputs().GetVels(time + info_.integrator_dt)))/info_.integrator_dt;
     }
 
     const CentroidalModel& MPC::GetModel() const {
