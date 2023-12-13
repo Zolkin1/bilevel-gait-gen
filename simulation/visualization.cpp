@@ -16,6 +16,9 @@ namespace simulation {
     double lastx = 0;
     double lasty = 0;
 
+    bool pause = false;
+    int step = 0;
+
     // MuJoCo data structures
     mjModel* m = NULL;                  // MuJoCo model
     mjData* d = NULL;                   // MuJoCo data
@@ -31,6 +34,20 @@ namespace simulation {
         if (act==GLFW_PRESS && key==GLFW_KEY_BACKSPACE) {
             mj_resetData(m, d);
             mj_forward(m, d);
+        }
+
+        if (act == GLFW_PRESS && key == GLFW_KEY_SPACE) {
+            pause = !pause;
+        }
+
+        if (act == GLFW_PRESS && key == GLFW_KEY_S) {
+            std::cout << "Step #" << step << ": " << std::endl;
+            std::cout << "Configuration: ";
+            for (int i = 0; i < m->nq; i++) {
+                std::cout << std::setw(15) << std::setprecision(6) << d->qpos[i];
+            }
+            std::cout << std::endl;
+            std::cout << std::endl;
         }
     }
 
@@ -139,11 +156,13 @@ namespace simulation {
             d->qvel[i] = 0;
             d->qacc[i] = 0;
         }
+        step++;
     }
 
     void Visualizer::UpdateViz(double dt) {
         using namespace std::chrono;
         steady_clock::time_point t1 = steady_clock::now();
+
         duration<double> time_span(0);
         while(!glfwWindowShouldClose(window) && time_span.count() < dt) {
             // get framebuffer viewport
@@ -159,8 +178,13 @@ namespace simulation {
 
             // process pending GUI events, call GLFW callbacks
             glfwPollEvents();
+
             steady_clock::time_point t2 = steady_clock::now();
-            time_span = duration_cast<duration<double>>(t2 - t1);
+            if (pause) {
+                time_span = duration_cast<duration<double>>(t2 - t2);
+            } else {
+                time_span = duration_cast<duration<double>>(t2 - t1);
+            }
         }
 
         if (glfwWindowShouldClose(window)) {

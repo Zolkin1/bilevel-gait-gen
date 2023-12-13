@@ -29,12 +29,14 @@ namespace mpc {
         vector_t swing_force_constants_;
 
         matrix_t foot_on_ground_constraints_;
-        vector_t foot_on_ground_lb_;
-        vector_t foot_on_ground_ub_;
+        vector_t foot_on_ground_constants_;
 
         matrix_t friction_cone_constraints_;
         vector_t friction_cone_ub_;
         vector_t friction_cone_lb_;
+
+        matrix_t swing_trajectory_constraints_;
+        vector_t swing_trajectory_constants_;
 
 //        matrix_t positive_force_constraints_;
 //        vector_t positive_force_lb_;
@@ -67,13 +69,14 @@ namespace mpc {
         int num_foot_on_ground_constraints_;
         int num_fk_constraints_;
         int num_swing_foot_constraints_;
+        int num_swing_foot_pos_constraints_;
         int num_force_box_constraints_;
 
         int GetTotalNumConstraints() const {
             return num_cone_constraints_ + num_box_constraints_ +
             num_foot_ground_inter_constraints_ + num_foot_on_ground_constraints_ +
             num_fk_constraints_ + num_swing_foot_constraints_ + num_force_box_constraints_ +
-            num_dynamics_constraints;
+            num_dynamics_constraints + num_swing_foot_pos_constraints_;
         }
     };
 } // mpc

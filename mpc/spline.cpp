@@ -19,6 +19,8 @@ namespace mpc {
         total_poly_ = 0;
         num_constant_ = 0;
 
+        // On 12/13/23 at 11:29am: making it so that in the initialization we don't always start on a constant
+
         for (int time_idx = 0; time_idx < times.size(); time_idx++) {
             if (start_on_constant_) {
                 if ((time_idx) % 2 == 0) {      // On a constant
@@ -394,6 +396,11 @@ namespace mpc {
                 i--;
             }
         }
+    }
+
+    bool Spline::IsConstant(double time) const {
+        int idx = GetPolyIdx(time);
+        return IsConstantPoly(idx) || (time == poly_times_.at(0) && poly_vars_.at(0).size() == 1);
     }
 
 } // mpc

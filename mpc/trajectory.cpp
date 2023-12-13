@@ -224,6 +224,7 @@ namespace mpc {
         return std::min(end_effector_pos_.at(0).at(0).GetEndTime(), inputs_.GetForces().at(0).at(0).GetEndTime());
     }
 
+    // TODO: Make sure they all have the same final time
     void Trajectory::AddPolys(double final_time) {
         if (GetTotalTime() < final_time) {
             for (auto &end_effector_pos: end_effector_pos_) {
@@ -328,6 +329,25 @@ namespace mpc {
         }
 
         return in_contact;
+    }
+
+    bool Trajectory::PosIsConstant(int ee, int coord, double time) const {
+        return end_effector_pos_.at(ee).at(coord).IsConstant(time);
+    }
+
+    int Trajectory::GetTotalPosNonConstantZ() const {
+        int non_const = 0;
+        const int coord = 2;
+        for (const auto& end_effector_pos : end_effector_pos_) {
+            const auto& poly_vars = end_effector_pos.at(coord).GetPolyVars();
+            for (int i = 0; i < poly_vars.size(); i++) {
+                if (poly_vars.size() != 1) {
+                    non_const++;
+                }
+            }
+        }
+
+        return non_const;
     }
 
 } // mpc

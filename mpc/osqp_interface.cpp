@@ -16,7 +16,7 @@ namespace mpc {
         qp_solver_.settings()->setAbsoluteTolerance(1e-5);
         qp_solver_.settings()->setRelativeTolerance(1e-5);
         qp_solver_.settings()->setScaledTerimination(false);
-        qp_solver_.settings()->setMaxIteration(100);
+        qp_solver_.settings()->setMaxIteration(4000);
 //        qp_solver_.settings()->setTimeLimit(2e-3); -- Can't do this unless I somehow recompile osqp-eigen with PROFILING=1
         qp_solver_.settings()->setRho(.01);
 //        qp_solver_.settings()->setAlpha(1.6);
@@ -31,6 +31,11 @@ namespace mpc {
     void OSQPInterface::SetupQP(const mpc::QPData &data, const vector_t& warm_start) {
         qp_solver_.data()->setNumberOfVariables(data.num_decision_vars);
         qp_solver_.data()->setNumberOfConstraints(data.GetTotalNumConstraints());
+
+        // TODO: Do better
+        if (prev_dual_sol_.size() != data.GetTotalNumConstraints()) {
+            prev_dual_sol_ = vector_t::Zero(data.GetTotalNumConstraints());
+        }
 
         qp_solver_.data()->clearLinearConstraintsMatrix();
         qp_solver_.data()->clearHessianMatrix();
@@ -125,21 +130,41 @@ namespace mpc {
     }
 
     void OSQPInterface::ConvertDataToOSQPConstraints(const mpc::QPData& data) {
+        // TODO: Remove zero initialziation (everything should be overwritten anyway)
         A_ = matrix_t::Zero(data.GetTotalNumConstraints(), data.num_decision_vars);
 
-        A_ << data.dynamics_constraints, data.fk_constraints_,
-                data.swing_force_constraints_, data.foot_on_ground_constraints_, data.friction_cone_constraints_,
-                data.foot_ground_inter_constraints_, data.box_constraints_, data.force_box_constraints_;
+        A_ << data.dynamics_constraints,
+                data.fk_constraints_,
+                data.swing_force_constraints_,
+                data.foot_on_ground_constraints_,
+                data.friction_cone_constraints_,
+                data.foot_ground_inter_constraints_,
+                data.box_constraints_,
+                data.force_box_constraints_,
+                data.swing_trajectory_constraints_;
 
         lb_ = vector_t::Zero(data.GetTotalNumConstraints());
         ub_ = lb_;
 
-        lb_ << data.dynamics_constants, data.fk_constants_, data.swing_force_constants_,
-                data.foot_on_ground_lb_, data.friction_cone_lb_,
-                data.foot_ground_inter_lb_, data.box_lb_, data.force_box_lb_;
-        ub_ << data.dynamics_constants, data.fk_constants_, data.swing_force_constants_,
-                data.foot_on_ground_ub_, data.friction_cone_ub_,
-                data.foot_ground_inter_ub_, data.box_ub_, data.force_box_ub_;
+        lb_ << data.dynamics_constants,
+                data.fk_constants_,
+                data.swing_force_constants_,
+                data.foot_on_ground_constants_,
+                data.friction_cone_lb_,
+                data.foot_ground_inter_lb_,
+                data.box_lb_,
+                data.force_box_lb_,
+                data.swing_trajectory_constants_;
+
+        ub_ << data.dynamics_constants,
+                data.fk_constants_,
+                data.swing_force_constants_,
+                data.foot_on_ground_constants_,
+                data.friction_cone_ub_,
+                data.foot_ground_inter_ub_,
+                data.box_ub_,
+                data.force_box_ub_,
+                data.swing_trajectory_constants_;
     }
 
     void OSQPInterface::ConvertDataToOSQPCost(const mpc::QPData& data) {

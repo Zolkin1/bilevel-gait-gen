@@ -143,6 +143,8 @@ namespace mpc {
 
         void RemoveUnused(double time);
 
+        bool IsConstant(double time) const;
+
     protected:
     private:
         bool IsConstantPoly(int idx) const;

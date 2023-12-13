@@ -20,12 +20,13 @@ TEST_CASE("basic mpc", "[mpc]") {
     mpc::MPCInfo info;
     info.discretization_steps = config.ParseNumber<int>("discretization_steps");
     info.num_nodes = config.ParseNumber<int>("num_nodes");
-    info.time_horizon = config.ParseNumber<int>("time_horizon");
     info.num_qp_iterations = config.ParseNumber<int>("num_qp");
     info.friction_coef = config.ParseNumber<double>("friction_coef");
     info.vel_bounds = config.ParseEigenVector("vel_bounds");
-    info.joint_bounds = config.ParseEigenVector("joint_bounds");
+    info.joint_bounds_lb = config.ParseEigenVector("joint_bounds_lb");
+    info.joint_bounds_ub = config.ParseEigenVector("joint_bounds_ub");
     info.ee_frames = config.ParseStdVector<std::string>("collision_frames");
+    info.force_bound = config.ParseNumber<double>("force_bound");
 
     mpc::MPC mpc(info, config.ParseString("robot_urdf"));
 

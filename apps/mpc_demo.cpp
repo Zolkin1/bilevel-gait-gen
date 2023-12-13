@@ -41,6 +41,7 @@ int main() {
     info.integrator_dt = config.ParseNumber<double>("integrator_dt");
     info.num_contacts = info.ee_frames.size();
     info.force_bound = config.ParseNumber<double>("force_bound");
+    info.swing_height = config.ParseNumber<double>("swing_height");
 
     mpc::MPC mpc(info, config.ParseString("robot_urdf"));
 
@@ -82,7 +83,7 @@ int main() {
 
     // Add in costs
     mpc.AddQuadraticTrackingCost(des_alg, Q);
-    mpc.AddForceCost(0.02);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
+    mpc.AddForceCost(0.00);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
     mpc.SetQuadraticFinalCost(50*Q);
     mpc.SetLinearFinalCost(-50*Q*des_alg);
 
@@ -108,7 +109,10 @@ int main() {
     auto robot_file = config.ParseString("robot_xml");
     std::unique_ptr<simulator::SimulationRobot> robot = std::make_unique<simulator::SimulationRobot>(robot_file, mpc_controller);
 
-    mpc.Solve(init_state, 0);
+    for (int i = 0; i < 1; i++) {
+        mpc.Solve(init_state, 0);
+    }
+    mpc.PrintStats();
 
     // Visualize results
     simulation::Visualizer viz(config.ParseString("robot_xml"));
@@ -118,12 +122,4 @@ int main() {
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
     }
 
-    // Solve multiple times
-//    for (int i = 0; i < 10; i++) {
-//        mpc.Solve(curr_state, (i+1)*info.integrator_dt);
-//        curr_state(0) += 0.2;
-//        curr_state(3) += 0.1;
-//    }
-
-    mpc.PrintStats();
 }

@@ -214,6 +214,7 @@ namespace mpc {
         C = integrator_->CalcLinearTermDiscretization(Cc, Cc, Ac); //GetDt()*Cc;
     }
 
+    // TODO: Note this changed to giving the result in global coordiantes
     void CentroidalModel::GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
                                                  matrix_t& A, vector_t& C) {
         vector_t q_pin = ConvertMPCStateToPinocchioState(state);
@@ -227,11 +228,12 @@ namespace mpc {
         pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_map_.at(frames_.at(end_effector)),
                                     pinocchio::LOCAL_WORLD_ALIGNED, J);
 
-        // TODO: Check this
-        A = J.topRows<3>() - Eigen::Matrix3Xd::Identity(3, pin_model_.nv);
+        // TODO: Is this in the correct coordinates?
+        A = J.topRows<3>();// - Eigen::Matrix3Xd::Identity(3, pin_model_.nv);
 
         const vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
-        C = GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector)) - A*state_alg.tail(pin_model_.nv);
+        C = GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector)) + GetCOMPosition(state)
+                - A*state_alg.tail(pin_model_.nv);
 //        std::cout << "ee com frame pos: \n" << GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector)) << std::endl;
 //        std::cout << "COM position: \n" << pin_data_->com[0] << std::endl;
 //        std::cout << "C: \n" << C << std::endl;
@@ -246,10 +248,8 @@ namespace mpc {
         matrix6x_t J = matrix_t::Zero(6,pin_model_.nv);
         pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_map_.at(frame), pinocchio::LOCAL_WORLD_ALIGNED, J);
 
-        Eigen::Matrix3Xd dCOM = Eigen::Matrix3Xd::Identity(3, pin_model_.nv);
-
         // Only return the position coordinates
-        return J.topRows<3>() - dCOM;
+        return J.topRows<3>() - Eigen::Matrix3Xd::Identity(3, pin_model_.nv);
     }
 
     Eigen::Vector3d CentroidalModel::GetEndEffectorLocationCOMFrame(const vector_t& state, const std::string& frame) const {

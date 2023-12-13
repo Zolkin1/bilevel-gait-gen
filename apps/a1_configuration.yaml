@@ -14,16 +14,16 @@ foot_type: "POINT_FEET"
 ## ----------------------- Configurations ----------------------- ##
 # initial joint config
 # xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
-#init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
-#              -0.02, 0.144, -0.976,     # front right
-#              0.02, 0.2, -0.977,      # front left
-#              -0.08, 0.45, -1.03,       # rear right
-#              0.08, 0.45, -1.03]        # rear left
 init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
-              -0.02, 0.2, -0.977,     # front right
-              0.02, 0.524, -1.63,      # front left
-              -0.08, 0.498, -1.57,       # rear right
-              0.08, 0.45, -1.03]
+              -0.02, 0.144, -0.976,     # front right
+              0.02, 0.2, -0.977,      # front left
+              -0.08, 0.45, -1.03,       # rear right
+              0.08, 0.45, -1.03]        # rear left
+#init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
+#              -0.02, 0.2, -0.977,     # front right
+#              0.02, 0.524, -1.63,      # front left
+#              -0.08, 0.498, -1.57,       # rear right
+#              0.08, 0.45, -1.03]
 # initial joint velocity
 # xv, yv, zv, angle rates, v0, ..., v11
 init_vel: [0., 0., 0., 0., 0., 0.,
@@ -65,8 +65,8 @@ force_tracking_weight: 0.0
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
-num_nodes: 40
-integrator_dt: 0.025
+num_nodes: 50
+integrator_dt: 0.02
 num_qp: 1
 vel_bounds: [1, 1, 1,
              1, 1, 1,
@@ -88,5 +88,7 @@ joint_bounds_ub: [0.802851, 4.18879, -0.916298,
 num_switches: 2
 force_bound: 150
 
+swing_height: 0.15
+
 ## --- Temp --- ##
-viz_rate: 0.1
+viz_rate: 0.2

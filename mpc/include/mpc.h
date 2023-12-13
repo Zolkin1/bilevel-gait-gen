@@ -37,6 +37,7 @@ namespace mpc {
         int num_switches;
         double integrator_dt;
         double force_bound;
+        double swing_height;
 
         MPCInfo();
         MPCInfo(const MPCInfo& info);
@@ -126,6 +127,8 @@ namespace mpc {
         void AddGroundIntersectConstraints();
 
         void AddFrictionConeConstraints(const vector_t& state, double time, int node);
+
+        void AddSwingFootConstraints();
 
         void AddInequalityConstraints(const vector_t& state, double time, int node);
 

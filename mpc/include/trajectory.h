@@ -85,6 +85,10 @@ namespace mpc {
 
         std::vector<bool> GetContacts(double time) const;
 
+        bool PosIsConstant(int ee, int coord, double time) const;
+
+        int GetTotalPosNonConstantZ() const;
+
     protected:
     private:
         void UpdatePosSplineVarsCount();
