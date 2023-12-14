@@ -126,14 +126,14 @@ namespace mpc {
         // Linear in each force, and each force is linear in its coefficients at each point in time.
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int coord = 0; coord < 3; coord++) {
-                vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
+                if (input.IsForceMutable(ee, coord, time)) {
+                    vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
 
-                int vars_idx, vars_affecting;
-                std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
+                    int vars_idx, vars_affecting;
+                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
 
-//                if (vars_affecting != 1) {
-                Bc.block(coord, vars_idx - vars_affecting, 1, vars_affecting) = vars_lin.transpose();
-//                }
+                    Bc.block(coord, vars_idx - vars_affecting, 1, vars_affecting) = vars_lin.transpose();
+                }
             }
         }
 
@@ -175,13 +175,15 @@ namespace mpc {
 //                    B.block(5, vars_idx - vars_affecting, 1, vars_affecting) = -ee_pos_wrt_com(1)*vars_lin.transpose();
 //                }
 
-                int vars_idx, vars_affecting;
-                std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
-                vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
+                if (input.IsForceMutable(ee, coord, time)) {
+                    int vars_idx, vars_affecting;
+                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
+                    vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
 
-                for (int poly = 0; poly < vars_lin.size(); poly++) {
-                    Bc.block(3, vars_idx - vars_affecting + poly, 3, 1) =
-                            ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
+                    for (int poly = 0; poly < vars_lin.size(); poly++) {
+                        Bc.block(3, vars_idx - vars_affecting + poly, 3, 1) =
+                                ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
+                    }
                 }
 
             }

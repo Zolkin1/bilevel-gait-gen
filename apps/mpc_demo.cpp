@@ -71,7 +71,7 @@ int main() {
     mpc.SetStateTrajectoryWarmStart(warm_start);
 
     // Create weights
-    matrix_t Q = matrix_t::Zero(24, 24);
+    matrix_t Q = 20*matrix_t::Identity(24, 24);
     Q.topLeftCorner<6,6>() = matrix_t::Zero(6,6);
     Q(6,6) = 300; //30;
     Q(7,7) = 300; //30;

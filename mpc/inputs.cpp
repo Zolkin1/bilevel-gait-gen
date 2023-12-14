@@ -8,11 +8,16 @@ namespace mpc {
     Inputs::Inputs(const std::vector<std::vector<double>>& switching_times, int num_joints, int num_nodes, double node_dt) :
             node_dt_(node_dt) {
         for (auto & switching_time : switching_times) {
+            const std::vector<bool> mut_pattern(1, true);
             // TODO: Clean up
             std::array<Spline, 3> end_effector_force =
-                    {Spline(3, switching_time, true), Spline(3, switching_time, true), Spline(3, switching_time, true)};
+                    {Spline(3, switching_time, true, Spline::Force),
+                     Spline(3, switching_time, true, Spline::Force),
+                     Spline(3, switching_time, true, Spline::Force)};
             std::array<Spline, 3> end_effector_pos =
-                    {Spline(3, switching_time, false), Spline(3, switching_time, false), Spline(3, switching_time, false)};
+                    {Spline(3, switching_time, false, Spline::Normal),
+                     Spline(3, switching_time, false, Spline::Normal),
+                     Spline(3, switching_time, false, Spline::Normal)};
             forces_.emplace_back(end_effector_force);
 //            positions_.emplace_back(end_effector_pos);        NOTE: Removed positions from the inputs
         }
@@ -332,5 +337,10 @@ namespace mpc {
         }
 
         return inp;
+    }
+
+    bool Inputs::IsForceMutable(int ee, int coord, double time) const {
+        const int idx = forces_.at(ee).at(coord).GetPolyIdx(time);
+        return forces_.at(ee).at(coord).IsMutable(idx);
     }
 }

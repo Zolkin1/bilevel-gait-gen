@@ -159,6 +159,8 @@ namespace mpc {
 
         vector_t AsQPVector() const;
 
+        bool IsForceMutable(int ee, int coord, double time) const;
+
     protected:
     private:
         void UpdateForceSplineVarsCount();

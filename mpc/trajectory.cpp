@@ -10,20 +10,26 @@
 namespace mpc {
 
     Trajectory::Trajectory(int len, int state_size, int num_joints,
-                           const std::vector<std::vector<double>>& switching_times, double node_dt) :
-            inputs_(switching_times, num_joints, len, node_dt) {
+                           const std::vector<std::vector<double>>& switching_times, double node_dt,
+                           double swing_height) :
+            inputs_(switching_times, num_joints, len, node_dt),
+            swing_height_(swing_height) {
         for (int i = 0; i < len; i++) {
             states_.push_back(vector_t::Zero(state_size));
         }
 
         for (const auto& switching_time : switching_times) {
             std::array<Spline, 3> end_effector_pos =
-                    {Spline(3, switching_time, false), Spline(3, switching_time, false),
-                     Spline(3, switching_time, false)};
+                    {Spline(2, switching_time, false, Spline::Normal),
+                     Spline(2, switching_time, false, Spline::Normal),
+                     Spline(2, switching_time, false, Spline::Normal)};
             end_effector_pos_.emplace_back(end_effector_pos);
+            const std::array<bool, 3> mut_arr = {true, true, false}; // z pos is always a constant trajectory
+            mut_flags_.emplace_back(mut_arr);
         }
 
         UpdatePosSplineVarsCount();
+        SetSwingPosZ();
     }
 
     std::vector<vector_t> Trajectory::GetStates() const {
@@ -103,16 +109,20 @@ namespace mpc {
     }
 
     std::pair<int, int> Trajectory::GetPositionSplineIndex(int end_effector, double time, int coord) const {
+        if (!mut_flags_.at(end_effector).at(coord)) {
+            throw std::runtime_error("The chose spline is not mutable and thus does not provide a index.");
+        }
+
         int num_spline_vars_before = 0;
         for (int ee = 0; ee < end_effector; ee++) {
             for (int j = 0; j < POS_VARS; j++) {
-                num_spline_vars_before += end_effector_pos_.at(ee).at(j).GetTotalPolyVars();
+                    num_spline_vars_before += end_effector_pos_.at(ee).at(j).GetTotalPolyVars();
             }
         }
 
         int idx_into_ee_coord_spline_vars = 0;
         for (int j = 0; j < coord; j++) {
-            idx_into_ee_coord_spline_vars += end_effector_pos_.at(end_effector).at(j).GetTotalPolyVars();
+                idx_into_ee_coord_spline_vars += end_effector_pos_.at(end_effector).at(j).GetTotalPolyVars();
         }
 
         int vars_idx, vars_affecting;
@@ -123,7 +133,9 @@ namespace mpc {
 
     void Trajectory::SetPositionsForAllTime(int ee, const std::array<double, POS_VARS>& ee_pos) {
         for (int coord = 0; coord < POS_VARS; coord++) {
-            end_effector_pos_.at(ee).at(coord).SetAllPositions(ee_pos.at(coord));
+            if (mut_flags_.at(ee).at(coord)) {
+                end_effector_pos_.at(ee).at(coord).SetAllPositions(ee_pos.at(coord));
+            }
         }
     }
 
@@ -225,6 +237,7 @@ namespace mpc {
     }
 
     // TODO: Make sure they all have the same final time
+    // TODO: Update for the constant z
     void Trajectory::AddPolys(double final_time) {
         if (GetTotalTime() < final_time) {
             for (auto &end_effector_pos: end_effector_pos_) {
@@ -256,9 +269,11 @@ namespace mpc {
 
     void Trajectory::UpdatePosSplineVarsCount() {
         pos_spline_vars_ = 0;
-        for (const auto& end_effector_pos : end_effector_pos_) {
+        for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
             for (int coord = 0; coord < 3; coord++) {
-                pos_spline_vars_ += end_effector_pos.at(coord).GetTotalPolyVars();
+                if (mut_flags_.at(ee).at(coord)) {
+                    pos_spline_vars_ += end_effector_pos_.at(ee).at(coord).GetTotalPolyVars();
+                }
             }
         }
     }
@@ -268,6 +283,8 @@ namespace mpc {
             end_effector_pos_.at(ee).at(coord) = pos_spline;
             inputs_.SetForceSpline(ee, coord, force_spline);
         }
+        // TODO: Consider doing this differently
+        SetSwingPosZ();
     }
 
     vector_t Trajectory::ConvertToQPVector() const {
@@ -290,11 +307,13 @@ namespace mpc {
     vector_t Trajectory::PositionAsQPVector() const {
         vector_t pos_vec = vector_t::Zero(pos_spline_vars_);
         int idx = 0;
-        for (const auto& pos : end_effector_pos_) {
+        for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
             for (int coord = 0; coord < POS_VARS; coord++) {
-                pos_vec.segment(idx, pos.at(coord).GetTotalPolyVars()) =
-                        pos.at(coord).GetAllPolyVars();
-                idx += pos.at(coord).GetTotalPolyVars();
+                if (mut_flags_.at(ee).at(coord)) {
+                    pos_vec.segment(idx, end_effector_pos_.at(ee).at(coord).GetTotalPolyVars()) =
+                            end_effector_pos_.at(ee).at(coord).GetAllPolyVars();
+                    idx += end_effector_pos_.at(ee).at(coord).GetTotalPolyVars();
+                }
             }
         }
 
@@ -348,6 +367,22 @@ namespace mpc {
         }
 
         return non_const;
+    }
+
+    bool Trajectory::IsSplineMutable(int ee, int coord) const {
+        return mut_flags_.at(ee).at(coord);
+    }
+
+    void Trajectory::SetSwingPosZ() {
+        const int coord = 2;
+        for (auto& end_effector_pos : end_effector_pos_) {
+            const auto& poly_vars = end_effector_pos.at(coord).GetPolyVars();
+            for (int i = 0; i < poly_vars.size(); i++) {
+                if (poly_vars.at(i).size() == 2) {
+                    end_effector_pos.at(coord).SetPolyVars(i, {swing_height_, 0});
+                }
+            }
+        }
     }
 
 } // mpc

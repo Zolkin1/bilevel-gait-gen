@@ -18,7 +18,8 @@ namespace mpc {
 
     public:
         Trajectory(int len, int state_size, int num_joints,
-                   const std::vector<std::vector<double>>& switching_times, double node_dt);
+                   const std::vector<std::vector<double>>& switching_times, double node_dt,
+                   double swing_height);
 
 //        Trajectory(const Trajectory& traj);
 
@@ -89,15 +90,23 @@ namespace mpc {
 
         int GetTotalPosNonConstantZ() const;
 
+        bool IsSplineMutable(int ee, int coord) const;
+
     protected:
     private:
         void UpdatePosSplineVarsCount();
 
+        void SetSwingPosZ();
+
+
         std::vector<vector_t> states_;
         Inputs inputs_;
         std::vector<std::array<Spline, 3>> end_effector_pos_;
+        std::vector<std::array<bool, 3>> mut_flags_;
 
         int pos_spline_vars_;
+
+        double swing_height_;
     };
 } // mpc
 

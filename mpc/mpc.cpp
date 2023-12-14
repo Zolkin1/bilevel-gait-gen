@@ -34,7 +34,7 @@ namespace mpc {
         num_ee_(model_.GetNumEndEffectors()),
         prev_traj_(info.num_nodes+1, num_states_+1, num_joints_,
                CreateDefaultSwitchingTimes(info.num_switches, num_ee_, info.integrator_dt*(info.num_nodes)),
-               info.integrator_dt) {
+               info.integrator_dt, info.swing_height) {
 
         assert(info_.ee_frames.size() == num_ee_);
 
@@ -98,14 +98,6 @@ namespace mpc {
         data_.dynamics_constants.head(num_states_) =
                 -CentroidalModel::ConvertManifoldStateToAlgebraState(centroidal_state, centroidal_state);
 
-
-        // TODO: Current problems:
-        // 12/8 6:09pm: Dynamics lin violation on prev point != Dynamics violation on prev point, but it should
-        // - looks like an issue with both discretizers. Small for euler
-        // Why is the joint box constraint so critical? - Something related to the CMM
-        // 12/11/23 2:02pm: RK integrator is definitely wrong. Euler gives generally as expected but RK does not. - Fixed
-
-
         // Constraints on all the nodes BUT the first
         for (int i = 0; i < info_.num_nodes; i++) {
             double time = GetTime(i);
@@ -113,7 +105,7 @@ namespace mpc {
             AddDynamicsConstraints(centroidal_state, time, i);
 
             // ------------------------ Inequality Constraints ------------------------ //
-            AddBoxConstraints(centroidal_state, time, i);
+//            AddBoxConstraints(centroidal_state, time, i);
         }
 
         // ----------------------- Costs ------------------------- //
@@ -125,15 +117,15 @@ namespace mpc {
         for (int i = 0; i < info_.num_nodes+1; i++) {
             double time = GetTime(i);
             // ------------------------ FK Constraint ------------------------ //
-            AddFKConstraints(centroidal_state, time, i);
+//            AddFKConstraints(centroidal_state, time, i);
 
             // ------------------------ Friction Cone Constraints ------------------------ //
-            AddFrictionConeConstraints(centroidal_state, time, i);
+//            AddFrictionConeConstraints(centroidal_state, time, i);
 
             // Positivity of z direction force
 //            AddPositivityConstraints(time, i);
 
-            AddForceBoxConstraints(time, i);
+//            AddForceBoxConstraints(time, i);
         }
 
         // TODO: instead of adding a constraint consider removing them as decision variables
@@ -143,10 +135,11 @@ namespace mpc {
         // - All the conversion functions for inputs and trajectories will need to be looked at
         // - These values will need to be set at some point
         // - When a new point in the spline is added it needs to be given the correct value
-        // - Maybe denote a spline as mutable or not. For mutable splines denote certaint polys as mutable
-        AddSwingFootConstraints();  // All end effector z trajectories are set
-        AddForceConstraints();      // All force constants are set to 0
-        AddGroundIntersectConstraints();    // All position constants are set to 0
+        // - Maybe denote a spline as mutable or not. For mutable splines denote certain polys as mutable
+        // - Size of decision variables is different
+//        AddSwingFootConstraints();  // All end effector z trajectories are set
+//        AddForceConstraints();        // All force constants are set to 0
+//        AddGroundIntersectConstraints();    // All position Z constants are set to 0
 
 
         qp_solver->SetupQP(data_, prev_qp_sol);
@@ -278,8 +271,8 @@ namespace mpc {
         data_.friction_cone_lb_ = vector_t::Zero(data_.num_cone_constraints_);
         data_.friction_cone_ub_ = vector_t::Zero(data_.num_cone_constraints_);
 
-        data_.swing_trajectory_constraints_ = matrix_t::Zero(data_.num_swing_foot_pos_constraints_, data_.num_decision_vars);
-        data_.swing_trajectory_constants_ = vector_t::Zero(data_.num_swing_foot_pos_constraints_);
+//        data_.swing_trajectory_constraints_ = matrix_t::Zero(data_.num_swing_foot_pos_constraints_, data_.num_decision_vars);
+//        data_.swing_trajectory_constants_ = vector_t::Zero(data_.num_swing_foot_pos_constraints_);
 
 //        data_.positive_force_constraints_ = matrix_t::Zero(data_.num_positive_force_constraints_, data_.num_decision_vars);
 //        data_.positive_force_lb_ = vector_t::Zero(data_.num_positive_force_constraints_);
@@ -331,6 +324,9 @@ namespace mpc {
     }
 
 
+    // TODO: When the nodes increase this start to look more sus
+    // Need to confirm which legs should be fixed, etc...
+    // TODO: Maybe just let the first constant of the z direction be mutable and all the other vars fixed
     void MPC::AddFKConstraints(const vector_t& state, double time, int node) {
         matrix_t G;
         vector_t g;
@@ -342,22 +338,33 @@ namespace mpc {
             state1 = state;
         }
 
-        for (int ee = 0; ee < num_ee_; ee++) {
-            model_.GetFKLinearization(state1, state, prev_traj_.GetInputs(), ee, G, g);
-            data_.fk_constraints_.block(node * POS_VARS * num_ee_ + ee * POS_VARS,
-                                             node * num_states_ + CentroidalModel::MOMENTUM_OFFSET,
-                                             POS_VARS, num_joints_ + CentroidalModel::FLOATING_VEL_OFFSET) = G;
+        // TODO: Remove this node restriction, then the initial condition will require we are at zero
+        // TODO: I wonder if the FK would be better in the cost (would do with auto-diff)?
+        // Or maybe this is better using the null space projection strategy?
+        // This doesn't work well when I have a capped joint velocity limit
+        if (node > 0) {
+            for (int ee = 0; ee < num_ee_; ee++) {
+                model_.GetFKLinearization(state1, state, prev_traj_.GetInputs(), ee, G, g);
+                data_.fk_constraints_.block(node * POS_VARS * num_ee_ + ee * POS_VARS,
+                                            node * num_states_ + CentroidalModel::MOMENTUM_OFFSET,
+                                            POS_VARS, num_joints_ + CentroidalModel::FLOATING_VEL_OFFSET) = G;
 
-            data_.fk_constants_.segment(node * POS_VARS * num_ee_ + ee * POS_VARS, POS_VARS) = -g;
+                data_.fk_constants_.segment(node * POS_VARS * num_ee_ + ee * POS_VARS, POS_VARS) = -g;
 
-            for (int coord = 0; coord < POS_VARS; coord++) {
-                int vars_index, vars_affecting;
-                std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, time, coord);
-                data_.fk_constraints_.block(node * POS_VARS * num_ee_ + ee * POS_VARS + coord,
-                                                 spline_offset + vars_index - vars_affecting,
-                                                 1,
-                                                 vars_affecting) =
-                                                         -prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose();
+                for (int coord = 0; coord < POS_VARS; coord++) {
+                    if (prev_traj_.IsSplineMutable(ee, coord)) {
+                        int vars_index, vars_affecting;
+                        std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, time, coord);
+                        data_.fk_constraints_.block(node * POS_VARS * num_ee_ + ee * POS_VARS + coord,
+                                                    spline_offset + vars_index - vars_affecting,
+                                                    1,
+                                                    vars_affecting) =
+                                -prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose();
+                    } else {
+                        data_.fk_constants_(node * POS_VARS * num_ee_ + ee * POS_VARS + coord) +=
+                                prev_traj_.GetPositions().at(ee).at(coord).ValueAt(time);
+                    }
+                }
             }
         }
 
@@ -468,29 +475,29 @@ namespace mpc {
 
     // TODO: Currently assuming the end effector z parameterization only has 2 polynomials
     // Constrains thw swing foot trajectory
-    void MPC::AddSwingFootConstraints() {
-        // Assign the constant height and zero derivative (at the top) to the swing foot trajectory
-        int idx = 0;
-        const int coord = 2;
-        const int pos_offset = GetPosSplineStartIdx();
-        const auto& positions = prev_traj_.GetPositions();
-        for (int ee = 0; ee < num_ee_; ee++) {
-            const auto& poly_vars = positions.at(ee).at(coord).GetPolyVars();
-            const auto& poly_times = positions.at(ee).at(coord).GetPolyTimes();
-            for (int i = 0; i < poly_vars.size(); i++) {
-                if (poly_vars.at(i).size() == 2) {
-                    int vars_index, vars_affecting;
-                    std::tie(vars_index, vars_affecting) =
-                            prev_traj_.GetPositionSplineIndex(ee, poly_times.at(i), coord);
-                    data_.swing_trajectory_constraints_(idx, pos_offset + vars_index - 2) = 1;
-                    data_.swing_trajectory_constants_(idx) = info_.swing_height;
-                    data_.swing_trajectory_constraints_(idx+1, pos_offset + vars_index - 1) = 1;
-                    data_.swing_trajectory_constants_(idx+1) = 0;
-                    idx += 2;
-                }
-            }
-        }
-    }
+//    void MPC::AddSwingFootConstraints() {
+//        // Assign the constant height and zero derivative (at the top) to the swing foot trajectory
+//        int idx = 0;
+//        const int coord = 2;
+//        const int pos_offset = GetPosSplineStartIdx();
+//        const auto& positions = prev_traj_.GetPositions();
+//        for (int ee = 0; ee < num_ee_; ee++) {
+//            const auto& poly_vars = positions.at(ee).at(coord).GetPolyVars();
+//            const auto& poly_times = positions.at(ee).at(coord).GetPolyTimes();
+//            for (int i = 0; i < poly_vars.size(); i++) {
+//                if (poly_vars.at(i).size() == 2) {
+//                    int vars_index, vars_affecting;
+//                    std::tie(vars_index, vars_affecting) =
+//                            prev_traj_.GetPositionSplineIndex(ee, poly_times.at(i), coord);
+//                    data_.swing_trajectory_constraints_(idx, pos_offset + vars_index - 2) = 1;
+//                    data_.swing_trajectory_constants_(idx) = info_.swing_height;
+//                    data_.swing_trajectory_constraints_(idx+1, pos_offset + vars_index - 1) = 1;
+//                    data_.swing_trajectory_constants_(idx+1) = 0;
+//                    idx += 2;
+//                }
+//            }
+//        }
+//    }
 
     void MPC::AddPositivityConstraints(double time, int node) {
         // -------------------- Z force is non-negative at all time -------------------- //
@@ -693,7 +700,7 @@ namespace mpc {
         data_.num_cone_constraints_ = (info_.num_nodes+1)*4*num_ee_;
         data_.num_box_constraints_ = info_.num_nodes*2*num_joints_;
 //        data_.num_positive_force_constraints_ = (info_.num_nodes+1)*num_ee_;
-        data_.num_swing_foot_pos_constraints_ = 2*prev_traj_.GetTotalPosNonConstantZ();
+//        data_.num_swing_foot_pos_constraints_ = 2*prev_traj_.GetTotalPosNonConstantZ();
         data_.num_foot_ground_inter_constraints_ = (info_.num_nodes+1)*num_ee_;
         data_.num_foot_on_ground_constraints_ = prev_traj_.GetTotalPosConstantsZ();
         data_.num_force_box_constraints_ = POS_VARS*num_ee_*(info_.num_nodes+1);
@@ -732,14 +739,18 @@ namespace mpc {
                 times.push_back(0.35);
                 times.push_back(0.75);
 
-                Spline type1 = Spline(num_polys, times, true);
-                Spline type2 = Spline(num_polys, times, false);
+
+                Spline position1(num_polys, times, true, Spline::Normal);
+                Spline position2(num_polys, times, false, Spline::Normal);
+
+                Spline force1(num_polys, times, false, Spline::Force);
+                Spline force2(num_polys, times, true, Spline::Force);
 
                 for (int ee = 0; ee < num_ee_; ee++) {
                     if (ee == 0 || ee == 3) {
-                        prev_traj_.SetEndEffectorSplines(ee, type1, type2);
+                        prev_traj_.SetEndEffectorSplines(ee, force1, position1);
                     } else {
-                        prev_traj_.SetEndEffectorSplines(ee, type2, type1);
+                        prev_traj_.SetEndEffectorSplines(ee, force2, position2);
                     }
                     for (int coord = 0; coord < POS_VARS; coord++) {
                         prev_traj_.SetPositionsForAllTime(ee, ee_pos.at(ee));

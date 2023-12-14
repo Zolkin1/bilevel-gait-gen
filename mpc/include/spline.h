@@ -45,6 +45,12 @@ namespace mpc {
     public:
         static int constexpr POLY_ORDER = 4;    // actually a cubic
 
+        enum SplineType {
+            Normal = 0,
+            PositionZ = 1,
+            Force = 2
+        };
+
         /**
          *
          * Note that the times is the times between constant and non-constant polynomials.
@@ -55,7 +61,8 @@ namespace mpc {
          * @param times times to switch between constant and non-constant polynomials
          * @param start_on_poly false if we start on a constant polynomial
          */
-        Spline(int num_polys, const std::vector<double>& times, bool start_on_poly);
+        Spline(int num_polys, const std::vector<double>& times, bool start_on_poly,
+               const SplineType& type);
 
         double ValueAt(double time) const;
 
@@ -65,16 +72,17 @@ namespace mpc {
 
         /**
          * Sets the variables at a given index.
-         * @param poly_time Index of the polynomial switching time
+         * @param idx Index of the polynomial switching time
          * @param vars new polynomial variables
          */
-        void SetPolyVars(int poly_time, const std::vector<double>& vars);
+        void SetPolyVars(int idx, const std::vector<double>& vars);
 
         void SetAllSplineVars(const std::vector<std::vector<double>>& vars);
 
         /**
          * Note that this function returns the minimum number of variables used to describe
          * the spline. i.e. all the constant polynomial sections are collapsed to one variable.
+         * Note that this only considers mutable variables
          * @return The total number of scalars used to describe the spline.
          */
         int GetTotalPolyVars() const;
@@ -145,6 +153,8 @@ namespace mpc {
 
         bool IsConstant(double time) const;
 
+        bool IsMutable(int idx) const;
+
     protected:
     private:
         bool IsConstantPoly(int idx) const;
@@ -161,6 +171,8 @@ namespace mpc {
         std::vector<std::vector<double>> poly_vars_;   // All the variables that define each polynomial
 
         std::vector<double> poly_times_;    // The start and end of each polynomial
+
+        std::vector<bool> mut_flags_;
 
         int total_poly_;
 

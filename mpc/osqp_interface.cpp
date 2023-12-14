@@ -140,8 +140,7 @@ namespace mpc {
                 data.friction_cone_constraints_,
                 data.foot_ground_inter_constraints_,
                 data.box_constraints_,
-                data.force_box_constraints_,
-                data.swing_trajectory_constraints_;
+                data.force_box_constraints_;
 
         lb_ = vector_t::Zero(data.GetTotalNumConstraints());
         ub_ = lb_;
@@ -153,8 +152,7 @@ namespace mpc {
                 data.friction_cone_lb_,
                 data.foot_ground_inter_lb_,
                 data.box_lb_,
-                data.force_box_lb_,
-                data.swing_trajectory_constants_;
+                data.force_box_lb_;
 
         ub_ << data.dynamics_constants,
                 data.fk_constants_,
@@ -163,8 +161,7 @@ namespace mpc {
                 data.friction_cone_ub_,
                 data.foot_ground_inter_ub_,
                 data.box_ub_,
-                data.force_box_ub_,
-                data.swing_trajectory_constants_;
+                data.force_box_ub_;
     }
 
     void OSQPInterface::ConvertDataToOSQPCost(const mpc::QPData& data) {
