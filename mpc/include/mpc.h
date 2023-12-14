@@ -103,6 +103,8 @@ namespace mpc {
 
         controller::Contact GetDesiredContacts(double time) const;
 
+        vector_t GetFullTargetState(double time) const;
+
     protected:
     private:
         // ---------------- Private Member Functions ---------------- //

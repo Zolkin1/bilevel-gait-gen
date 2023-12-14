@@ -73,9 +73,13 @@ int main() {
     // Create weights
     matrix_t Q = matrix_t::Zero(24, 24);
     Q.topLeftCorner<6,6>() = matrix_t::Zero(6,6);
-    Q(6,6) = 30; //30;
-    Q(7,7) = 30; //30;
-    Q(8,8) = 30; //10;
+    Q(6,6) = 300; //30;
+    Q(7,7) = 300; //30;
+    Q(8,8) = 400; //10;
+    Q(9,9) = 50;
+    Q(10,10) = 50;
+    Q(11,11) = 50;
+    Q(12,12) = 50;
 
     // Desried state in the lie algebra
     const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(mpc_des_state, init_state);
@@ -83,7 +87,7 @@ int main() {
 
     // Add in costs
     mpc.AddQuadraticTrackingCost(des_alg, Q);
-    mpc.AddForceCost(0.00);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
+    mpc.AddForceCost(0.01);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
     mpc.SetQuadraticFinalCost(50*Q);
     mpc.SetLinearFinalCost(-50*Q*des_alg);
 
@@ -118,8 +122,12 @@ int main() {
     simulation::Visualizer viz(config.ParseString("robot_xml"));
     robot->SetSimModel(viz.GetModel());
     for (int i = 0; i < info.num_nodes+1; i++) {
+        vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
+//        if (i % 10 == 0) {
+//            mpc.Solve(temp_state, 0);
+//        }
     }
 
 }

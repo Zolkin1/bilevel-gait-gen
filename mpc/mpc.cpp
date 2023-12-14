@@ -116,12 +116,6 @@ namespace mpc {
             AddBoxConstraints(centroidal_state, time, i);
         }
 
-//        std::cout << "Dynamics lin violation on prev point: "
-//                    << (data_.dynamics_constraints*prev_qp_sol - data_.dynamics_constants).lpNorm<1>() << std::endl;
-//
-//        std::cout << "Dynamics violation on prev point: "
-//                    << GetEqualityConstraintValues(prev_traj_, centroidal_state).lpNorm<1>() << std::endl;
-
         // ----------------------- Costs ------------------------- //
         AddHessianApproxCost();
         AddGradientCost();
@@ -143,13 +137,17 @@ namespace mpc {
         }
 
         // TODO: instead of adding a constraint consider removing them as decision variables
-        AddSwingFootConstraints();
-        AddForceConstraints();
-        AddGroundIntersectConstraints();
+        // - None of these constraints will need to be added
+        // - Above constraints that are effected by these will need to be changed
+        // - Converting a trajectory to and from a QP vector will take some effort
+        // - All the conversion functions for inputs and trajectories will need to be looked at
+        // - These values will need to be set at some point
+        // - When a new point in the spline is added it needs to be given the correct value
+        // - Maybe denote a spline as mutable or not. For mutable splines denote certaint polys as mutable
+        AddSwingFootConstraints();  // All end effector z trajectories are set
+        AddForceConstraints();      // All force constants are set to 0
+        AddGroundIntersectConstraints();    // All position constants are set to 0
 
-//        PrintEqualityConstraints();
-//        PrintInequalityConstraints();
-//        PrintDynamicsConstraints();
 
         qp_solver->SetupQP(data_, prev_qp_sol);
         vector_t sol = qp_solver->Solve(data_);
@@ -337,7 +335,7 @@ namespace mpc {
         matrix_t G;
         vector_t g;
 
-        int spline_offset = GetPosSplineStartIdx();
+        const int spline_offset = GetPosSplineStartIdx();
 
         vector_t state1 = prev_traj_.GetStates().at(node);
         if (node == 0) {
@@ -366,7 +364,7 @@ namespace mpc {
     }
 
     void MPC::AddForceConstraints() {
-        // TODO: Might be able to enforce onlyo on Z then let the friction cone enforce it on the other coords
+        // TODO: Might be able to enforce only on Z then let the friction cone enforce it on the other coords
         // -------------------- Zero force when in swing ----------------- //
         int idx = 0; //(info_.num_nodes+1) * POS_VARS * num_ee_;
         int force_offset = GetForceSplineStartIdx();
@@ -419,7 +417,7 @@ namespace mpc {
         for (int ee = 0; ee < num_ee_; ee++) {
             const auto& poly_vars = prev_traj_.GetPositions().at(ee).at(coord).GetPolyVars();
             const auto& poly_times = prev_traj_.GetPositions().at(ee).at(coord).GetPolyTimes();
-            for (int i = 0; i < poly_times.size(); i++) {
+            for (int i = 1; i < poly_times.size(); i++) { // TODO: Currently ignoring the first time
                 // TODO: Change this to a function call to verify if its a constant
                 if ((poly_vars.at(i).size() == 1 && i < poly_times.size() - 1 && poly_vars.at(i + 1).size() == 1)
                     || (i == 0 && poly_vars.at(i).size() == 1) ||
@@ -487,7 +485,7 @@ namespace mpc {
                     data_.swing_trajectory_constraints_(idx, pos_offset + vars_index - 2) = 1;
                     data_.swing_trajectory_constants_(idx) = info_.swing_height;
                     data_.swing_trajectory_constraints_(idx+1, pos_offset + vars_index - 1) = 1;
-                    data_.swing_force_constants_(idx+1) = 0;
+                    data_.swing_trajectory_constants_(idx+1) = 0;
                     idx += 2;
                 }
             }
@@ -729,8 +727,10 @@ namespace mpc {
             case Trot: {
                 std::vector<double> times;
                 // TODO: Change
-                times.push_back(prev_traj_.GetTotalTime()/2);
-                times.push_back(prev_traj_.GetTotalTime());
+//                times.push_back(prev_traj_.GetTotalTime()/2);
+//                times.push_back(prev_traj_.GetTotalTime());
+                times.push_back(0.35);
+                times.push_back(0.75);
 
                 Spline type1 = Spline(num_polys, times, true);
                 Spline type2 = Spline(num_polys, times, false);
@@ -774,6 +774,11 @@ namespace mpc {
     vector_t MPC::GetTargetConfig(double time) const {
         int node = floor((time - init_time_)/info_.integrator_dt);
         return prev_traj_.GetStates().at(node).tail(num_states_ - 5);
+    }
+
+    vector_t MPC::GetFullTargetState(double time) const {
+        int node = floor((time - init_time_)/info_.integrator_dt);
+        return prev_traj_.GetStates().at(node);
     }
 
     vector_t MPC::GetTargetVelocity(double time) const {

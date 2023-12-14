@@ -286,6 +286,7 @@ namespace simulator {
     }
 
     Eigen::VectorXd SimulationRobot::ConvertPinocchioConfigToMujoco(const Eigen::VectorXd& q) const{
+        assert(q.size() == muj_model_->nq);
         Eigen::VectorXd muj_q(q.size());
         muj_q.tail(muj_model_->nv - FLOATING_VEL_OFFSET) =
                 ConvertPinocchioJointToMujoco(q.tail(muj_model_->nv - FLOATING_VEL_OFFSET));

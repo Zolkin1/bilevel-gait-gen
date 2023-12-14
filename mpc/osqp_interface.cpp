@@ -9,7 +9,7 @@ namespace mpc {
     OSQPInterface::OSQPInterface(QPData data, bool verbose) : QPInterface(data.num_decision_vars), verbose_(verbose){
 
         // Set solver settings
-        qp_solver_.settings()->setVerbosity(verbose_);
+        qp_solver_.settings()->setVerbosity(true);
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
