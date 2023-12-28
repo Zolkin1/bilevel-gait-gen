@@ -11,7 +11,7 @@
 namespace mpc {
     Spline::Spline(int num_polys, const std::vector<double> &times, bool start_on_poly,
                    const SplineType& type) :
-                    start_on_constant_(!start_on_poly), num_polys_(num_polys) {
+                    start_on_constant_(!start_on_poly), num_polys_(num_polys), type_(type){
 
         std::vector<double> const ZERO_CONSTANT = {0};
         std::vector<double> const ZERO_POLY = {0, 0};
@@ -115,6 +115,20 @@ namespace mpc {
                 }
                 break;
         }
+    }
+
+    Spline& Spline::operator=(const Spline& spline) {
+        poly_vars_ = spline.poly_vars_;
+        poly_times_ = spline.poly_times_;
+        mut_flags_ = spline.mut_flags_;
+        total_poly_ = spline.total_poly_;
+        start_on_constant_ = spline.start_on_constant_;
+        num_constant_ = spline.num_constant_;
+        num_polys_ = spline.num_polys_;
+        num_all_poly_vars = spline.num_all_poly_vars;
+        type_ = spline.type_;
+
+        return *this;
     }
 
     double Spline::ValueAt(double time) const {
@@ -252,9 +266,13 @@ namespace mpc {
     int Spline::GetPolyIdx(double time) const {
         assert(time >= poly_times_.at(0));
         for (int i = 1; i < poly_times_.size(); i++) {     // Start at i = 1 because t = 0  at 0
-            if (time <= poly_times_.at(i)) {
+            if (time < poly_times_.at(i)) {     // Note: removed equality here
                 return i;
             }
+        }
+
+        if (time == poly_times_.back()) {
+            return poly_times_.size() - 1;
         }
 
         // The spine is fully defined in the switching time, so if we got here then it's an invalid time.
@@ -264,11 +282,11 @@ namespace mpc {
     vector_t Spline::GetPolyVarsLin(double time) const {
         int i = GetPolyIdx(time);
 
-//        if (IsConstantPoly(i) || time == poly_times_.at(0)) {
-//            vector_t vars(1);
-//            vars << 1;
-//            return vars;
-//        }
+        if (IsConstantPoly(i)) {
+            vector_t vars(1);
+            vars << 1;
+            return vars;
+        }
 
         // Polynomial
         double DeltaT = poly_times_.at(i) - poly_times_.at(i-1);
@@ -362,6 +380,8 @@ namespace mpc {
             }
         }
 
+        throw std::runtime_error("Reached bad spot. PolyVarsLin");
+
     }
 
     bool Spline::IsConstantPoly(int idx) const {
@@ -372,13 +392,13 @@ namespace mpc {
         // Given the index of the switching time, determine the start index of the (minimal) vars vector that
         // describes this polynomial
 
-        // TODO: Change for mutability
-
-        if (time == poly_times_.at(0) && mut_flags_.at(0)) {
-            int num_vars_affecting = 1;
-            int vars_idx = 1;
-            return std::pair<double, double>(vars_idx, num_vars_affecting);
-        }
+//        if (time == poly_times_.at(0) && mut_flags_.at(0)) {
+//            int num_vars_affecting = 1;
+//            int vars_idx = 1;
+//            return std::pair<double, double>(vars_idx, num_vars_affecting);
+//        } else if (time == poly_times_.at(0)) {
+//            throw std::runtime_error("The polynomial is not mutable at the provided time.");
+//        }
 
         int idx = GetPolyIdx(time);
 
@@ -438,7 +458,9 @@ namespace mpc {
 
     void Spline::SetAllPositions(double position) {
         for (int i = 0; i < poly_vars_.size(); i++) {
-            poly_vars_.at(i).at(0) = position;
+            if (mut_flags_.at(i)) {
+                poly_vars_.at(i).at(0) = position;
+            }
         }
     }
 
@@ -461,22 +483,45 @@ namespace mpc {
         int end_idx = poly_vars_.size()-1;
         std::vector<double> const ZERO_CONSTANT = {0};
         std::vector<double> const ZERO_POLY = {0, 0};
+        bool added_constant = false;
 
         if ((poly_vars_.at(end_idx).size() == 1 && poly_vars_.at(end_idx-1).size() != 1)) {
+            // Internal change
             poly_vars_.push_back(ZERO_CONSTANT);
             poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time);
+            added_constant = true;
         } else if (end_idx >= num_polys_ - 2 && poly_vars_.at(end_idx - num_polys_ + 2).size() == 2 &&
                     poly_vars_.at(end_idx).size() == 2) {
+            // Internal and external change
             poly_vars_.push_back(ZERO_CONSTANT);
-            num_all_poly_vars++;
+            if (type_ == Normal) {
+                num_all_poly_vars++;
+            }
             num_constant_++;
             total_poly_++;
             poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time/num_polys_);
+            added_constant = true;
         } else {
+            // Internal and external change
             poly_vars_.push_back(ZERO_POLY);
             total_poly_++;
             num_all_poly_vars+=2;
             poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time/num_polys_);
+        }
+        switch (type_) {
+            case Force:
+                if (added_constant) {
+                    mut_flags_.emplace_back(false);
+                } else {
+                    mut_flags_.emplace_back(true);
+                }
+                break;
+            case Normal:
+                mut_flags_.emplace_back(true);
+                break;
+            case PositionZ:
+                throw std::runtime_error("Position z spline type not yet supported.");
+                break;
         }
     }
 
@@ -488,15 +533,18 @@ namespace mpc {
 
                 } else if (poly_vars_.at(i).size() == 1) {
                     // Then we are removing the last part of a constant segment
-                    total_poly_--;
+                    total_poly_--;  // TODO: Do I need to update this for the force spline too?
                     num_constant_--;
-                    num_all_poly_vars--;
+                    if (type_ == Normal) {
+                        num_all_poly_vars--;
+                    }
                 } else {
                     total_poly_--;
                     num_all_poly_vars -= 2;
                 }
                 poly_times_.erase(poly_times_.begin() + i);
                 poly_vars_.erase(poly_vars_.begin() + i);
+                mut_flags_.erase(mut_flags_.begin() + i);
                 i--;
             }
         }

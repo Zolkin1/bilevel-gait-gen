@@ -161,6 +161,8 @@ namespace mpc {
 
         bool IsForceMutable(int ee, int coord, double time) const;
 
+        bool IsForceMutable(int ee, int coord, int idx) const;
+
     protected:
     private:
         void UpdateForceSplineVarsCount();

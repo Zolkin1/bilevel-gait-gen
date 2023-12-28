@@ -115,8 +115,6 @@ namespace mpc {
 
             std::cout << "index of max: " << ind << std::endl;
             std::cout << "num dynamics constraints: " << data.num_dynamics_constraints << std::endl;
-            std::cout << "num equality constraints: " << data.num_equality_constraints << std::endl;
-            std::cout << "num inequality constraints: " << data.num_inequality_constraints << std::endl;
             std::cout << "num decision variables: " << data.num_decision_vars << std::endl;
             std::cout << std::endl;
         }
@@ -130,7 +128,7 @@ namespace mpc {
     }
 
     void OSQPInterface::ConvertDataToOSQPConstraints(const mpc::QPData& data) {
-        // TODO: Remove zero initialziation (everything should be overwritten anyway)
+        // TODO: Remove zero initialization (everything should be overwritten anyway)
         A_ = matrix_t::Zero(data.GetTotalNumConstraints(), data.num_decision_vars);
 
         A_ << data.dynamics_constraints,

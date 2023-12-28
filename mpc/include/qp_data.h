@@ -35,13 +35,6 @@ namespace mpc {
         vector_t friction_cone_ub_;
         vector_t friction_cone_lb_;
 
-//        matrix_t swing_trajectory_constraints_;
-//        vector_t swing_trajectory_constants_;
-
-//        matrix_t positive_force_constraints_;
-//        vector_t positive_force_lb_;
-//        vector_t positive_force_ub_;
-
         matrix_t foot_ground_inter_constraints_;
         vector_t foot_ground_inter_lb_;
         vector_t foot_ground_inter_ub_;
@@ -58,18 +51,14 @@ namespace mpc {
         vector_t force_box_ub_;
 
         int num_dynamics_constraints;
-        int num_equality_constraints;
-        int num_inequality_constraints;
         int num_decision_vars;
 
         int num_cone_constraints_;
         int num_box_constraints_;
-//        int num_positive_force_constraints_;
         int num_foot_ground_inter_constraints_;
         int num_foot_on_ground_constraints_;
         int num_fk_constraints_;
         int num_swing_foot_constraints_;
-//        int num_swing_foot_pos_constraints_;
         int num_force_box_constraints_;
 
         int GetTotalNumConstraints() const {

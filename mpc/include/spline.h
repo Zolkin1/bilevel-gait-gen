@@ -64,6 +64,8 @@ namespace mpc {
         Spline(int num_polys, const std::vector<double>& times, bool start_on_poly,
                const SplineType& type);
 
+        Spline& operator=(const Spline& spline);
+
         double ValueAt(double time) const;
 
         double DerivWrtTime(double time) const;
@@ -183,6 +185,8 @@ namespace mpc {
         int num_polys_;
 
         int num_all_poly_vars;
+
+        SplineType type_;
     };
 } // mpc
 

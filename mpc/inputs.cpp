@@ -200,7 +200,6 @@ namespace mpc {
 
     // Always returns the index of the end of the end point of the polynomial
     std::pair<int, int> Inputs::GetForceSplineIndex(int end_effector, double time, int coord) const {
-        // TODO: remove the constants as decision variables.
         int num_spline_vars_before = 0;
         for (int ee = 0; ee < end_effector; ee++) {
             for (int j = 0; j < POS_VARS; j++) {
@@ -341,6 +340,10 @@ namespace mpc {
 
     bool Inputs::IsForceMutable(int ee, int coord, double time) const {
         const int idx = forces_.at(ee).at(coord).GetPolyIdx(time);
+        return forces_.at(ee).at(coord).IsMutable(idx) || forces_.at(ee).at(coord).IsMutable(idx-1);
+    }
+
+    bool Inputs::IsForceMutable(int ee, int coord, int idx) const {
         return forces_.at(ee).at(coord).IsMutable(idx);
     }
 }

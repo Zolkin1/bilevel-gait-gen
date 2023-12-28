@@ -116,7 +116,7 @@ namespace mpc {
 
         void AddDynamicsConstraints(const vector_t& state, double time, int node);
 
-        void AddFKConstraints(const vector_t& state, double time, int node);
+        void AddFKConstraints(const vector_t& state);
 
         void AddForceConstraints();
 
@@ -124,11 +124,11 @@ namespace mpc {
 
         void AddBoxConstraints(const vector_t& state, double time, int node);
 
-        void AddForceBoxConstraints(double time, int node);
+        void AddForceBoxConstraints();
 
         void AddGroundIntersectConstraints();
 
-        void AddFrictionConeConstraints(const vector_t& state, double time, int node);
+        void AddFrictionConeConstraints();
 
         void AddSwingFootConstraints();
 
@@ -161,6 +161,8 @@ namespace mpc {
 
         void RecordStats(double alpha, const vector_t& direction, const std::string& solve_type,
                          const vector_t& ref_state);
+
+        int GetNodeIntersectMutableForces() const;
 
         // Temp functions
         void PrintDynamicsConstraints() const;

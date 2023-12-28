@@ -24,7 +24,7 @@ namespace mpc {
                      Spline(2, switching_time, false, Spline::Normal),
                      Spline(2, switching_time, false, Spline::Normal)};
             end_effector_pos_.emplace_back(end_effector_pos);
-            const std::array<bool, 3> mut_arr = {true, true, false}; // z pos is always a constant trajectory
+            const std::array<bool, 3> mut_arr = {true, true, true}; // z pos is always a constant trajectory
             mut_flags_.emplace_back(mut_arr);
         }
 
@@ -74,16 +74,10 @@ namespace mpc {
     void Trajectory::UpdateForceSpline(int end_effector, int coord, const vector_t& vars) {
         int idx = 0;
         for (int i = 0; i < inputs_.GetForces().at(end_effector).at(coord).GetNumPolyTimes(); i++) {
-            int num_vars = inputs_.GetForces().at(end_effector).at(coord).GetNumPolyVars(i);
-            inputs_.UpdateForcePoly(end_effector, coord, i, vars.segment(idx, num_vars));
-            if (num_vars == 1 && i+1 < inputs_.GetForces().at(end_effector).at(coord).GetNumPolyTimes() &&
-            inputs_.GetForces().at(end_effector).at(coord).GetNumPolyVars(i+1) == 1) {
-                // Set then skip the additional constant term
-                // TODO: In theory we can skip this
-                inputs_.UpdateForcePoly(end_effector, coord, i+1, vars.segment(idx, num_vars));
-                i++;
+            if (inputs_.IsForceMutable(end_effector, coord, i)) {
+                inputs_.UpdateForcePoly(end_effector, coord, i, vars.segment(idx, 2));
+                idx += 2;
             }
-            idx += num_vars;
         }
     }
 
