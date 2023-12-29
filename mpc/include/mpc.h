@@ -120,7 +120,6 @@ namespace mpc {
 
         void AddForceConstraints();
 
-        void AddPositivityConstraints(double time, int node);
 
         void AddBoxConstraints(const vector_t& state, double time, int node);
 
@@ -129,10 +128,6 @@ namespace mpc {
         void AddGroundIntersectConstraints();
 
         void AddFrictionConeConstraints();
-
-        void AddSwingFootConstraints();
-
-        void AddInequalityConstraints(const vector_t& state, double time, int node);
 
         int GetForceSplineStartIdx() const;
 
@@ -228,6 +223,8 @@ namespace mpc {
         vector_t prev_dual_sol_;
 
         double mu_;
+
+        int num_ineq_fk_;
 
         std::vector<double> equality_constraint_violations_;
         std::vector<double> step_norm_;

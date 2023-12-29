@@ -24,7 +24,7 @@ namespace mpc {
                      Spline(2, switching_time, false, Spline::Normal),
                      Spline(2, switching_time, false, Spline::Normal)};
             end_effector_pos_.emplace_back(end_effector_pos);
-            const std::array<bool, 3> mut_arr = {true, true, true}; // z pos is always a constant trajectory
+            const std::array<bool, 3> mut_arr = {true, true, false}; // z pos is always a constant trajectory
             mut_flags_.emplace_back(mut_arr);
         }
 
@@ -104,19 +104,23 @@ namespace mpc {
 
     std::pair<int, int> Trajectory::GetPositionSplineIndex(int end_effector, double time, int coord) const {
         if (!mut_flags_.at(end_effector).at(coord)) {
-            throw std::runtime_error("The chose spline is not mutable and thus does not provide a index.");
+            throw std::runtime_error("The chosen spline is not mutable and thus does not provide a index.");
         }
 
         int num_spline_vars_before = 0;
         for (int ee = 0; ee < end_effector; ee++) {
             for (int j = 0; j < POS_VARS; j++) {
+                if (mut_flags_.at(ee).at(j)) {
                     num_spline_vars_before += end_effector_pos_.at(ee).at(j).GetTotalPolyVars();
+                }
             }
         }
 
         int idx_into_ee_coord_spline_vars = 0;
         for (int j = 0; j < coord; j++) {
+            if (mut_flags_.at(end_effector).at(j)) {
                 idx_into_ee_coord_spline_vars += end_effector_pos_.at(end_effector).at(j).GetTotalPolyVars();
+            }
         }
 
         int vars_idx, vars_affecting;

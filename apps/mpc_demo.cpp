@@ -71,11 +71,12 @@ int main() {
     mpc.SetStateTrajectoryWarmStart(warm_start);
 
     // Create weights
+    // TODO: Can probably tune this to get better performance
     matrix_t Q = 20*matrix_t::Identity(24, 24);
     Q.topLeftCorner<6,6>() = matrix_t::Zero(6,6);
     Q(6,6) = 300; //30;
     Q(7,7) = 300; //30;
-    Q(8,8) = 400; //10;
+    Q(8,8) = 450; //10;
     Q(9,9) = 50;
     Q(10,10) = 50;
     Q(11,11) = 50;
@@ -113,7 +114,7 @@ int main() {
     auto robot_file = config.ParseString("robot_xml");
     std::unique_ptr<simulator::SimulationRobot> robot = std::make_unique<simulator::SimulationRobot>(robot_file, mpc_controller);
 
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < 15; i++) {
         mpc.Solve(init_state, 0);
     }
     mpc.PrintStats();
@@ -125,9 +126,7 @@ int main() {
         vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
-//        if (i % 10 == 0) {
-//            mpc.Solve(temp_state, 0);
-//        }
+//        mpc.Solve(temp_state, i*info.integrator_dt);
     }
 
 }

@@ -43,6 +43,8 @@ namespace mpc {
             throw std::runtime_error("Velocity or joint bounds do not match the number of joints on the robot.");
         }
 
+        num_ineq_fk_ = 3;
+
         // --------------------------------- //
         // k = # of nodes
         // QP Decision vector:
@@ -79,6 +81,7 @@ namespace mpc {
 
         prev_traj_.SetInitTime(init_time);
 
+        // TODO: Make everything add the correct amount of time.
         prev_traj_.AddPolys(info_.integrator_dt*info_.num_nodes + init_time);
 
         prev_traj_.RemoveUnusedPolys(init_time);
@@ -113,21 +116,22 @@ namespace mpc {
         AddGradientCost();
         AddFinalCost();
 
+        // TODO: Convert the FK constraints to work with a fixed z position spline. Maybe shrinking inequality constraints
+        // on the first few nodes
+
         // More constraints
         AddFKConstraints(centroidal_state);
         AddFrictionConeConstraints();
         AddForceBoxConstraints();
 
-        // TODO: I am making progress on removing the zero force decision variables
-        // Some problems:
-        // - Box constraints causing infeasability
-        // - Force Box constraints definetly not doing what I expect. Causing much smaller forces. -- Fixed
-        // - Friction cone constraints -- Fixed
-        // - Probably other things too. I suspect there is at least one root bug causing a few issues.
-
-
         qp_solver->SetupQP(data_, prev_qp_sol);
         vector_t sol = qp_solver->Solve(data_);
+
+        if (qp_solver->GetSolveQuality() != "Solved Inaccurate" && qp_solver->GetSolveQuality() != "Solved"
+                && qp_solver->GetSolveQuality() != "Max Iter Reached") {
+            std::cerr << "Warning: " << qp_solver->GetSolveQuality() << std::endl;
+//            throw std::runtime_error("Bad solve.");
+        }
 
         vector_t p = sol - prev_qp_sol;
         double alpha = 0;
@@ -216,6 +220,10 @@ namespace mpc {
         data_.fk_constraints_ = matrix_t::Zero(data_.num_fk_constraints_, data_.num_decision_vars);
         data_.fk_constants_ = vector_t::Zero(data_.num_fk_constraints_);
 
+        data_.fk_ineq_constraints_ = matrix_t::Zero(data_.num_fk_ineq_constraints_, data_.num_decision_vars);
+        data_.fk_lb_ = vector_t::Zero(data_.num_fk_ineq_constraints_);
+        data_.fk_ub_ = vector_t::Zero(data_.num_fk_ineq_constraints_);
+
         data_.swing_force_constraints_ = matrix_t::Zero(data_.num_swing_foot_constraints_, data_.num_decision_vars);
         data_.swing_force_constants_ = vector_t::Zero(data_.num_swing_foot_constraints_);
 
@@ -272,14 +280,15 @@ namespace mpc {
     }
 
 
-    // TODO: When the nodes increase this start to look more sus
-    // Need to confirm which legs should be fixed, etc...
-    // TODO: Maybe just let the first constant of the z direction be mutable and all the other vars fixed
+    // TODO: I think something is still wrong here. even with 0 margin it can solve, but that shouldnt be possible I think
     void MPC::AddFKConstraints(const vector_t& state) {
         matrix_t G;
         vector_t g;
 
         const int spline_offset = GetPosSplineStartIdx();
+        int idx_eq = 0;
+        int idx_ineq = 0;
+        const double margin = 0.01;
 
         for (int node = 0; node < info_.num_nodes+1; node++) {
             double time = GetTime(node);
@@ -288,31 +297,54 @@ namespace mpc {
                 state1 = state;
             }
 
-            // TODO: Remove this node restriction, then the initial condition will require we are at zero
-            // TODO: I wonder if the FK would be better in the cost (would do with auto-diff)?
-            // Or maybe this is better using the null space projection strategy?
-            // This doesn't work well when I have a capped joint velocity limit
-            if (node > 0) {
-                for (int ee = 0; ee < num_ee_; ee++) {
-                    model_.GetFKLinearization(state1, state, prev_traj_.GetInputs(), ee, G, g);
-                    data_.fk_constraints_.block(node * POS_VARS * num_ee_ + ee * POS_VARS,
+            for (int ee = 0; ee < num_ee_; ee++) {
+                model_.GetFKLinearization(state1, state, prev_traj_.GetInputs(), ee, G, g);
+                if (node >= num_ineq_fk_) {
+                    data_.fk_constraints_.block(idx_eq,
                                                 node * num_states_ + CentroidalModel::MOMENTUM_OFFSET,
                                                 POS_VARS, num_joints_ + CentroidalModel::FLOATING_VEL_OFFSET) = G;
 
-                    data_.fk_constants_.segment(node * POS_VARS * num_ee_ + ee * POS_VARS, POS_VARS) = -g;
+                    data_.fk_constants_.segment(idx_eq, POS_VARS) = -g;
+                } else {
+                    data_.fk_ineq_constraints_.block(idx_ineq,
+                                                node * num_states_ + CentroidalModel::MOMENTUM_OFFSET,
+                                                POS_VARS, num_joints_ + CentroidalModel::FLOATING_VEL_OFFSET) = G;
 
-                    for (int coord = 0; coord < POS_VARS; coord++) {
-                        if (prev_traj_.IsSplineMutable(ee, coord)) {
-                            int vars_index, vars_affecting;
-                            std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, time, coord);
-                            data_.fk_constraints_.block(node * POS_VARS * num_ee_ + ee * POS_VARS + coord,
+                    data_.fk_lb_.segment(idx_ineq, POS_VARS) = -g - ((num_ineq_fk_ - node)*margin)*vector_t::Ones(POS_VARS);
+                    data_.fk_ub_.segment(idx_ineq, POS_VARS) = -g + ((num_ineq_fk_ - node)*margin)*vector_t::Ones(POS_VARS);
+                }
+
+                for (int coord = 0; coord < POS_VARS; coord++) {
+                    if (prev_traj_.IsSplineMutable(ee, coord)) {
+                        int vars_index, vars_affecting;
+                        std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, time, coord);
+
+                        if (node >= num_ineq_fk_) {
+                            data_.fk_constraints_.block(idx_eq,
                                                         spline_offset + vars_index - vars_affecting,
                                                         1,
                                                         vars_affecting) =
                                     -prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose();
+                            idx_eq++;
                         } else {
-                            data_.fk_constants_(node * POS_VARS * num_ee_ + ee * POS_VARS + coord) +=
+                            data_.fk_ineq_constraints_.block(idx_ineq,
+                                                        spline_offset + vars_index - vars_affecting,
+                                                        1,
+                                                        vars_affecting) =
+                                    -prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose();
+                            idx_ineq++;
+                        }
+                    } else {
+                        if (node >= num_ineq_fk_) {
+                            data_.fk_constants_(idx_eq) +=
                                     prev_traj_.GetPositions().at(ee).at(coord).ValueAt(time);
+                            idx_eq++;
+                        } else {
+                            data_.fk_lb_(idx_ineq) +=
+                                    prev_traj_.GetPositions().at(ee).at(coord).ValueAt(time);
+                            data_.fk_ub_(idx_ineq) +=
+                                    prev_traj_.GetPositions().at(ee).at(coord).ValueAt(time);
+                            idx_ineq++;
                         }
                     }
                 }
@@ -529,9 +561,11 @@ namespace mpc {
                 traj.UpdateForceSpline(ee, coord, qp_sol.segment(force_idx, vars_in_spline));
                 force_idx += vars_in_spline;
 
-                vars_in_spline = traj.GetPositions().at(ee).at(coord).GetTotalPolyVars();
-                traj.UpdatePositionSpline(ee, coord, qp_sol.segment(pos_idx, vars_in_spline));
-                pos_idx += vars_in_spline;
+                if (traj.IsSplineMutable(ee, coord)) {
+                    vars_in_spline = traj.GetPositions().at(ee).at(coord).GetTotalPolyVars();
+                    traj.UpdatePositionSpline(ee, coord, qp_sol.segment(pos_idx, vars_in_spline));
+                    pos_idx += vars_in_spline;
+                }
             }
         }
 
@@ -572,7 +606,9 @@ namespace mpc {
         data_.num_foot_on_ground_constraints_ = prev_traj_.GetTotalPosConstantsZ();
         data_.num_force_box_constraints_ = GetNodeIntersectMutableForces(); //POS_VARS*num_ee_*(info_.num_nodes+1);
 
-        data_.num_fk_constraints_ = POS_VARS*num_ee_*(info_.num_nodes+1);
+        data_.num_fk_ineq_constraints_ = 3*num_ee_*num_ineq_fk_;
+
+        data_.num_fk_constraints_ = POS_VARS*num_ee_*(info_.num_nodes+1) - data_.num_fk_ineq_constraints_;
         data_.num_swing_foot_constraints_ = prev_traj_.GetInputs().GetTotalForceConstants();
     }
 

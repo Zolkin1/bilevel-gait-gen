@@ -13,10 +13,10 @@ namespace mpc {
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
-        qp_solver_.settings()->setAbsoluteTolerance(1e-5);
-        qp_solver_.settings()->setRelativeTolerance(1e-5);
+        qp_solver_.settings()->setAbsoluteTolerance(1e-4);
+        qp_solver_.settings()->setRelativeTolerance(1e-4);
         qp_solver_.settings()->setScaledTerimination(false);
-        qp_solver_.settings()->setMaxIteration(4000);
+        qp_solver_.settings()->setMaxIteration(100);
 //        qp_solver_.settings()->setTimeLimit(2e-3); -- Can't do this unless I somehow recompile osqp-eigen with PROFILING=1
         qp_solver_.settings()->setRho(.01);
 //        qp_solver_.settings()->setAlpha(1.6);
@@ -138,7 +138,8 @@ namespace mpc {
                 data.friction_cone_constraints_,
                 data.foot_ground_inter_constraints_,
                 data.box_constraints_,
-                data.force_box_constraints_;
+                data.force_box_constraints_,
+                data.fk_ineq_constraints_;
 
         lb_ = vector_t::Zero(data.GetTotalNumConstraints());
         ub_ = lb_;
@@ -150,7 +151,8 @@ namespace mpc {
                 data.friction_cone_lb_,
                 data.foot_ground_inter_lb_,
                 data.box_lb_,
-                data.force_box_lb_;
+                data.force_box_lb_,
+                data.fk_lb_;
 
         ub_ << data.dynamics_constants,
                 data.fk_constants_,
@@ -159,7 +161,8 @@ namespace mpc {
                 data.friction_cone_ub_,
                 data.foot_ground_inter_ub_,
                 data.box_ub_,
-                data.force_box_ub_;
+                data.force_box_ub_,
+                data.fk_ub_;
     }
 
     void OSQPInterface::ConvertDataToOSQPCost(const mpc::QPData& data) {
