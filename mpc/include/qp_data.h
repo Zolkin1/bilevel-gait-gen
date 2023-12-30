@@ -29,19 +29,9 @@ namespace mpc {
         vector_t fk_lb_;
         vector_t fk_ub_;
 
-        matrix_t swing_force_constraints_;
-        vector_t swing_force_constants_;
-
-        matrix_t foot_on_ground_constraints_;
-        vector_t foot_on_ground_constants_;
-
         matrix_t friction_cone_constraints_;
         vector_t friction_cone_ub_;
         vector_t friction_cone_lb_;
-
-        matrix_t foot_ground_inter_constraints_;
-        vector_t foot_ground_inter_lb_;
-        vector_t foot_ground_inter_ub_;
 
         matrix_t box_constraints_;
         vector_t box_lb_;
@@ -59,18 +49,68 @@ namespace mpc {
 
         int num_cone_constraints_;
         int num_box_constraints_;
-        int num_foot_ground_inter_constraints_;
-        int num_foot_on_ground_constraints_;
         int num_fk_constraints_;
-        int num_swing_foot_constraints_;
         int num_force_box_constraints_;
         int num_fk_ineq_constraints_;
 
         int GetTotalNumConstraints() const {
             return num_cone_constraints_ + num_box_constraints_ +
-            num_foot_ground_inter_constraints_ + num_foot_on_ground_constraints_ +
-            num_fk_constraints_ + num_swing_foot_constraints_ + num_force_box_constraints_ +
+            num_fk_constraints_ + num_force_box_constraints_ +
             num_dynamics_constraints + num_fk_ineq_constraints_;
+        }
+
+        void InitQPMats() {
+            dynamics_constraints = matrix_t::Zero(num_dynamics_constraints, num_decision_vars);
+            dynamics_constants = vector_t::Zero(num_dynamics_constraints);
+
+            cost_quadratic = matrix_t::Zero(num_decision_vars, num_decision_vars);
+            cost_linear = vector_t::Zero(num_decision_vars);
+
+            fk_constraints_ = matrix_t::Zero(num_fk_constraints_, num_decision_vars);
+            fk_constants_ = vector_t::Zero(num_fk_constraints_);
+
+            fk_ineq_constraints_ = matrix_t::Zero(num_fk_ineq_constraints_, num_decision_vars);
+            fk_lb_ = vector_t::Zero(num_fk_ineq_constraints_);
+            fk_ub_ = vector_t::Zero(num_fk_ineq_constraints_);
+
+            friction_cone_constraints_ = matrix_t::Zero(num_cone_constraints_, num_decision_vars);
+            friction_cone_lb_ = vector_t::Zero(num_cone_constraints_);
+            friction_cone_ub_ = vector_t::Zero(num_cone_constraints_);
+
+            box_constraints_ = matrix_t::Zero(num_box_constraints_, num_decision_vars);
+            box_lb_ = vector_t::Zero(num_box_constraints_);
+            box_ub_ = vector_t::Zero(num_box_constraints_);
+
+            force_box_constraints_ = matrix_t::Zero(num_force_box_constraints_, num_decision_vars);
+            force_box_lb_ = vector_t::Zero(num_force_box_constraints_);
+            force_box_ub_ = vector_t::Zero(num_force_box_constraints_);
+        }
+
+        void ResizeQPMats() {
+            dynamics_constraints.resize(num_dynamics_constraints, num_decision_vars);
+            dynamics_constants.resize(num_dynamics_constraints);
+
+            cost_quadratic.resize(num_decision_vars, num_decision_vars);
+            cost_linear.resize(num_decision_vars);
+
+            fk_constraints_.resize(num_fk_constraints_, num_decision_vars);
+            fk_constants_.resize(num_fk_constraints_);
+
+            fk_ineq_constraints_.resize(num_fk_ineq_constraints_, num_decision_vars);
+            fk_lb_.resize(num_fk_ineq_constraints_);
+            fk_ub_.resize(num_fk_ineq_constraints_);
+
+            friction_cone_constraints_.resize(num_cone_constraints_, num_decision_vars);
+            friction_cone_lb_.resize(num_cone_constraints_);
+            friction_cone_ub_.resize(num_cone_constraints_);
+
+            box_constraints_.resize(num_box_constraints_, num_decision_vars);
+            box_lb_.resize(num_box_constraints_);
+            box_ub_.resize(num_box_constraints_);
+
+            force_box_constraints_.resize(num_force_box_constraints_, num_decision_vars);
+            force_box_lb_.resize(num_force_box_constraints_);
+            force_box_ub_.resize(num_force_box_constraints_);
         }
     };
 } // mpc

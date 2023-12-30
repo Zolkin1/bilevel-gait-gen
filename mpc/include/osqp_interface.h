@@ -8,7 +8,7 @@
 #include "OsqpEigen/OsqpEigen.h"
 
 #include "qp_interface.h"
-
+#include "timer.h"
 
 namespace mpc {
     class OSQPInterface : public QPInterface {
@@ -37,6 +37,7 @@ namespace mpc {
 
         // OSQP specific vectors and matricies
         matrix_t A_, P_;
+//        Eigen::SparseMatrix<double> A_, P_;
         vector_t lb_, ub_, w_;
 
         vector_t prev_dual_sol_;
@@ -44,6 +45,9 @@ namespace mpc {
         int run;
 
         bool verbose_;
+
+        utils::Timer osqp_interface_timer_;
+        utils::Timer sparse_conversion_timer_;
     };
 } // mpc
 

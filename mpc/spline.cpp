@@ -485,43 +485,38 @@ namespace mpc {
         std::vector<double> const ZERO_POLY = {0, 0};
         bool added_constant = false;
 
-        if ((poly_vars_.at(end_idx).size() == 1 && poly_vars_.at(end_idx-1).size() != 1)) {
-            // Internal change
-            poly_vars_.push_back(ZERO_CONSTANT);
-            poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time);
-            added_constant = true;
-        } else if (end_idx >= num_polys_ - 2 && poly_vars_.at(end_idx - num_polys_ + 2).size() == 2 &&
-                    poly_vars_.at(end_idx).size() == 2) {
+        if (poly_vars_.at(end_idx).size() == 1 && poly_vars_.at(end_idx-1).size() == 1) {
+            // External and internal change
+            for (int i = 0; i < num_polys_-1; i++) {
+                poly_vars_.push_back(ZERO_POLY);
+                total_poly_++;
+                num_all_poly_vars+=2;
+                poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time/num_polys_);
+                mut_flags_.emplace_back(true);
+            }
+
             // Internal and external change
             poly_vars_.push_back(ZERO_CONSTANT);
-            if (type_ == Normal) {
-                num_all_poly_vars++;
-            }
+            poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time/num_polys_);
             num_constant_++;
             total_poly_++;
-            poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time/num_polys_);
-            added_constant = true;
+
+            if (type_ == Normal) {
+                mut_flags_.emplace_back(true);
+                num_all_poly_vars++;
+            } else {
+                mut_flags_.emplace_back(false);
+            }
         } else {
             // Internal and external change
-            poly_vars_.push_back(ZERO_POLY);
-            total_poly_++;
-            num_all_poly_vars+=2;
-            poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time/num_polys_);
-        }
-        switch (type_) {
-            case Force:
-                if (added_constant) {
-                    mut_flags_.emplace_back(false);
-                } else {
-                    mut_flags_.emplace_back(true);
-                }
-                break;
-            case Normal:
+            poly_vars_.push_back(ZERO_CONSTANT);
+            poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time);
+
+            if (type_ == Normal) {
                 mut_flags_.emplace_back(true);
-                break;
-            case PositionZ:
-                throw std::runtime_error("Position z spline type not yet supported.");
-                break;
+            } else {
+                mut_flags_.emplace_back(false);
+            }
         }
     }
 

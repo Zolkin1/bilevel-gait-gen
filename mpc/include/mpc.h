@@ -14,6 +14,7 @@
 #include "trajectory.h"
 #include "qp_data.h"
 #include "controller.h"
+#include "timer.h"
 
 namespace mpc {
     /**
@@ -105,6 +106,8 @@ namespace mpc {
 
         vector_t GetFullTargetState(double time) const;
 
+        Trajectory GetTrajectory() const;
+
     protected:
     private:
         // ---------------- Private Member Functions ---------------- //
@@ -112,20 +115,13 @@ namespace mpc {
         // Since we have flat ground and a constant coefficient of friction, we can just make one pyramid
         void SetFrictionPyramid();
 
-        void ResetQPMats();
-
-        void AddDynamicsConstraints(const vector_t& state, double time, int node);
+        void AddDynamicsConstraints(const vector_t& state);
 
         void AddFKConstraints(const vector_t& state);
 
-        void AddForceConstraints();
-
-
-        void AddBoxConstraints(const vector_t& state, double time, int node);
+        void AddBoxConstraints();
 
         void AddForceBoxConstraints();
-
-        void AddGroundIntersectConstraints();
 
         void AddFrictionConeConstraints();
 
@@ -159,10 +155,6 @@ namespace mpc {
 
         int GetNodeIntersectMutableForces() const;
 
-        // Temp functions
-        void PrintDynamicsConstraints() const;
-        void PrintEqualityConstraints() const;
-        void PrintInequalityConstraints() const;
 
         // ---------------- Member Variables ---------------- //
         // Centroidal model
@@ -234,6 +226,12 @@ namespace mpc {
         std::vector<double> merit_directional_deriv_;
         std::vector<std::string> solve_type_;
         std::vector<vector_t> ref_state_;
+
+        utils::Timer solve_timer_;
+        utils::Timer constraint_costs_timer_;
+        utils::Timer line_search_timer_;
+        utils::Timer poly_update_timer_;
+        utils::Timer data_update_timer_;
     };
 } // mpc
 

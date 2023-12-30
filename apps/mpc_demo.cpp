@@ -82,6 +82,8 @@ int main() {
     Q(11,11) = 50;
     Q(12,12) = 50;
 
+    // TODO: Weight shoulder joints to keep the legs in line
+
     // Desried state in the lie algebra
     const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(mpc_des_state, init_state);
     std::cout << des_alg << std::endl;
@@ -114,7 +116,7 @@ int main() {
     auto robot_file = config.ParseString("robot_xml");
     std::unique_ptr<simulator::SimulationRobot> robot = std::make_unique<simulator::SimulationRobot>(robot_file, mpc_controller);
 
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < 7; i++) {
         mpc.Solve(init_state, 0);
     }
     mpc.PrintStats();
@@ -128,5 +130,9 @@ int main() {
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
 //        mpc.Solve(temp_state, i*info.integrator_dt);
     }
+
+    // Print the final trajectory to a file for viewing
+    mpc::Trajectory traj = mpc.GetTrajectory();
+    traj.PrintTrajectoryToFile("demo_final_traj.txt");
 
 }

@@ -86,7 +86,7 @@ joint_bounds_ub: [0.802851, 4.18879, -0.916298,
                   0.802851, 4.18879, -0.916298]
 
 num_switches: 2
-force_bound: 200
+force_bound: 300
 
 swing_height: 0.1
 

@@ -1,9 +1,11 @@
 
 set(UTIL_HEADER_LIST "include/config_parser.h"
-        "include/logger.h")
+        "include/logger.h"
+        "include/timer.h")
 
 add_library(utils config_parser.cpp
         logger.cpp
+        timer.cpp
         ${UTIL_HEADER_LIST})
 target_include_directories(utils PUBLIC include)
 

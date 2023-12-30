@@ -72,7 +72,7 @@ namespace mpc {
             Eigen::Vector3d force = input.GetForce(i, time);
             for (int j = 0; j < pin_model_.nv; j++) {
                 // Cross product with the corresponding input force, add these for all the end effectors
-                cross_sum.col(j) += static_cast<Eigen::Vector3d>(J.col(j)).cross(force);    // TODO: Is there a negative?
+                cross_sum.col(j) += static_cast<Eigen::Vector3d>(J.col(j)).cross(force);
             }
         }
         Ac.block(3, MOMENTUM_OFFSET, cross_sum.rows(), cross_sum.cols()) = cross_sum;
@@ -84,22 +84,44 @@ namespace mpc {
 
         matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
         matrix_t CMMj = CMM.rightCols(num_joints_);
-        matrix_t CMMbinv = CMMb.inverse();  // TODO: maybe calc better
+        matrix_t CMMbinv = CMMb.inverse();  // TODO: maybe calc better, see below
+
+        // OCS2 Version
+        const double mass = CMMb(0, 0);
+        Eigen::Matrix<double, 3, 3> Ab_22_inv = CMMb.template block<3, 3>(3, 3).inverse();
+        Eigen::Matrix<double, 6, 6> Ab_inv = Eigen::Matrix<double, 6, 6>::Zero();
+        Ab_inv << 1.0 / mass * Eigen::Matrix<double, 3, 3>::Identity(), -1.0 / mass * CMMb.template block<3, 3>(0, 3) * Ab_22_inv,
+                Eigen::Matrix<double, 3, 3>::Zero(), Ab_22_inv;
+
         vector_t v_pin = ComputePinocchioVelocities(state, input.GetVels(time), CMMbinv, CMMj);
+
+//        std::cout << "pinocchio velocities: \n" << v_pin << std::endl;
 
         vector_t a_pin = vector_t::Zero(pin_model_.nv);
 
-        matrix6x_t dhdq = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
+        matrix6x_t dhdq_m = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
         matrix6x_t dhdotdq = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
         matrix6x_t dhdotdv = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
 
+        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
         // Get dhdq
-        // TODO: I only need this for dhdq so I can just steal that one line for efficiency
+        // TODO: I only need this for dhdq so I can just steal that one line for efficiency, see below
         pinocchio::computeCentroidalDynamicsDerivatives(pin_model_, *pin_data_, q_pin, v_pin, a_pin,
-                                                        dhdq, dhdotdq, dhdotdv, CMM);
+                                                        dhdq_m, dhdotdq, dhdotdv, CMM);
 
-        // TODO: Check dhdq
-//        Ac.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << CMMbinv, CMMbinv * dhdq; // TODO: Check negative sign
+        // OCS2 version
+//        matrix6x_t dhdq(6, pin_model_.nv);
+//        pinocchio::translateForceSet(pin_data_->dHdq, pin_data_->com[0], dhdq.const_cast_derived());
+//        for (size_t k = 0; k < pin_model_.nv; ++k) {
+//            dhdq.template block<3, 1>(pinocchio::Force::ANGULAR, k) +=
+//                    pin_data_->hg.linear().cross(pin_data_->dFda.template block<3, 1>(pinocchio::Force::LINEAR, k))
+//                    / pin_data_->Ig.mass();
+//        }
+
+//        std::cout << "dhdq me: \n" << dhdq_m << std::endl;
+//        std::cout << "dhdq ocs2: \n" << dhdq << std::endl;
+
+//        Ac.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << CMMbinv, CMMbinv * dhdq;
         // TODO: Note CMM has been removed
         Ac.block(MOMENTUM_OFFSET, 0, POS_VARS, POS_VARS) = matrix_t::Identity(POS_VARS, POS_VARS)/robot_mass_;
         Ac.block(MOMENTUM_OFFSET + 3, 3, POS_VARS, POS_VARS) = matrix_t::Identity(POS_VARS, POS_VARS)/robot_mass_;
@@ -194,7 +216,7 @@ namespace mpc {
         // --- Base velocity --- //
 //        Bc.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) <<
 //                matrix_t::Zero(FLOATING_VEL_OFFSET, num_inputs - num_joints_),
-//                -CMMbinv*CMMj*matrix_t::Identity(num_joints_, num_joints_);
+//                -CMMbinv*CMMj;
 
         // --- Joint velocity --- //
         Bc.bottomRows(num_joints_) << matrix_t::Zero(num_joints_, num_inputs - num_joints_),
@@ -207,13 +229,13 @@ namespace mpc {
         vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
         // TODO: move this to an integrator function
         vector_t Cc = CalcDynamics(state_alg, input, time, ref_state) -Ac*state_alg -Bc*input.AsQPVector(time);
-//        vector_t Cc2 = CalcDynamics(state_alg, input, time + integrator_->GetDt()/2, ref_state)
-//                -Ac*state_alg -Bc*input.AsQPVector(time+ integrator_->GetDt()/2);
+        vector_t Cc2 = CalcDynamics(state_alg, input, time + integrator_->GetDt()/2, ref_state)
+                -Ac*state_alg -Bc*input.AsQPVector(time+ integrator_->GetDt()/2);
 
         // Discretize with the integrator
         A = integrator_->CalcDerivWrtStateSingleStep(state, Ac);
         B = integrator_->CalcDerivWrtInputSingleStep(state, Bc, Ac);    // TODO: Technically this Ac should be evaluated at a different time
-        C = integrator_->CalcLinearTermDiscretization(Cc, Cc, Ac); //GetDt()*Cc;
+        C = integrator_->CalcLinearTermDiscretization(Cc, Cc2, Ac); //GetDt()*Cc;
     }
 
     // TODO: Note this changed to giving the result in global coordiantes

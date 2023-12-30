@@ -266,11 +266,11 @@ TEST_CASE("Normal Spline", "[mpc][spline]") {
         REQUIRE(spline2.GetNumPolyTimes() == 2);
 
         spline2.AddPoly(0.5);
-        REQUIRE(spline2.GetPolyTimes().size() == 3);
-        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(0.916666667, MARGIN));
-        REQUIRE(spline2.GetNumConstant() == 1);
-        REQUIRE(spline2.GetTotalPolyVars() == 3);
-        REQUIRE(spline2.GetNumPolyTimes() == 3);
+        REQUIRE(spline2.GetPolyTimes().size() == 5);
+        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(1.25, MARGIN));
+        REQUIRE(spline2.GetNumConstant() == 2);
+        REQUIRE(spline2.GetTotalPolyVars() == 6);
+        REQUIRE(spline2.GetNumPolyTimes() == 5);
 
         std::tie(vars_index, vars_affecting) = spline2.GetVarsIndexEnd(0.71);
         REQUIRE(vars_index == 1);
@@ -281,18 +281,18 @@ TEST_CASE("Normal Spline", "[mpc][spline]") {
         REQUIRE(vars_affecting == 3);
 
         spline2.AddPoly(0.5);
-        REQUIRE(spline2.GetPolyTimes().size() == 4);
-        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(1.083333, MARGIN));
-        REQUIRE(spline2.GetNumConstant() == 1);
-        REQUIRE(spline2.GetTotalPolyVars() == 5);
-        REQUIRE(spline2.GetNumPolyTimes() == 4);
-
-        spline2.AddPoly(0.5);
-        REQUIRE(spline2.GetPolyTimes().size() == 5);
-        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(1.25, MARGIN));
+        REQUIRE(spline2.GetPolyTimes().size() == 6);
+        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(1.75, MARGIN));
         REQUIRE(spline2.GetNumConstant() == 2);
         REQUIRE(spline2.GetTotalPolyVars() == 6);
-        REQUIRE(spline2.GetNumPolyTimes() == 5);
+        REQUIRE(spline2.GetNumPolyTimes() == 6);
+
+        spline2.AddPoly(0.5);
+        REQUIRE(spline2.GetPolyTimes().size() == 9);
+        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(2.25, MARGIN));
+        REQUIRE(spline2.GetNumConstant() == 3);
+        REQUIRE(spline2.GetTotalPolyVars() == 11);
+        REQUIRE(spline2.GetNumPolyTimes() == 9);
 
         std::tie(vars_index, vars_affecting) = spline2.GetVarsIndexEnd(1);
         REQUIRE(vars_index == 5);
@@ -303,17 +303,17 @@ TEST_CASE("Normal Spline", "[mpc][spline]") {
         REQUIRE(vars_affecting == 3);
 
         spline2.AddPoly(0.35);
-        REQUIRE(spline2.GetPolyTimes().size() == 6);
-        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(1.6, MARGIN));
-        REQUIRE(spline2.GetNumConstant() == 2);
-        REQUIRE(spline2.GetTotalPolyVars() == 6);
-        REQUIRE(spline2.GetNumPolyTimes() == 6);
+        REQUIRE(spline2.GetPolyTimes().size() == 10);
+        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(2.6, MARGIN));
+        REQUIRE(spline2.GetNumConstant() == 3);
+        REQUIRE(spline2.GetTotalPolyVars() == 11);
+        REQUIRE(spline2.GetNumPolyTimes() == 10);
 
         std::tie(vars_index, vars_affecting) = spline2.GetVarsIndexEnd(1.5);
         REQUIRE(vars_index == 6);
         REQUIRE(vars_affecting == 1);
 
-        REQUIRE(spline2.ValueAt(1.6) == 0);
+        REQUIRE(spline2.ValueAt(2.6) == 0);
         REQUIRE(spline2.ValueAt(0.6) == 5);
     }
 }
@@ -478,29 +478,29 @@ TEST_CASE("Force Spline", "[mpc][spline]") {
         REQUIRE(spline2.GetNumPolyTimes() == 2);
 
         spline2.AddPoly(0.5);
-        REQUIRE(spline2.GetPolyTimes().size() == 3);
-        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(0.916666667, MARGIN));
-        REQUIRE(spline2.GetNumConstant() == 1);
-        REQUIRE(spline2.GetTotalPolyVars() == 2);
-        REQUIRE(spline2.GetNumPolyTimes() == 3);
+        REQUIRE(spline2.GetPolyTimes().size() == 5);
+        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(1.25, MARGIN));
+        REQUIRE(spline2.GetNumConstant() == 2);
+        REQUIRE(spline2.GetTotalPolyVars() == 4);
+        REQUIRE(spline2.GetNumPolyTimes() == 5);
 
         std::tie(vars_index, vars_affecting) = spline2.GetVarsIndexEnd(0.9);
         REQUIRE(vars_index == 2);
         REQUIRE(vars_affecting == 2);
 
         spline2.AddPoly(0.5);
-        REQUIRE(spline2.GetPolyTimes().size() == 4);
-        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(1.083333, MARGIN));
-        REQUIRE(spline2.GetNumConstant() == 1);
-        REQUIRE(spline2.GetTotalPolyVars() == 4);
-        REQUIRE(spline2.GetNumPolyTimes() == 4);
-
-        spline2.AddPoly(0.5);
-        REQUIRE(spline2.GetPolyTimes().size() == 5);
-        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(1.25, MARGIN));
+        REQUIRE(spline2.GetPolyTimes().size() == 6);
+        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(1.75, MARGIN));
         REQUIRE(spline2.GetNumConstant() == 2);
         REQUIRE(spline2.GetTotalPolyVars() == 4);
-        REQUIRE(spline2.GetNumPolyTimes() == 5);
+        REQUIRE(spline2.GetNumPolyTimes() == 6);
+
+        spline2.AddPoly(0.5);
+        REQUIRE(spline2.GetPolyTimes().size() == 9);
+        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(2.25, MARGIN));
+        REQUIRE(spline2.GetNumConstant() == 3);
+        REQUIRE(spline2.GetTotalPolyVars() == 8);
+        REQUIRE(spline2.GetNumPolyTimes() == 9);
 
         std::tie(vars_index, vars_affecting) = spline2.GetVarsIndexEnd(1);
         REQUIRE(vars_index == 4);
@@ -511,17 +511,17 @@ TEST_CASE("Force Spline", "[mpc][spline]") {
         REQUIRE(vars_affecting == 2);
 
         spline2.AddPoly(0.35);
-        REQUIRE(spline2.GetPolyTimes().size() == 6);
-        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(1.6, MARGIN));
-        REQUIRE(spline2.GetNumConstant() == 2);
-        REQUIRE(spline2.GetTotalPolyVars() == 4);
-        REQUIRE(spline2.GetNumPolyTimes() == 6);
+        REQUIRE(spline2.GetPolyTimes().size() == 10);
+        REQUIRE_THAT(spline2.GetEndTime(), WithinAbs(2.6, MARGIN));
+        REQUIRE(spline2.GetNumConstant() == 3);
+        REQUIRE(spline2.GetTotalPolyVars() == 8);
+        REQUIRE(spline2.GetNumPolyTimes() == 10);
 
         std::tie(vars_index, vars_affecting) = spline2.GetVarsIndexEnd(1.15);
         REQUIRE(vars_index == 4);
         REQUIRE(vars_affecting == 2);
 
-        REQUIRE(spline2.ValueAt(1.6) == 0);
+        REQUIRE(spline2.ValueAt(2.6) == 0);
         spline2.SetPolyVars(2, {2,2});
         REQUIRE_THAT(spline2.ValueAt(0.916), WithinAbs(2.0, MARGIN));
     }
