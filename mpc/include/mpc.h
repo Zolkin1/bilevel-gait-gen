@@ -54,7 +54,12 @@ namespace mpc {
     public:
         MPC(const MPCInfo& info, const std::string& robot_urdf);
 
-        Trajectory Solve(const vector_t& centroidal_state, double init_time);
+        Trajectory CreateInitialRun(const vector_t& state);
+
+        Trajectory GetRealTimeUpdate(const vector_t& state, double init_time);
+
+        // TODO: Maybe move to private
+        Trajectory Solve(const vector_t& state, double init_time);
 
         void SetWarmStartTrajectory(const Trajectory& trajectory);
 
@@ -140,6 +145,8 @@ namespace mpc {
         double LineSearch(const vector_t& direction, const vector_t& init_state);
 
         double GetMeritValue(const vector_t& x, double mu, const vector_t& init_state) const;
+
+        double GetMeritValue(const Trajectory& traj, double mu, const vector_t& init_state) const;
 
         double GetCostValue(const vector_t& x) const;
 
@@ -232,6 +239,9 @@ namespace mpc {
         utils::Timer line_search_timer_;
         utils::Timer poly_update_timer_;
         utils::Timer data_update_timer_;
+        utils::Timer qp_solve_timer_;
+
+        bool in_real_time_;
     };
 } // mpc
 

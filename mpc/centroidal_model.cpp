@@ -65,49 +65,47 @@ namespace mpc {
         pinocchio::computeJointJacobians(pin_model_, *pin_data_, q_pin);
         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin);
 
-        Eigen::Matrix3Xd cross_sum = Eigen::Matrix3Xd::Zero(3, pin_model_.nv);
+        matrix_3t J = matrix_t::Zero(3, pin_model_.nv);
         for (int i = 0; i < num_ee_; i++) {
             // Get the jacobian of the FK
-            matrix_t J = GetFKJacobianForEndEffector(q_pin, frames_.at(i), false);
+            J = GetFKJacobianForEndEffector(q_pin, frames_.at(i), false);
             Eigen::Vector3d force = input.GetForce(i, time);
             for (int j = 0; j < pin_model_.nv; j++) {
                 // Cross product with the corresponding input force, add these for all the end effectors
-                cross_sum.col(j) += static_cast<Eigen::Vector3d>(J.col(j)).cross(force);
+                Ac.block<3,1>(POS_VARS, MOMENTUM_OFFSET + j) +=
+                        static_cast<Eigen::Vector3d>(J.col(j)).cross(force);
             }
         }
-        Ac.block(3, MOMENTUM_OFFSET, cross_sum.rows(), cross_sum.cols()) = cross_sum;
-
-//        std::cout << "A: \n" << A << std::endl;
 
         // Deal with centroidal dynamics
-        matrix6x_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q_pin);
-
-        matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
-        matrix_t CMMj = CMM.rightCols(num_joints_);
-        matrix_t CMMbinv = CMMb.inverse();  // TODO: maybe calc better, see below
+//        matrix6x_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q_pin);
+//
+//        matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
+//        matrix_t CMMj = CMM.rightCols(num_joints_);
+//        matrix_t CMMbinv = CMMb.inverse();  // TODO: maybe calc better, see below
 
         // OCS2 Version
-        const double mass = CMMb(0, 0);
-        Eigen::Matrix<double, 3, 3> Ab_22_inv = CMMb.template block<3, 3>(3, 3).inverse();
-        Eigen::Matrix<double, 6, 6> Ab_inv = Eigen::Matrix<double, 6, 6>::Zero();
-        Ab_inv << 1.0 / mass * Eigen::Matrix<double, 3, 3>::Identity(), -1.0 / mass * CMMb.template block<3, 3>(0, 3) * Ab_22_inv,
-                Eigen::Matrix<double, 3, 3>::Zero(), Ab_22_inv;
-
-        vector_t v_pin = ComputePinocchioVelocities(state, input.GetVels(time), CMMbinv, CMMj);
+//        const double mass = CMMb(0, 0);
+//        Eigen::Matrix<double, 3, 3> Ab_22_inv = CMMb.template block<3, 3>(3, 3).inverse();
+//        Eigen::Matrix<double, 6, 6> Ab_inv = Eigen::Matrix<double, 6, 6>::Zero();
+//        Ab_inv << 1.0 / mass * Eigen::Matrix<double, 3, 3>::Identity(), -1.0 / mass * CMMb.template block<3, 3>(0, 3) * Ab_22_inv,
+//                Eigen::Matrix<double, 3, 3>::Zero(), Ab_22_inv;
+//
+//        vector_t v_pin = ComputePinocchioVelocities(state, input.GetVels(time), CMMbinv, CMMj);
 
 //        std::cout << "pinocchio velocities: \n" << v_pin << std::endl;
 
-        vector_t a_pin = vector_t::Zero(pin_model_.nv);
-
-        matrix6x_t dhdq_m = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
-        matrix6x_t dhdotdq = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
-        matrix6x_t dhdotdv = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
-
-        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
+//        vector_t a_pin = vector_t::Zero(pin_model_.nv);
+//
+//        matrix6x_t dhdq_m = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
+//        matrix6x_t dhdotdq = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
+//        matrix6x_t dhdotdv = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
+//
+//        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
         // Get dhdq
         // TODO: I only need this for dhdq so I can just steal that one line for efficiency, see below
-        pinocchio::computeCentroidalDynamicsDerivatives(pin_model_, *pin_data_, q_pin, v_pin, a_pin,
-                                                        dhdq_m, dhdotdq, dhdotdv, CMM);
+//        pinocchio::computeCentroidalDynamicsDerivatives(pin_model_, *pin_data_, q_pin, v_pin, a_pin,
+//                                                        dhdq_m, dhdotdq, dhdotdv, CMM);
 
         // OCS2 version
 //        matrix6x_t dhdq(6, pin_model_.nv);
@@ -159,48 +157,16 @@ namespace mpc {
             }
         }
 
-        Eigen::Matrix3d Id = Eigen::Matrix3d::Identity();
+        const Eigen::Matrix3d Id = Eigen::Matrix3d::Identity();
         // --- Angular momentum --- //
+        vector_t vars_lin;
         for (int ee = 0; ee < num_ee_; ee++) {
             Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
             for (int coord = 0; coord < 3; coord++) {
-
-//                if (coord == 0) {
-//                    int vars_idx, vars_affecting;
-//
-//                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, 2);
-//                    vector_t vars_lin = input.GetForces().at(ee).at(2).GetPolyVarsLin(time);
-//                    B.block(3, vars_idx - vars_affecting, 1, vars_affecting) = ee_pos_wrt_com(1)*vars_lin.transpose();
-//
-//                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, 1);
-//                    vars_lin = input.GetForces().at(ee).at(1).GetPolyVarsLin(time);
-//                    B.block(3, vars_idx - vars_affecting, 1, vars_affecting) = -ee_pos_wrt_com(2)*vars_lin.transpose();
-//                } else if (coord == 1) {
-//                    int vars_idx, vars_affecting;
-//
-//                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, 0);
-//                    vector_t vars_lin = input.GetForces().at(ee).at(0).GetPolyVarsLin(time);
-//                    B.block(4, vars_idx - vars_affecting, 1, vars_affecting) = ee_pos_wrt_com(2)*vars_lin.transpose();
-//
-//                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, 2);
-//                    vars_lin = input.GetForces().at(ee).at(2).GetPolyVarsLin(time);
-//                    B.block(4, vars_idx - vars_affecting, 1, vars_affecting) = -ee_pos_wrt_com(0)*vars_lin.transpose();
-//                } else {
-//                    int vars_idx, vars_affecting;
-//
-//                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, 1);
-//                    vector_t vars_lin = input.GetForces().at(ee).at(1).GetPolyVarsLin(time);
-//                    B.block(5, vars_idx - vars_affecting, 1, vars_affecting) = ee_pos_wrt_com(0)*vars_lin.transpose();
-//
-//                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, 0);
-//                    vars_lin = input.GetForces().at(ee).at(0).GetPolyVarsLin(time);
-//                    B.block(5, vars_idx - vars_affecting, 1, vars_affecting) = -ee_pos_wrt_com(1)*vars_lin.transpose();
-//                }
-
                 if (input.IsForceMutable(ee, coord, time)) {
                     int vars_idx, vars_affecting;
                     std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
-                    vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
+                    vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
 
                     for (int poly = 0; poly < vars_lin.size(); poly++) {
                         Bc.block(3, vars_idx - vars_affecting + poly, 3, 1) =
@@ -236,12 +202,16 @@ namespace mpc {
         A = integrator_->CalcDerivWrtStateSingleStep(state, Ac);
         B = integrator_->CalcDerivWrtInputSingleStep(state, Bc, Ac);    // TODO: Technically this Ac should be evaluated at a different time
         C = integrator_->CalcLinearTermDiscretization(Cc, Cc2, Ac); //GetDt()*Cc;
+
+        // TODO: Remove
+        for (int i = 0; i < C.size(); i++) {
+            assert(!std::isnan(C(i)));
+        }
     }
 
-    // TODO: Note this changed to giving the result in global coordiantes
     void CentroidalModel::GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
                                                  matrix_t& A, vector_t& C) {
-        vector_t q_pin = ConvertMPCStateToPinocchioState(state);
+        const vector_t q_pin = ConvertMPCStateToPinocchioState(state);
         A = matrix_t::Zero(3, pin_model_.nv);
         C = vector_t::Zero(3);
 
@@ -252,18 +222,14 @@ namespace mpc {
         pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_map_.at(frames_.at(end_effector)),
                                     pinocchio::LOCAL_WORLD_ALIGNED, J);
 
-        // TODO: Is this in the correct coordinates?
         A = J.topRows<3>();// - Eigen::Matrix3Xd::Identity(3, pin_model_.nv);
 
         const vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
         C = GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector)) + GetCOMPosition(state)
                 - A*state_alg.tail(pin_model_.nv);
-//        std::cout << "ee com frame pos: \n" << GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector)) << std::endl;
-//        std::cout << "COM position: \n" << pin_data_->com[0] << std::endl;
-//        std::cout << "C: \n" << C << std::endl;
     }
 
-    matrix_t CentroidalModel::GetFKJacobianForEndEffector(const vector_t& q, const std::string& frame, bool compute_jac) {
+    matrix_3t CentroidalModel::GetFKJacobianForEndEffector(const vector_t& q, const std::string& frame, bool compute_jac) {
         if (compute_jac) {
             pinocchio::computeJointJacobians(pin_model_, *pin_data_, q);
             pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q);
@@ -283,8 +249,8 @@ namespace mpc {
     }
 
     vector_t CentroidalModel::ComputeBaseVelocities(const vector_t& state, const vector_t& vel) const {
-        vector_t q_pin = ConvertMPCStateToPinocchioState(state);
-        matrix6x_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q_pin);
+        const vector_t q_pin = ConvertMPCStateToPinocchioState(state);
+        const matrix6x_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q_pin);
 
         matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
         matrix_t CMMj = CMM.rightCols(num_joints_);
@@ -309,7 +275,7 @@ namespace mpc {
                                                          const matrix_t& CMMbinv, const matrix_t& CMMj) const {
         vector_t v_pin(FLOATING_VEL_OFFSET + num_joints_);
 
-        v_pin.head<FLOATING_VEL_OFFSET>() = CMMbinv * (state.head<MOMENTUM_OFFSET>() - CMMj*joint_vels);
+        v_pin.head<FLOATING_VEL_OFFSET>().noalias() = CMMbinv * (state.head<MOMENTUM_OFFSET>() - CMMj*joint_vels);
 
         v_pin.tail(num_joints_) = joint_vels;
 
@@ -329,7 +295,7 @@ namespace mpc {
 
     vector_t CentroidalModel::ConvertPinocchioStateToMPCState(const Eigen::Vector<double, MOMENTUM_OFFSET>& momentum,
                                                               const vector_t& state) const {
-        Eigen::Vector3d rot = ConvertQuaternionToZYXRot(state.segment<4>(POS_VARS));
+        const Eigen::Vector3d rot = ConvertQuaternionToZYXRot(state.segment<4>(POS_VARS));
         vector_t x(num_total_states_);
         x.head<MOMENTUM_OFFSET>() = momentum;
         x.segment<POS_VARS>(MOMENTUM_OFFSET) = state.head<POS_VARS>();
@@ -417,11 +383,6 @@ namespace mpc {
         }
     }
 
-//    void CentroidalModel::SetDynamicsRefState(const vector_t& state) {
-//        ref_state_ = state;
-//    }
-
-    // TODO: check all the manifold stuff
     vector_t CentroidalModel::CalcDynamics(const vector_t& state, const Inputs& input, double time,
                                            const vector_t& ref_state) const {
         assert(state.size() == pin_model_.nv + 6);
@@ -429,8 +390,6 @@ namespace mpc {
         const vector_t state_man = ConvertAlgebraStateToManifoldState(state, ref_state);
 
         vector_t xdot = vector_t::Zero(num_total_states_);
-
-        pinocchio::forwardKinematics(pin_model_, *pin_data_, ConvertMPCStateToPinocchioState(state_man));
 
         xdot.topRows<3>() = robot_mass_*GRAVITY;
 
@@ -442,16 +401,14 @@ namespace mpc {
             xdot.middleRows<3>(3) += GetEndEffectorLocationCOMFrame(state_man, frames_.at(i)).cross(input.GetForce(i, time));
         }
 
-        matrix_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, ConvertMPCStateToPinocchioState(state_man));
-        matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
-        matrix_t CMMj = CMM.rightCols(num_joints_);
+        // NOTE: This CMM call is expensive
+//        matrix_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, ConvertMPCStateToPinocchioState(state_man));
+//        matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
+//        matrix_t CMMj = CMM.rightCols(num_joints_);
 //        xdot.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) =
 //                CMMb.householderQr().solve(state.head<MOMENTUM_OFFSET>() - CMMj*input.GetVels(time));
         xdot.segment<POS_VARS>(MOMENTUM_OFFSET) = state.segment<POS_VARS>(0)/robot_mass_;
         xdot.segment<POS_VARS>(MOMENTUM_OFFSET + POS_VARS) = state.segment<POS_VARS>(POS_VARS)/robot_mass_;
-
-//        std::cout << "hcom: \n" << state.head<MOMENTUM_OFFSET>() << std::endl;
-//        std::cout << "qbdot: \n" << xdot.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << std::endl;
 
         xdot.bottomRows(num_joints_) = input.GetVels(time);
 
@@ -464,7 +421,6 @@ namespace mpc {
 
     vector_t CentroidalModel::GetDiscreteDynamics(const vector_t& state, const Inputs& input, double time,
                                                   const vector_t& ref_state) const {
-        // TODO: Change to a different integrator
         vector_t xkp1 = integrator_->CalcIntegral(state, input, time, 1, *this, ref_state); //state + integrator_->GetDt()*CalcDynamics(state, input, time, ref_state);
         return xkp1;
     }

@@ -14,11 +14,13 @@
 //#include "integrator.h"
 #include "inputs.h"
 #include "rk_integrator.h"
+#include "timer.h"
 
 namespace mpc {
     using vector_t = Eigen::VectorXd;
     using matrix_t =  Eigen::MatrixXd;
     using vector6_t = Eigen::Vector<double, 6>;
+    using matrix_3t = Eigen::Matrix3Xd;
 
     class CentroidalModel {
         // Note: I am using tait-bryan z-y-x angles
@@ -47,7 +49,7 @@ namespace mpc {
         void GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
                                     matrix_t& A, vector_t& C);
 
-        matrix_t GetFKJacobianForEndEffector(const vector_t& state, const std::string& frame, bool compute_jac);
+        matrix_3t GetFKJacobianForEndEffector(const vector_t& state, const std::string& frame, bool compute_jac);
 
         Eigen::Vector3d GetEndEffectorLocationCOMFrame(const vector_t& state, const std::string& frame) const;
 

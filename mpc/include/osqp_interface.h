@@ -26,6 +26,10 @@ namespace mpc {
 
         vector_t GetDualSolution() const override;
 
+        void ConfigureForInitialRun() const override;
+
+        void ConfigureForRealTime() const override;
+
     protected:
     private:
         void ConvertDataToOSQPConstraints(const QPData& data);

@@ -5,6 +5,7 @@
 #ifndef BILEVEL_GAIT_GEN_INPUTS_H
 #define BILEVEL_GAIT_GEN_INPUTS_H
 
+#include <cassert>
 #include <Eigen/Core>
 
 #include "spline.h"

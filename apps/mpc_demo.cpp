@@ -73,7 +73,7 @@ int main() {
     // Create weights
     // TODO: Can probably tune this to get better performance
     matrix_t Q = 20*matrix_t::Identity(24, 24);
-    Q.topLeftCorner<6,6>() = matrix_t::Zero(6,6);
+    Q.topLeftCorner<6,6>() = 1*matrix_t::Identity(6, 6);    // TODO: Change
     Q(6,6) = 300; //30;
     Q(7,7) = 300; //30;
     Q(8,8) = 450; //10;
@@ -82,7 +82,7 @@ int main() {
     Q(11,11) = 50;
     Q(12,12) = 50;
 
-    // TODO: Weight shoulder joints to keep the legs in line
+    // TODO: Weight shoulder joints to keep the legs in line?
 
     // Desried state in the lie algebra
     const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(mpc_des_state, init_state);
@@ -116,9 +116,7 @@ int main() {
     auto robot_file = config.ParseString("robot_xml");
     std::unique_ptr<simulator::SimulationRobot> robot = std::make_unique<simulator::SimulationRobot>(robot_file, mpc_controller);
 
-    for (int i = 0; i < 7; i++) {
-        mpc.Solve(init_state, 0);
-    }
+    mpc.CreateInitialRun(init_state);
     mpc.PrintStats();
 
     // Visualize results
@@ -128,11 +126,13 @@ int main() {
         vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
-//        mpc.Solve(temp_state, i*info.integrator_dt);
+        mpc.GetRealTimeUpdate(temp_state, i*info.integrator_dt);
     }
 
     // Print the final trajectory to a file for viewing
     mpc::Trajectory traj = mpc.GetTrajectory();
     traj.PrintTrajectoryToFile("demo_final_traj.txt");
+
+    mpc.PrintStats();
 
 }

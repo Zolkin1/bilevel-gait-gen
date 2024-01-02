@@ -41,6 +41,10 @@ namespace mpc {
 
         virtual vector_t GetDualSolution() const = 0;
 
+        virtual void ConfigureForInitialRun() const = 0;
+
+        virtual void ConfigureForRealTime() const = 0;
+
     protected:
         vector_t prev_qp_sol_;
     private:

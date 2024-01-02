@@ -36,7 +36,6 @@ namespace mpc {
         qp_solver_.data()->setNumberOfVariables(data.num_decision_vars);
         qp_solver_.data()->setNumberOfConstraints(data.GetTotalNumConstraints());
 
-        // TODO: Do better
         if (prev_dual_sol_.size() != data.GetTotalNumConstraints()) {
             prev_dual_sol_ = vector_t::Zero(data.GetTotalNumConstraints());
         }
@@ -45,9 +44,31 @@ namespace mpc {
         qp_solver_.data()->clearHessianMatrix();
         qp_solver_.clearSolver();
 
+        // TODO: Consider multithreading this (?)
         ConvertDataToOSQPConstraints(data);
         ConvertDataToOSQPCost(data);
 
+        for (int i = 0; i < A_.rows(); i++) {
+            for (int j = 0; j < A_.cols(); j++) {
+                assert(!std::isnan(A_(i,j)));
+                assert(std::abs(A_(i,j)) < 1e6);
+            }
+        }
+
+        for (int i = 0; i < P_.rows(); i++) {
+            for (int j = 0; j < P_.cols(); j++) {
+                assert(!std::isnan(P_(i,j)));
+                assert(std::abs(P_(i,j)) < 1e6);
+            }
+        }
+
+        for (int i = 0; i < lb_.size(); i++) {
+            assert(!std::isnan(lb_(i)));
+
+            assert(!std::isnan(ub_(i)));
+        }
+
+        // TODO: We loose about 10ms on the sparse conversion (order of the short QP solve)
         sparse_conversion_timer_.StartTimer();
         Eigen::SparseMatrix<double> sparseA = A_.sparseView();
         Eigen::SparseMatrix<double> sparseP = P_.sparseView();
@@ -72,7 +93,7 @@ namespace mpc {
         osqp_interface_timer_.StopTimer();
         std::cout << std::endl;
         osqp_interface_timer_.PrintElapsedTime();
-//        sparse_conversion_timer_.PrintElapsedTime();
+        sparse_conversion_timer_.PrintElapsedTime();
     }
 
     // TODO: remove data after debugging
@@ -206,6 +227,21 @@ namespace mpc {
 
     vector_t OSQPInterface::GetDualSolution() const {
         return prev_dual_sol_;
+    }
+
+    void OSQPInterface::ConfigureForInitialRun() const {
+        qp_solver_.settings()->setPolish(true);
+        qp_solver_.settings()->setAbsoluteTolerance(1e-5);
+        qp_solver_.settings()->setRelativeTolerance(1e-5);
+        qp_solver_.settings()->setMaxIteration(3000);
+    }
+
+    void OSQPInterface::ConfigureForRealTime() const {
+        qp_solver_.settings()->setPolish(false);
+        qp_solver_.settings()->setAbsoluteTolerance(1e-4);
+        qp_solver_.settings()->setRelativeTolerance(1e-4);
+        qp_solver_.settings()->setMaxIteration(200);
+
     }
 
 } // mpc

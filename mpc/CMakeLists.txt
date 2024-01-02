@@ -47,6 +47,8 @@ target_link_libraries(mpc PUBLIC controller)
 # Utils
 target_link_libraries(mpc PUBLIC utils)
 
+#add_compile_options(mpc PRIVATE -ffast-math)
+
 # MKL and OpenMP
 #find_package(OpenMP)
 #target_link_libraries(mpc PUBLIC OpenMP::OpenMP_CXX)

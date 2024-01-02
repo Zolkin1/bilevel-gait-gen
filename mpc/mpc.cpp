@@ -39,7 +39,8 @@ namespace mpc {
         constraint_costs_timer_("constraints and costs"),
         line_search_timer_("line search"),
         poly_update_timer_("spline update"),
-        data_update_timer_("data update") {
+        data_update_timer_("data update"),
+        qp_solve_timer_("QP solve") {
 
         assert(info_.ee_frames.size() == num_ee_);
 
@@ -75,17 +76,43 @@ namespace mpc {
         init_time_ = 0;
 
         line_search_res_ = vector_t::Zero(data_.num_decision_vars);
-        mu_ = 500;
+        mu_ = 5000;
         run_num_ = 0;
+
+        in_real_time_ = false;
 
         // Set everything to 0
         data_.InitQPMats();
     }
 
-    Trajectory MPC::Solve(const vector_t &centroidal_state, double init_time) {
+    Trajectory MPC::CreateInitialRun(const mpc::vector_t& state) {
+        bool converged = false;
+        int num_iter = 0;
+        in_real_time_ = false;
+
+        qp_solver->ConfigureForInitialRun();
+
+        while (!converged && num_iter < 10) {
+            Solve(state, 0);
+            num_iter++;
+        }
+        return prev_traj_;
+    }
+
+    Trajectory MPC::GetRealTimeUpdate(const vector_t& state, double init_time) {
+        if (in_real_time_) {
+            return Solve(state, init_time);
+        } else {
+            qp_solver->ConfigureForRealTime();
+            in_real_time_ = true;
+            return Solve(state, init_time);
+        }
+    }
+
+    Trajectory MPC::Solve(const vector_t &state, double init_time) {
         solve_timer_.StartTimer();
 
-        assert(centroidal_state.size() == num_states_ + 1);
+        assert(state.size() == num_states_ + 1);
 
         init_time_ = init_time;
 
@@ -97,9 +124,9 @@ namespace mpc {
 
         data_update_timer_.StartTimer();
         UpdateQPSizes();
-        data_.ResizeQPMats();
+        data_.InitQPMats();
 
-        prev_traj_.SetState(0, centroidal_state);
+        prev_traj_.SetState(0, state);
         prev_qp_sol = prev_traj_.ConvertToQPVector();
         data_update_timer_.StopTimer();
 
@@ -112,16 +139,18 @@ namespace mpc {
         AddFinalCost();
 
         // -------------------- Constraints ---------------------- //
-        AddDynamicsConstraints(centroidal_state);
+        AddDynamicsConstraints(state);
         AddBoxConstraints();
-        AddFKConstraints(centroidal_state);
+        AddFKConstraints(state);
         AddFrictionConeConstraints();
         AddForceBoxConstraints();
         constraint_costs_timer_.StopTimer();
 
         // ----------------------- Solve ------------------------- //
         qp_solver->SetupQP(data_, prev_qp_sol);
-        vector_t sol = qp_solver->Solve(data_);
+        qp_solve_timer_.StartTimer();
+        const vector_t sol = qp_solver->Solve(data_);
+        qp_solve_timer_.StopTimer();
 
         if (qp_solver->GetSolveQuality() != "Solved Inaccurate" && qp_solver->GetSolveQuality() != "Solved"
                 && qp_solver->GetSolveQuality() != "Max Iter Reached") {
@@ -129,11 +158,11 @@ namespace mpc {
 //            throw std::runtime_error("Bad solve.");
         }
 
-        vector_t p = sol - prev_qp_sol;
+        const vector_t p = sol - prev_qp_sol;
         double alpha = 0;
         if (sol.size() == prev_qp_sol.size()) {
             line_search_timer_.StartTimer();
-            alpha = LineSearch(p, centroidal_state);
+            alpha = LineSearch(p, state);
             line_search_timer_.StopTimer();
         }
 
@@ -143,23 +172,23 @@ namespace mpc {
 
         prev_dual_sol_ = qp_solver->GetDualSolution();
 
-        prev_qp_sol = alpha * p + prev_qp_sol;
+        prev_qp_sol = ((alpha * p) + prev_qp_sol).eval();
 
-        prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, centroidal_state);
+        // TODO: This conversion isn't perfect. Need to investigate
+        prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, state);
 
-//        prev_traj_.PrintTrajectoryToFile("prev_traj_after_solve.txt");
-
-        RecordStats(alpha, p, qp_solver->GetSolveQuality(), centroidal_state);
+        RecordStats(alpha, p, qp_solver->GetSolveQuality(), state);
 
         run_num_++;
 
         solve_timer_.StopTimer();
 
-        solve_timer_.PrintElapsedTime();
         constraint_costs_timer_.PrintElapsedTime();
         line_search_timer_.PrintElapsedTime();
         poly_update_timer_.PrintElapsedTime();
         data_update_timer_.PrintElapsedTime();
+        qp_solve_timer_.PrintElapsedTime();
+        solve_timer_.PrintElapsedTime();
         std::cout << "-----------" << std::endl;
 
         return prev_traj_;
@@ -630,36 +659,41 @@ namespace mpc {
 
 
         int i = 0;
-        while ((merit - merit_step) < -0.0001 * alpha * merit_directional && i < 5) {
+        while ((merit - merit_step) < -0.00001 * alpha * merit_directional && i < 5) {
             alpha *= 0.5;
-            merit_step = GetMeritValue(alpha * direction + prev_qp_sol, mu_, init_state);
+            vector_t temp = (alpha * direction) + prev_qp_sol;
+            merit_step = GetMeritValue(temp, mu_, init_state);
             i++;
         }
 
-        if (i == 5) {
-            alpha = 1;
-        }
+//        std::cout << "final vector: " << ((alpha * direction) + prev_qp_sol).transpose() << std::endl;
 
-        // TODO: I would expect alpha = 1 to be the most common value
+        std::cout << "final merit: " << merit_step << std::endl;
+
+//        if (i == 5) {
+//            alpha = 1;
+//        }
 
         return alpha;
     }
 
-    // TODO: Optimize. Takes ~130ms right now.
     double MPC::GetMeritValue(const vector_t& x, double mu, const vector_t& init_state) const {
-        // TODO: Do more efficiently
         const Trajectory temp_traj = ConvertQPSolToTrajectory(x, init_state);
-        temp_traj.PrintTrajectoryToFile("temp_traj.txt");
 
-        return GetCostValue(x) + mu*GetEqualityConstraintValues(temp_traj, init_state).lpNorm<1>();
+        return mu*GetEqualityConstraintValues(temp_traj, init_state).lpNorm<1>() + GetCostValue(x);
+    }
+
+    double MPC::GetMeritValue(const Trajectory& traj, double mu, const mpc::vector_t& init_state) const {
+        return mu*GetEqualityConstraintValues(traj, init_state).lpNorm<1>() + GetCostValue(traj.ConvertToQPVector());
     }
 
     double MPC::GetCostValue(const vector_t& x) const {
         return 0.5*x.dot(data_.cost_quadratic*(x)) + data_.cost_linear.dot(x);
     }
 
+    // TODO: Optimize this and make it so it is called less
     vector_t MPC::GetEqualityConstraintValues(const Trajectory& traj, const vector_t& init_state) const {
-        vector_t eq_constraints = vector_t::Zero(data_.num_fk_constraints_ + data_.num_dynamics_constraints - num_states_);
+        vector_t eq_constraints = vector_t::Zero(data_.num_dynamics_constraints - num_states_); // data_.num_fk_constraints_
 
         for (int node = 0; node < info_.num_nodes; node++) {
             eq_constraints.segment(node*num_states_, num_states_) =
@@ -672,7 +706,6 @@ namespace mpc {
 //                        - traj.GetPosition(ee,GetTime(node));
 //            }
         }
-
         return eq_constraints;
     }
 
@@ -699,7 +732,7 @@ namespace mpc {
         step_norm_.push_back(direction.norm());
         alpha_.push_back(alpha);
         cost_result_.push_back(GetCostValue(prev_qp_sol));
-        merit_result_.push_back(GetMeritValue(prev_qp_sol, mu_, ref_state));
+        merit_result_.push_back(GetMeritValue(prev_traj_, mu_, ref_state));
         merit_directional_deriv_.push_back(GetMeritGradient(prev_qp_sol - alpha*direction, direction, mu_, ref_state));
         solve_type_.push_back(solve_type);
         ref_state_.push_back(ref_state);
