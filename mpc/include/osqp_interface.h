@@ -5,6 +5,8 @@
 #ifndef BILEVEL_GAIT_GEN_OSQP_INTERFACE_H
 #define BILEVEL_GAIT_GEN_OSQP_INTERFACE_H
 
+#include <Eigen/SparseCore>
+
 #include "OsqpEigen/OsqpEigen.h"
 
 #include "qp_interface.h"
@@ -40,8 +42,8 @@ namespace mpc {
         OsqpEigen::Solver qp_solver_;
 
         // OSQP specific vectors and matricies
-        matrix_t A_, P_;
-//        Eigen::SparseMatrix<double> A_, P_;
+//        matrix_t P_;
+        Eigen::SparseMatrix<double> A_, P_;
         vector_t lb_, ub_, w_;
 
         vector_t prev_dual_sol_;
@@ -52,6 +54,10 @@ namespace mpc {
 
         utils::Timer osqp_interface_timer_;
         utils::Timer sparse_conversion_timer_;
+        utils::Timer matrix_gather_timer_;
+
+        int prev_num_constraints_;
+        int prev_num_decision_;
     };
 } // mpc
 

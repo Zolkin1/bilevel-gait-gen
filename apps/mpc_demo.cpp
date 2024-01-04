@@ -57,7 +57,7 @@ int main() {
 
     // Create the goal state
     vector_t mpc_des_state = init_state;
-    mpc_des_state.segment<2>(6) << 1, 0;
+    mpc_des_state.segment<2>(6) << 1, 1;
 
     // Inital guess end effector positions
     std::array<std::array<double, 3>, 4> ee_pos{};
@@ -73,10 +73,10 @@ int main() {
     // Create weights
     // TODO: Can probably tune this to get better performance
     matrix_t Q = 20*matrix_t::Identity(24, 24);
-    Q.topLeftCorner<6,6>() = 1*matrix_t::Identity(6, 6);    // TODO: Change
-    Q(6,6) = 300; //30;
-    Q(7,7) = 300; //30;
-    Q(8,8) = 450; //10;
+    Q.topLeftCorner<6,6>() = matrix_t::Zero(6, 6);    // TODO: Change
+    Q(6,6) = 300; //300;
+    Q(7,7) = 300; //300;
+    Q(8,8) = 450; //450;
     Q(9,9) = 50;
     Q(10,10) = 50;
     Q(11,11) = 50;
@@ -90,7 +90,7 @@ int main() {
 
     // Add in costs
     mpc.AddQuadraticTrackingCost(des_alg, Q);
-    mpc.AddForceCost(0.01);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
+    mpc.AddForceCost(0.001);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
     mpc.SetQuadraticFinalCost(50*Q);
     mpc.SetLinearFinalCost(-50*Q*des_alg);
 
@@ -122,7 +122,7 @@ int main() {
     // Visualize results
     simulation::Visualizer viz(config.ParseString("robot_xml"));
     robot->SetSimModel(viz.GetModel());
-    for (int i = 0; i < info.num_nodes+1; i++) {
+    for (int i = 0; i < info.num_nodes+1+50; i++) {
         vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));

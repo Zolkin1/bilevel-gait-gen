@@ -7,10 +7,12 @@
 
 #include <Eigen/Core>
 
+#include "sparse_matrix_builder.h"
+
 namespace mpc {
 
     using vector_t = Eigen::VectorXd;
-    using matrix_t =  Eigen::MatrixXd;
+    using matrix_t = Eigen::MatrixXd;
 
 
     // mpc data, stored as a struct to be cache friendly
@@ -19,28 +21,28 @@ namespace mpc {
     // - warm start
     // TODO: is this really the struct I want?
     struct QPData {
-        matrix_t dynamics_constraints;
+        // NOTE: I ultimately want sparse matricies, so I will just store triplets here
+        // and construct the sparse matrix later
+
+        // Eigen triplet for filling the sparse matrix
+        utils::SparseMatrixBuilder constraint_mat_;
+        utils::SparseMatrixBuilder cost_mat_;
+
         vector_t dynamics_constants;
 
-        matrix_t fk_constraints_;
         vector_t fk_constants_;
 
-        matrix_t fk_ineq_constraints_;
         vector_t fk_lb_;
         vector_t fk_ub_;
 
-        matrix_t friction_cone_constraints_;
         vector_t friction_cone_ub_;
         vector_t friction_cone_lb_;
 
-        matrix_t box_constraints_;
         vector_t box_lb_;
         vector_t box_ub_;
 
-        matrix_t cost_quadratic;
         vector_t cost_linear;
 
-        matrix_t force_box_constraints_;
         vector_t force_box_lb_;
         vector_t force_box_ub_;
 
@@ -60,57 +62,26 @@ namespace mpc {
         }
 
         void InitQPMats() {
-            dynamics_constraints = matrix_t::Zero(num_dynamics_constraints, num_decision_vars);
+            constraint_mat_.Reserve(18000);     // TODO: Make not hard coded
+            cost_mat_.Reserve(2000);            // TODO: Make not hard coded
+
             dynamics_constants = vector_t::Zero(num_dynamics_constraints);
 
-            cost_quadratic = matrix_t::Zero(num_decision_vars, num_decision_vars);
             cost_linear = vector_t::Zero(num_decision_vars);
 
-            fk_constraints_ = matrix_t::Zero(num_fk_constraints_, num_decision_vars);
             fk_constants_ = vector_t::Zero(num_fk_constraints_);
 
-            fk_ineq_constraints_ = matrix_t::Zero(num_fk_ineq_constraints_, num_decision_vars);
             fk_lb_ = vector_t::Zero(num_fk_ineq_constraints_);
             fk_ub_ = vector_t::Zero(num_fk_ineq_constraints_);
 
-            friction_cone_constraints_ = matrix_t::Zero(num_cone_constraints_, num_decision_vars);
             friction_cone_lb_ = vector_t::Zero(num_cone_constraints_);
             friction_cone_ub_ = vector_t::Zero(num_cone_constraints_);
 
-            box_constraints_ = matrix_t::Zero(num_box_constraints_, num_decision_vars);
             box_lb_ = vector_t::Zero(num_box_constraints_);
             box_ub_ = vector_t::Zero(num_box_constraints_);
 
-            force_box_constraints_ = matrix_t::Zero(num_force_box_constraints_, num_decision_vars);
             force_box_lb_ = vector_t::Zero(num_force_box_constraints_);
             force_box_ub_ = vector_t::Zero(num_force_box_constraints_);
-        }
-
-        void ResizeQPMats() {
-            dynamics_constraints.resize(num_dynamics_constraints, num_decision_vars);
-            dynamics_constants.resize(num_dynamics_constraints);
-
-            cost_quadratic.resize(num_decision_vars, num_decision_vars);
-            cost_linear.resize(num_decision_vars);
-
-            fk_constraints_.resize(num_fk_constraints_, num_decision_vars);
-            fk_constants_.resize(num_fk_constraints_);
-
-            fk_ineq_constraints_.resize(num_fk_ineq_constraints_, num_decision_vars);
-            fk_lb_.resize(num_fk_ineq_constraints_);
-            fk_ub_.resize(num_fk_ineq_constraints_);
-
-            friction_cone_constraints_.resize(num_cone_constraints_, num_decision_vars);
-            friction_cone_lb_.resize(num_cone_constraints_);
-            friction_cone_ub_.resize(num_cone_constraints_);
-
-            box_constraints_.resize(num_box_constraints_, num_decision_vars);
-            box_lb_.resize(num_box_constraints_);
-            box_ub_.resize(num_box_constraints_);
-
-            force_box_constraints_.resize(num_force_box_constraints_, num_decision_vars);
-            force_box_lb_.resize(num_force_box_constraints_);
-            force_box_ub_.resize(num_force_box_constraints_);
         }
     };
 } // mpc

@@ -162,6 +162,7 @@ namespace mpc {
 
         int GetNodeIntersectMutableForces() const;
 
+        void SetInitQPSizes();
 
         // ---------------- Member Variables ---------------- //
         // Centroidal model
@@ -242,6 +243,8 @@ namespace mpc {
         utils::Timer qp_solve_timer_;
 
         bool in_real_time_;
+
+        int constraint_idx_;
     };
 } // mpc
 

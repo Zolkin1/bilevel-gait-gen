@@ -142,9 +142,9 @@ namespace mpc {
         //     one set of columns for each spline.
 
         matrix_t Bc = matrix_t::Zero(num_total_states_, num_inputs);
-        // --- Linear momentum --- //
-        // Linear in each force, and each force is linear in its coefficients at each point in time.
+        const Eigen::Matrix3d Id = Eigen::Matrix3d::Identity();
         for (int ee = 0; ee < num_ee_; ee++) {
+            Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
             for (int coord = 0; coord < 3; coord++) {
                 if (input.IsForceMutable(ee, coord, time)) {
                     vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
@@ -152,28 +152,15 @@ namespace mpc {
                     int vars_idx, vars_affecting;
                     std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
 
+                    // linear momentum
                     Bc.block(coord, vars_idx - vars_affecting, 1, vars_affecting) = vars_lin.transpose();
-                }
-            }
-        }
 
-        const Eigen::Matrix3d Id = Eigen::Matrix3d::Identity();
-        // --- Angular momentum --- //
-        vector_t vars_lin;
-        for (int ee = 0; ee < num_ee_; ee++) {
-            Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
-            for (int coord = 0; coord < 3; coord++) {
-                if (input.IsForceMutable(ee, coord, time)) {
-                    int vars_idx, vars_affecting;
-                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
-                    vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
-
+                    // Angular momentum
                     for (int poly = 0; poly < vars_lin.size(); poly++) {
-                        Bc.block(3, vars_idx - vars_affecting + poly, 3, 1) =
+                        Bc.block(3, vars_idx - vars_affecting + poly, 3, 1).noalias() =
                                 ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
                     }
                 }
-
             }
         }
 
@@ -202,11 +189,6 @@ namespace mpc {
         A = integrator_->CalcDerivWrtStateSingleStep(state, Ac);
         B = integrator_->CalcDerivWrtInputSingleStep(state, Bc, Ac);    // TODO: Technically this Ac should be evaluated at a different time
         C = integrator_->CalcLinearTermDiscretization(Cc, Cc2, Ac); //GetDt()*Cc;
-
-        // TODO: Remove
-        for (int i = 0; i < C.size(); i++) {
-            assert(!std::isnan(C(i)));
-        }
     }
 
     void CentroidalModel::GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
@@ -215,6 +197,7 @@ namespace mpc {
         A = matrix_t::Zero(3, pin_model_.nv);
         C = vector_t::Zero(3);
 
+//        pinocchio::forwardKinematics(pin_model_, *pin_data_, q_pin);
         pinocchio::computeJointJacobians(pin_model_, *pin_data_, q_pin);
         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin);
 
@@ -273,7 +256,7 @@ namespace mpc {
 
     vector_t CentroidalModel::ComputePinocchioVelocities(const vector_t& state, const vector_t& joint_vels,
                                                          const matrix_t& CMMbinv, const matrix_t& CMMj) const {
-        vector_t v_pin(FLOATING_VEL_OFFSET + num_joints_);
+        vector_t v_pin = vector_t::Zero(FLOATING_VEL_OFFSET + num_joints_);
 
         v_pin.head<FLOATING_VEL_OFFSET>().noalias() = CMMbinv * (state.head<MOMENTUM_OFFSET>() - CMMj*joint_vels);
 
@@ -284,7 +267,7 @@ namespace mpc {
 
     vector_t CentroidalModel::ConvertMPCStateToPinocchioState(const vector_t &state) const {
         assert(state.size() == pin_model_.nq + 6);
-        vector_t q(pin_model_.nq);
+        vector_t q = vector_t::Zero(pin_model_.nq);
 
         q.head(POS_VARS) = state.segment<POS_VARS>(MOMENTUM_OFFSET);
         q.segment<4>(POS_VARS) = state.segment<4>(MOMENTUM_OFFSET + POS_VARS);
@@ -336,7 +319,7 @@ namespace mpc {
 
     vector_t CentroidalModel::ConvertManifoldStateToAlgebraState(const vector_t& state, const vector_t& ref_state) {
         assert(state.size() == ref_state.size());
-        vector_t alg_state(state.size()-1);
+        vector_t alg_state = vector_t::Zero(state.size()-1);
         alg_state.head<MOMENTUM_OFFSET>() = state.head<MOMENTUM_OFFSET>();
         alg_state.segment<POS_VARS>(MOMENTUM_OFFSET) = state.segment<POS_VARS>(MOMENTUM_OFFSET);
         Eigen::Quaterniond quat(static_cast<Eigen::Vector4d>(state.segment<4>(POS_VARS + MOMENTUM_OFFSET)));
@@ -349,7 +332,7 @@ namespace mpc {
 
     vector_t CentroidalModel::ConvertAlgebraStateToManifoldState(const mpc::vector_t &state, const vector_t& ref_state) {
         assert(state.size() == ref_state.size()-1);
-        vector_t man_state(state.size()+1);
+        vector_t man_state = vector_t::Zero(state.size()+1);
         Eigen::Quaterniond quat;
         pinocchio::quaternion::exp3(state.segment<3>(MOMENTUM_OFFSET+POS_VARS), quat);
         Eigen::Quaterniond quat_ref(static_cast<Eigen::Vector4d>(ref_state.segment<4>(POS_VARS + MOMENTUM_OFFSET)));

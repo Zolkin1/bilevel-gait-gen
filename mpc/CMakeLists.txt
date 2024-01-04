@@ -35,31 +35,26 @@ set(CMAKE_MODULE_PATH "${PINOCCHIO_DIR}/cmake/find-external/CppAD")
 find_package(pinocchio)
 target_link_libraries(mpc PRIVATE pinocchio)
 
+
+# TODO: Can go back and play with MKL more, QLDL seems quicker by a noticable amount
+# MKL (for OSQP)
+set(MKL_DIR /opt/intel/oneapi/mkl/latest/lib/cmake/mkl)
+set(MKL_THREADING gnu_thread)
+set(MKL_ARCH intel64)
+set(MKL_MPI openmpi)
+find_package(MKL CONFIG REQUIRED)
+
+# OpenMP (for MKL)
+find_package(OpenMP REQUIRED)
+target_link_libraries(mpc PUBLIC OpenMP::OpenMP_CXX)
+
 # OSPQ and OSQPEigen
-set(${PROFILING} 1)
 find_package(osqp REQUIRED)
 find_package(OsqpEigen REQUIRED)
-target_link_libraries(mpc PUBLIC osqp::osqp OsqpEigen::OsqpEigen)
+target_link_libraries(mpc PUBLIC osqp::osqpstatic OsqpEigen::OsqpEigen)
 
 # Controller
 target_link_libraries(mpc PUBLIC controller)
 
 # Utils
 target_link_libraries(mpc PUBLIC utils)
-
-#add_compile_options(mpc PRIVATE -ffast-math)
-
-# MKL and OpenMP
-#find_package(OpenMP)
-#target_link_libraries(mpc PUBLIC OpenMP::OpenMP_CXX)
-#set(THREADS_PREFER_PTHREAD_FLAG ON)
-#find_package(Threads REQUIRED)
-##target_link_libraries(my_app PRIVATE Threads::Threads)
-#
-#find_package(MKL CONFIG REQUIRED)
-#message(STATUS "${MKL_IMPORTED_TARGETS}") #Provides available list of targets based on input
-#add_executable(myapp app.c)
-#
-#target_compile_options(mpc PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
-#target_include_directories(mpc PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
-#target_link_libraries(mpc PUBLIC $<LINK_ONLY:MKL::MKL> OpenMP::OpenMP_CXX Threads::Threads)

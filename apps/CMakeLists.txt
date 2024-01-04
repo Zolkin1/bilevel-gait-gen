@@ -27,9 +27,9 @@ target_link_libraries(demo mpc)
 target_link_libraries(mpc_demo mpc)
 target_link_libraries(mpc_sim mpc)
 
-add_custom_command(TARGET mpc_demo POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/a1_configuration.yaml
-        ${CMAKE_CURRENT_SOURCE_DIR}/adam_configuration.yaml
-        $<TARGET_FILE_DIR:mpc_demo>
-)
+#add_custom_command(TARGET mpc_demo POST_BUILD
+#        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#        ${CMAKE_CURRENT_SOURCE_DIR}/a1_configuration.yaml
+#        ${CMAKE_CURRENT_SOURCE_DIR}/adam_configuration.yaml
+#        $<TARGET_FILE_DIR:mpc_demo>
+#)

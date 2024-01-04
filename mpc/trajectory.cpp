@@ -234,8 +234,6 @@ namespace mpc {
         return std::min(end_effector_pos_.at(0).at(0).GetEndTime(), inputs_.GetForces().at(0).at(0).GetEndTime());
     }
 
-    // TODO: Make sure they all have the same final time
-    // TODO: Update for the constant z
     void Trajectory::AddPolys(double final_time) {
         if (GetTotalTime() < final_time) {
             for (auto &end_effector_pos: end_effector_pos_) {
@@ -245,7 +243,7 @@ namespace mpc {
             }
             inputs_.AddPolys(0.35);
         }
-
+        SetSwingPosZ();
         UpdatePosSplineVarsCount();
     }
 

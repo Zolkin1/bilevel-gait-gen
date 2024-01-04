@@ -3,11 +3,14 @@
 //
 
 #include <array>
+#include <Eigen/SparseCore>
 
 #include "mpc.h"
 #include "osqp_interface.h"
 
 namespace mpc {
+
+    using triplet_t = Eigen::Triplet<double>;
 
     MPCInfo::MPCInfo() {}
     MPCInfo::MPCInfo(const MPCInfo& info) {
@@ -62,7 +65,7 @@ namespace mpc {
         // state vector: [lcom, kcom, qb, q0, ..., qnj]
         // input vector: [f1, ..., fnee, v0, ..., vnj]. Note each f is a set of 3 splines.
 
-        UpdateQPSizes();
+        SetInitQPSizes();
 
         qp_solver = std::make_unique<OSQPInterface>(data_, false);
 
@@ -78,6 +81,7 @@ namespace mpc {
         line_search_res_ = vector_t::Zero(data_.num_decision_vars);
         mu_ = 5000;
         run_num_ = 0;
+        constraint_idx_ = 0;
 
         in_real_time_ = false;
 
@@ -109,6 +113,7 @@ namespace mpc {
         }
     }
 
+    // TODO: Optimize constraints time and qp setup time
     Trajectory MPC::Solve(const vector_t &state, double init_time) {
         solve_timer_.StartTimer();
 
@@ -139,11 +144,18 @@ namespace mpc {
         AddFinalCost();
 
         // -------------------- Constraints ---------------------- //
-        AddDynamicsConstraints(state);
-        AddBoxConstraints();
+        // TODO: Only update the ones that change (?)
+        // TODO: Consider multi-threading
+        constraint_idx_ = 0;
+        utils::Timer dynamics_timer("dynamics constraints");
+        dynamics_timer.StartTimer();
+        AddDynamicsConstraints(state);  // TODO: Speed up
+        dynamics_timer.StopTimer();
+        dynamics_timer.PrintElapsedTime();
         AddFKConstraints(state);
         AddFrictionConeConstraints();
-        AddForceBoxConstraints();
+        AddBoxConstraints();
+        AddForceBoxConstraints(); // TODO: Can just do this in the z axis and will be enforced via the cone
         constraint_costs_timer_.StopTimer();
 
         // ----------------------- Solve ------------------------- //
@@ -247,7 +259,7 @@ namespace mpc {
     void MPC::AddDynamicsConstraints(const vector_t& state) {
 
         // initial condition
-        data_.dynamics_constraints.topLeftCorner(num_states_, num_states_) = -matrix_t::Identity(num_states_, num_states_);
+        data_.constraint_mat_.SetDiagonalMatrix(-1, 0, 0, num_states_);
         data_.dynamics_constants.head(num_states_) =
                 -CentroidalModel::ConvertManifoldStateToAlgebraState(state, state);
 
@@ -261,25 +273,19 @@ namespace mpc {
             // A can go in normally, B needs to be split
             model_.GetLinearDiscreteDynamics(prev_traj_.GetStates().at(node),
                                              state, prev_traj_.GetInputs(), time, A, B, C);
-            data_.dynamics_constraints.block((node + 1) * num_states_,
-                                             node * num_states_,
-                                             num_states_, num_states_) = A;
-            data_.dynamics_constraints.block((node + 1) * num_states_,
-                                             (node + 1) * num_states_,
-                                             num_states_, num_states_) = -matrix_t::Identity(num_states_,
-                                                                                             num_states_);
+            data_.constraint_mat_.SetMatrix(A, (node + 1) * num_states_, node * num_states_);
+
+            data_.constraint_mat_.SetDiagonalMatrix(-1, (node + 1) * num_states_,
+                                                    (node + 1) * num_states_, num_states_);
 
             matrix_t B_spline = B.leftCols(force_spline_vars);
             matrix_t B_vels = B.rightCols(num_joints_);
 
-            data_.dynamics_constraints.block((node + 1) * num_states_,
-                                             GetVelocityIndex(node),
-                                             num_states_, num_joints_) = B_vels;
-            data_.dynamics_constraints.block((node + 1) * num_states_,
-                                             GetForceSplineStartIdx(),
-                                             num_states_, force_spline_vars) = B_spline;
+            data_.constraint_mat_.SetMatrix(B_vels, (node + 1) * num_states_, GetVelocityIndex(node));
+            data_.constraint_mat_.SetMatrix(B_spline, (node + 1) * num_states_, GetForceSplineStartIdx());
             data_.dynamics_constants.segment((node + 1) * num_states_, num_states_) = -C;
         }
+        constraint_idx_ = (info_.num_nodes+1)*num_states_;
     }
 
     void MPC::AddFKConstraints(const vector_t& state) {
@@ -289,7 +295,7 @@ namespace mpc {
         const int spline_offset = GetPosSplineStartIdx();
         int idx_eq = 0;
         int idx_ineq = 0;
-        const double margin = 0.01;
+        const double margin = 0.002;
 
         for (int node = 0; node < info_.num_nodes+1; node++) {
             double time = GetTime(node);
@@ -301,24 +307,24 @@ namespace mpc {
             for (int ee = 0; ee < num_ee_; ee++) {
                 model_.GetFKLinearization(state1, state, prev_traj_.GetInputs(), ee, G, g);
                 if (node >= num_ineq_fk_) {
-                    data_.fk_constraints_.block(idx_eq,
-                                                node * num_states_ + CentroidalModel::MOMENTUM_OFFSET,
-                                                POS_VARS, num_joints_ + CentroidalModel::FLOATING_VEL_OFFSET) = G;
+                    data_.constraint_mat_.SetMatrix(G,
+                                                    constraint_idx_ + idx_eq +  data_.num_fk_ineq_constraints_,
+                                                    node * num_states_ + CentroidalModel::MOMENTUM_OFFSET);
 
                     data_.fk_constants_.segment(idx_eq, POS_VARS) = -g;
                 } else {
                     // We only need the margin in the z direction, in x and y we can treat it as an equality
-                    data_.fk_ineq_constraints_.block(idx_ineq,
-                                                node * num_states_ + CentroidalModel::MOMENTUM_OFFSET,
-                                                1, num_joints_ + CentroidalModel::FLOATING_VEL_OFFSET) = G.bottomRows<1>();
+                    data_.constraint_mat_.SetMatrix(G.bottomRows<1>(),
+                            constraint_idx_ + idx_ineq,
+                            node * num_states_ + CentroidalModel::MOMENTUM_OFFSET);
 
                     data_.fk_lb_(idx_ineq) = -g(2) - ((num_ineq_fk_ - node)*margin);
                     data_.fk_ub_(idx_ineq) = -g(2) + ((num_ineq_fk_ - node)*margin);
 
 
-                    data_.fk_constraints_.block(idx_eq,
-                                                node * num_states_ + CentroidalModel::MOMENTUM_OFFSET,
-                                                2, num_joints_ + CentroidalModel::FLOATING_VEL_OFFSET) = G.topRows<2>();
+                    data_.constraint_mat_.SetMatrix(G.topRows<2>(),
+                            constraint_idx_ + idx_eq + data_.num_fk_ineq_constraints_,
+                            node * num_states_ + CentroidalModel::MOMENTUM_OFFSET);
 
                     data_.fk_constants_.segment(idx_eq, 2) = -g.head<2>();
                 }
@@ -329,18 +335,14 @@ namespace mpc {
                         std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, time, coord);
 
                         if (node >= num_ineq_fk_ || coord != 2) {
-                            data_.fk_constraints_.block(idx_eq,
-                                                        spline_offset + vars_index - vars_affecting,
-                                                        1,
-                                                        vars_affecting) =
-                                    -prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose();
+                            data_.constraint_mat_.SetMatrix(-prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose(),
+                                                            constraint_idx_ + idx_eq + data_.num_fk_ineq_constraints_,
+                                                            spline_offset + vars_index - vars_affecting);
                             idx_eq++;
                         } else {
-                            data_.fk_ineq_constraints_.block(idx_ineq,
-                                                        spline_offset + vars_index - vars_affecting,
-                                                        1,
-                                                        vars_affecting) =
-                                    -prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose();
+                            data_.constraint_mat_.SetMatrix(-prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose(),
+                                                            constraint_idx_ + idx_ineq,
+                                                            spline_offset + vars_index - vars_affecting);
                             idx_ineq++;
                         }
                     } else {
@@ -359,6 +361,7 @@ namespace mpc {
                 }
             }
         }
+        constraint_idx_ = constraint_idx_ + idx_eq + data_.num_fk_ineq_constraints_;
     }
 
     void MPC::AddFrictionConeConstraints() {
@@ -378,10 +381,9 @@ namespace mpc {
 
                         for (int fric_con = 0; fric_con < 4; fric_con++) {
                             // All the friction constraints are effected by all 3 coordinates of the end effectors
-                            data_.friction_cone_constraints_.block(idx + fric_con,
-                                                                   force_offset + vars_index - vars_affecting,
-                                                                   1, vars_affecting) =
-                                    friction_pyramid_(fric_con, coord) * vars_lin.transpose();
+                            data_.constraint_mat_.SetMatrix(friction_pyramid_(fric_con, coord) * vars_lin.transpose(),
+                                                            constraint_idx_ + idx + fric_con,
+                                                            force_offset + vars_index - vars_affecting);
                             data_.friction_cone_ub_(idx + fric_con) = 0;
                             data_.friction_cone_lb_(idx + fric_con) = -qp_solver->GetInfinity(1)(0);
                         }
@@ -390,6 +392,7 @@ namespace mpc {
                 idx += 4;
             }
         }
+        constraint_idx_ += idx;
     }
 
     void MPC::AddBoxConstraints() {
@@ -398,19 +401,16 @@ namespace mpc {
             // Velocity bounds
             data_.box_ub_.segment(idx, num_joints_) = info_.vel_bounds;
             data_.box_lb_.segment(idx, num_joints_) = -info_.vel_bounds;
-            data_.box_constraints_.block(idx,
-                                         GetVelocityIndex(node),
-                                         num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
+            data_.constraint_mat_.SetDiagonalMatrix(1, constraint_idx_ + idx, GetVelocityIndex(node), num_joints_);
             idx += num_joints_;
 
             // Configuration bounds
             data_.box_ub_.segment(idx, num_joints_) = info_.joint_bounds_ub;
             data_.box_lb_.segment(idx, num_joints_) = info_.joint_bounds_lb;
-            data_.box_constraints_.block(idx,
-                                         GetJointIndex(node),
-                                         num_joints_, num_joints_) = matrix_t::Identity(num_joints_, num_joints_);
+            data_.constraint_mat_.SetDiagonalMatrix(1, constraint_idx_ + idx, GetJointIndex(node), num_joints_);
             idx += num_joints_;
         }
+        constraint_idx_ += idx;
     }
     void MPC::AddForceBoxConstraints() {
         int force_idx = GetForceSplineStartIdx();
@@ -418,6 +418,8 @@ namespace mpc {
         for (int node = 0; node < info_.num_nodes+1; node++) {
             double time = GetTime(node);
             for (int ee = 0; ee < num_ee_; ee++) {
+                // TODO: Consider using only the z coordinate
+//                const int coord = 2;
                 for (int coord = 0; coord < POS_VARS; coord++) {
                     if (prev_traj_.GetInputs().IsForceMutable(ee, coord, time)) {
                         int vars_index, vars_affecting;
@@ -425,9 +427,9 @@ namespace mpc {
                                                                                                           coord);
                         vector_t vars_lin = prev_traj_.GetInputs().GetForces().at(ee).at(coord).GetPolyVarsLin(time);
 
-                        data_.force_box_constraints_.block(row_idx,
-                                                           force_idx + vars_index - vars_affecting,
-                                                           1, vars_affecting) = vars_lin.transpose();
+                        data_.constraint_mat_.SetMatrix(vars_lin.transpose(),
+                                                        constraint_idx_ + row_idx,
+                                                        force_idx + vars_index - vars_affecting);
                         if (coord == 2) {
                             data_.force_box_lb_(row_idx) = 0;
                         } else {
@@ -439,6 +441,7 @@ namespace mpc {
                 }
             }
         }
+        constraint_idx_ += row_idx;
     }
 
     void MPC::AddQuadraticTrackingCost(const vector_t& state_des, const matrix_t& Q) {
@@ -452,13 +455,10 @@ namespace mpc {
 
     void MPC::AddHessianApproxCost() {
         for (int node = 0; node < info_.num_nodes; node++) {
-            data_.cost_quadratic.block(node*num_states_,
-                                   node*num_states_,
-                                   num_states_, num_states_) = Q_;
+            data_.cost_mat_.SetMatrix(Q_, node*num_states_, node*num_states_);
         }
         if (Q_forces_.size() > 0) {
-            data_.cost_quadratic.block(GetForceSplineStartIdx(), GetForceSplineStartIdx(),
-                                       Q_forces_.rows(), Q_forces_.cols()) = Q_forces_;
+            data_.cost_mat_.SetMatrix(Q_forces_, GetForceSplineStartIdx(), GetForceSplineStartIdx());
         }
     }
 
@@ -469,8 +469,7 @@ namespace mpc {
     }
 
     void MPC::AddFinalCost() {
-        data_.cost_quadratic.block(info_.num_nodes*num_states_, info_.num_nodes*num_states_,
-                                   num_states_, num_states_) = Phi_;
+        data_.cost_mat_.SetMatrix(Phi_, info_.num_nodes*num_states_, info_.num_nodes*num_states_);
 
         data_.cost_linear.segment(info_.num_nodes*num_states_, num_states_) = Phi_w_;
     }
@@ -550,7 +549,7 @@ namespace mpc {
         return traj;
     }
 
-    void MPC::UpdateQPSizes() {
+    void MPC::SetInitQPSizes() {
         data_.num_decision_vars = (info_.num_nodes+1)*num_states_ + info_.num_nodes*num_joints_ +
                                   prev_traj_.GetInputs().GetTotalForceSplineVars() + prev_traj_.GetTotalPosSplineVars();
         data_.num_dynamics_constraints = (info_.num_nodes+1)*num_states_;
@@ -561,6 +560,13 @@ namespace mpc {
 
         data_.num_fk_ineq_constraints_ = num_ee_*num_ineq_fk_;
         data_.num_fk_constraints_ = POS_VARS*num_ee_*(info_.num_nodes+1) - data_.num_fk_ineq_constraints_;
+    }
+
+    void MPC::UpdateQPSizes() {
+        data_.num_decision_vars = (info_.num_nodes+1)*num_states_ + info_.num_nodes*num_joints_ +
+                                  prev_traj_.GetInputs().GetTotalForceSplineVars() + prev_traj_.GetTotalPosSplineVars();
+
+        data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
     }
 
     void MPC::SetDefaultGaitTrajectory(Gaits gait, int num_polys, const std::array<std::array<double, 3>, 4>& ee_pos) {
@@ -648,7 +654,6 @@ namespace mpc {
         return model_;
     }
 
-    // TODO: Consider removing the init state somehow
     double MPC::LineSearch(const vector_t& direction, const vector_t& init_state) {
         double alpha = 1;
 
@@ -657,7 +662,6 @@ namespace mpc {
         double merit_step = GetMeritValue(alpha*direction + prev_qp_sol, mu_, init_state);
         double merit_directional = GetMeritGradient(prev_qp_sol, direction, mu_, init_state);
 
-
         int i = 0;
         while ((merit - merit_step) < -0.00001 * alpha * merit_directional && i < 5) {
             alpha *= 0.5;
@@ -665,14 +669,6 @@ namespace mpc {
             merit_step = GetMeritValue(temp, mu_, init_state);
             i++;
         }
-
-//        std::cout << "final vector: " << ((alpha * direction) + prev_qp_sol).transpose() << std::endl;
-
-        std::cout << "final merit: " << merit_step << std::endl;
-
-//        if (i == 5) {
-//            alpha = 1;
-//        }
 
         return alpha;
     }
@@ -688,7 +684,10 @@ namespace mpc {
     }
 
     double MPC::GetCostValue(const vector_t& x) const {
-        return 0.5*x.dot(data_.cost_quadratic*(x)) + data_.cost_linear.dot(x);
+        // TODO: Do more efficiently
+        Eigen::SparseMatrix<double> P(x.size(), x.size());
+        P.setFromTriplets(data_.cost_mat_.GetTriplet().begin(), data_.cost_mat_.GetTriplet().end());
+        return 0.5*x.dot(P*(x)) + data_.cost_linear.dot(x);
     }
 
     // TODO: Optimize this and make it so it is called less
@@ -714,10 +713,13 @@ namespace mpc {
     }
 
     double MPC::GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state) const {
-        // TODO: Do more efficiently
         const Trajectory temp_traj = ConvertQPSolToTrajectory(x, init_state);
 
-        return (data_.cost_quadratic*x + data_.cost_linear).dot(p)
+        // TODO: Do more efficiently (should probably compute this once somewhere)
+        Eigen::SparseMatrix<double> P(x.size(), x.size());
+        P.setFromTriplets(data_.cost_mat_.GetTriplet().begin(), data_.cost_mat_.GetTriplet().end());
+
+        return (P*x + data_.cost_linear).dot(p)
         - mu * GetEqualityConstraintValues(temp_traj, init_state).lpNorm<1>();
     }
 
@@ -786,6 +788,8 @@ namespace mpc {
         int count = 0;
         for (int node = 0; node < info_.num_nodes+1; node++) {
             for (int ee = 0; ee < num_ee_; ee++) {
+                // TODO: Consider changing this back to z only
+//                const int coord = 2;
                 for (int coord = 0; coord < POS_VARS; coord++) {
                     if (prev_traj_.GetInputs().IsForceMutable(ee, coord, GetTime(node))) {
                         count++;

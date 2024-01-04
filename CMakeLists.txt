@@ -14,6 +14,8 @@ set(CMAKE_CXX_STANDARD 17 CACHE STRING "The C++ standard to use")
 
 # TODO: add find packages
 
+#add_compile_options(-ffast-math)
+
 set(SIMULATION ON CACHE BOOL "Configure if the simulator is in use.")
 
 if (SIMULATION)
