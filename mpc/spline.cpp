@@ -16,38 +16,43 @@ namespace mpc {
         std::vector<double> const ZERO_CONSTANT = {0};
         std::vector<double> const ZERO_POLY = {0, 0};
 
-        poly_times_.push_back(0);
         num_all_poly_vars = 0;
         total_poly_ = 0;
         num_constant_ = 0;
 
         // On 12/13/23 at 11:29am: making it so that in the initialization we don't always start on a constant
 
+        poly_vars_.push_back(ZERO_CONSTANT);
+        poly_times_.push_back(0);
+
+        num_all_poly_vars++;
+        num_constant_++;
+
         int mut_idx = 0;
         for (int time_idx = 0; time_idx < times.size(); time_idx++) {
             if (start_on_constant_) {
                 if ((time_idx) % 2 == 0) {      // On a constant
                     poly_vars_.push_back(ZERO_CONSTANT);
-                    poly_vars_.push_back(ZERO_CONSTANT);
                     num_constant_++;
                     total_poly_++;
                     num_all_poly_vars++;
 
+                    if (time_idx != 0) {
+                        poly_times_.push_back(times.at(time_idx-1));
+                        poly_vars_.push_back(ZERO_CONSTANT);
+                    }
                     poly_times_.push_back(times.at(time_idx));
                 } else {        // On a polynomial
                     total_poly_ += num_polys_;
-
                     for (int i = 0; i < num_polys_ - 1; i++) {
                         poly_vars_.push_back(ZERO_POLY);
-
                         poly_times_.push_back((times.at(time_idx) - times.at(time_idx - 1))/num_polys
                         + poly_times_.at(poly_times_.size()-1));
 
                         num_all_poly_vars += 2;
-
                     }
 
-                    poly_times_.push_back(times.at(time_idx));
+//                    poly_times_.push_back(times.at(time_idx));
                 }
             } else {
                 if ((time_idx + 1) % 2 == 0) {      // On a constant
@@ -55,20 +60,14 @@ namespace mpc {
                     poly_vars_.push_back(ZERO_CONSTANT);
                     num_constant_++;
                     total_poly_++;
+                    total_poly_++;
 
                     num_all_poly_vars++;
 
+                    poly_times_.push_back(times.at(time_idx-1));
                     poly_times_.push_back(times.at(time_idx));
                 } else {        // On a polynomial
                     total_poly_ += num_polys_;
-                    if (time_idx == 0) {
-                        poly_times_.push_back(times.at(time_idx)/num_polys);
-                        poly_vars_.push_back(ZERO_CONSTANT);
-
-                        num_all_poly_vars++;
-
-                        num_constant_++;
-                    }
 
                     for (int i = 0; i < num_polys_ - 1; i++) {
                         if (time_idx == 0) {
@@ -90,6 +89,7 @@ namespace mpc {
         // Add final elements
         if ((start_on_constant_ && (times.size()) % 2 == 0) || (!start_on_constant_ && (times.size()-1) % 2 == 0)) {
             poly_vars_.push_back(ZERO_CONSTANT);
+            poly_times_.push_back(times.at(times.size()-1));
             num_constant_++;
             num_all_poly_vars++;
         }
@@ -115,6 +115,7 @@ namespace mpc {
                 }
                 break;
         }
+        assert(poly_times_.size() == poly_vars_.size() && poly_times_.size() == mut_flags_.size());
     }
 
     Spline& Spline::operator=(const Spline& spline) {

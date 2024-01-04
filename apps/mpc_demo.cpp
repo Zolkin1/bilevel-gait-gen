@@ -57,7 +57,7 @@ int main() {
 
     // Create the goal state
     vector_t mpc_des_state = init_state;
-    mpc_des_state.segment<2>(6) << 1, 1;
+    mpc_des_state.segment<2>(6) << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
 
     // Inital guess end effector positions
     std::array<std::array<double, 3>, 4> ee_pos{};
@@ -67,22 +67,33 @@ int main() {
     ee_pos.at(3) = {-0.2, -0.2, 0};
 
     // Set warm starts and defaults
-    mpc.SetDefaultGaitTrajectory(mpc::Gaits::Trot, 2, ee_pos);
+    mpc.SetDefaultGaitTrajectory(mpc::Gaits::Trot, config.ParseNumber<int>("num_polys"), ee_pos);
     mpc.SetStateTrajectoryWarmStart(warm_start);
 
     // Create weights
     // TODO: Can probably tune this to get better performance
-    matrix_t Q = 20*matrix_t::Identity(24, 24);
-    Q.topLeftCorner<6,6>() = matrix_t::Zero(6, 6);    // TODO: Change
+
+    // TODO: Add better costs (more expressive). Add things like a better reference and nominal foothold locations
+
+    matrix_t Q = 2*matrix_t::Identity(24, 24);
+    Q.topLeftCorner<6,6>() = matrix_t::Zero(6, 6); 
+//    Q(2,2) = 100;
     Q(6,6) = 300; //300;
     Q(7,7) = 300; //300;
-    Q(8,8) = 450; //450;
+    Q(8,8) = 700; //450;
     Q(9,9) = 50;
     Q(10,10) = 50;
     Q(11,11) = 50;
-    Q(12,12) = 50;
 
-    // TODO: Weight shoulder joints to keep the legs in line?
+    Q(12,12) = 500;
+    Q(15,15) = 500;
+    Q(18,18) = 500;
+    Q(21,21) = 500;
+
+    Q(13,13) = 50;
+    Q(16,16) = 50;
+    Q(19,19) = 50;
+    Q(22,22) = 50;
 
     // Desried state in the lie algebra
     const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(mpc_des_state, init_state);
@@ -122,11 +133,11 @@ int main() {
     // Visualize results
     simulation::Visualizer viz(config.ParseString("robot_xml"));
     robot->SetSimModel(viz.GetModel());
-    for (int i = 0; i < info.num_nodes+1+50; i++) {
+    for (int i = 0; i < info.num_nodes+1+100; i++) {
         vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
-        mpc.GetRealTimeUpdate(temp_state, i*info.integrator_dt);
+        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
     }
 
     // Print the final trajectory to a file for viewing

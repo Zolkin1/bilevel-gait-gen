@@ -52,7 +52,7 @@ namespace mpc {
             throw std::runtime_error("Velocity or joint bounds do not match the number of joints on the robot.");
         }
 
-        num_ineq_fk_ = 3;
+        num_ineq_fk_ = 2;
 
         // --------------------------------- //
         // k = # of nodes
@@ -103,11 +103,11 @@ namespace mpc {
         return prev_traj_;
     }
 
-    Trajectory MPC::GetRealTimeUpdate(const vector_t& state, double init_time) {
+    Trajectory MPC::GetRealTimeUpdate(double run_time_iters, const vector_t& state, double init_time) {
         if (in_real_time_) {
             return Solve(state, init_time);
         } else {
-            qp_solver->ConfigureForRealTime();
+            qp_solver->ConfigureForRealTime(run_time_iters);
             in_real_time_ = true;
             return Solve(state, init_time);
         }
@@ -295,7 +295,7 @@ namespace mpc {
         const int spline_offset = GetPosSplineStartIdx();
         int idx_eq = 0;
         int idx_ineq = 0;
-        const double margin = 0.002;
+        const double margin = .01;
 
         for (int node = 0; node < info_.num_nodes+1; node++) {
             double time = GetTime(node);
@@ -579,12 +579,13 @@ namespace mpc {
         switch (gait) {
             case Trot: {
                 std::vector<double> times;
-                times.push_back(0.35);
-                times.push_back(0.75);
+                times.push_back(0.2);
+                times.push_back(0.4);
+                times.push_back(0.6);
+                times.push_back(0.8);
 
-
-                Spline position1(num_polys, times, true, Spline::Normal);
-                Spline position2(num_polys, times, false, Spline::Normal);
+                Spline position1(2, times, true, Spline::Normal);
+                Spline position2(2, times, false, Spline::Normal);
 
                 Spline force1(num_polys, times, false, Spline::Force);
                 Spline force2(num_polys, times, true, Spline::Force);

@@ -19,6 +19,11 @@ init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
               0.02, 0.2, -0.977,      # front left
               -0.08, 0.45, -1.03,       # rear right
               0.08, 0.45, -1.03]        # rear left
+#  [0., 0., 0.3341, 1., 0, 0, 0,
+#              -0.02, 1.5, -1.75, # -0.976,     # front right
+#              0.02, 0.2, -1.25, # -0.977,      # front left
+#              -0.08, 0.2, -1.25, # -1.03,       # rear right
+#              0.08, 1.5, -1.75] # -1.03]        # rear left
 #init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
 #              -0.02, 0.2, -0.977,     # front right
 #              0.02, 0.524, -1.63,      # front left
@@ -51,7 +56,7 @@ control_rate: 400  # Hz
 torque_bounds: [100, 100, 100,
                 100, 100, 100,
                 100, 100, 100,
-                00, 100, 100] # 33.5
+                100, 100, 100] # 33.5
 friction_coef: 0.3
 base_pos_gains: [400, 400]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
 base_ang_gains: [0, 0]  # kd_ang, kp_ang
@@ -80,7 +85,7 @@ joint_bounds_lb: [-0.802851, -1.0472, -2.69653,
                   -0.802851, -1.0472, -2.69653,
                   -0.802851, -1.0472, -2.69653,
                   -0.802851, -1.0472, -2.69653]
-joint_bounds_ub: [0.802851, 4.18879, -0.916298,
+joint_bounds_ub:  [0.802851, 4.18879, -0.916298,
                   0.802851, 4.18879, -0.916298,
                   0.802851, 4.18879, -0.916298,
                   0.802851, 4.18879, -0.916298]
@@ -90,5 +95,11 @@ force_bound: 300
 
 swing_height: 0.1
 
+num_polys: 3
+
+x_des: 1
+y_des: 0
+
+run_time_iterations: 1000
 ## --- Temp --- ##
-viz_rate: 0.15
+viz_rate: 0.015

@@ -157,7 +157,7 @@ TEST_CASE("Normal Spline", "[mpc][spline]") {
         REQUIRE_THAT(spline2.ValueAt(0.036 + 0.11666666), WithinAbs(1.32076, MARGIN));
         REQUIRE_THAT(spline2.ValueAt(0.076 + 0.11666666), WithinAbs(1.85302, MARGIN + 0.05));   // Slightly more numerical error
         REQUIRE_THAT(spline2.ValueAt(0.112 + 0.11666666), WithinAbs(2.00823, MARGIN));
-        REQUIRE_THAT(spline2.ValueAt(0.35), WithinAbs(0, MARGIN));
+        REQUIRE_THAT(spline2.ValueAt(0.35), WithinAbs(0.0, MARGIN));
 
         std::vector<double> end3 = {5};
         spline2.SetPolyVars(3, end3);
@@ -382,7 +382,7 @@ TEST_CASE("Force Spline", "[mpc][spline]") {
         REQUIRE_THAT(spline2.ValueAt(0.036 + 0.11666666), WithinAbs(1.32076, MARGIN));
         REQUIRE_THAT(spline2.ValueAt(0.076 + 0.11666666), WithinAbs(1.85302, MARGIN + 0.05));   // Slightly more numerical error
         REQUIRE_THAT(spline2.ValueAt(0.112 + 0.11666666), WithinAbs(2.00823, MARGIN));
-        REQUIRE_THAT(spline2.ValueAt(0.35), WithinAbs(0, MARGIN));
+        REQUIRE_THAT(spline2.ValueAt(0.35), WithinAbs(0.0, MARGIN));
     }
 
     SECTION("Linearization/Coefficients") {

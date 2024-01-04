@@ -43,7 +43,7 @@ namespace mpc {
 
         virtual void ConfigureForInitialRun() const = 0;
 
-        virtual void ConfigureForRealTime() const = 0;
+        virtual void ConfigureForRealTime(double run_time_iters) const = 0;
 
     protected:
         vector_t prev_qp_sol_;

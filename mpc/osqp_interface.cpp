@@ -13,7 +13,7 @@ namespace mpc {
           A_(1000,1000){
 
         // Set solver settings
-        qp_solver_.settings()->setVerbosity(false);
+        qp_solver_.settings()->setVerbosity(true);
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
@@ -232,11 +232,11 @@ namespace mpc {
         qp_solver_.settings()->setMaxIteration(3000);
     }
 
-    void OSQPInterface::ConfigureForRealTime() const {
-        qp_solver_.settings()->setPolish(true);
+    void OSQPInterface::ConfigureForRealTime(double run_time_iters) const {
+        qp_solver_.settings()->setPolish(false);
         qp_solver_.settings()->setAbsoluteTolerance(1e-4);
         qp_solver_.settings()->setRelativeTolerance(1e-4);
-        qp_solver_.settings()->setMaxIteration(200);
+        qp_solver_.settings()->setMaxIteration(run_time_iters);
     }
 
 } // mpc

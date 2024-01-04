@@ -30,7 +30,7 @@ namespace mpc {
 
         void ConfigureForInitialRun() const override;
 
-        void ConfigureForRealTime() const override;
+        void ConfigureForRealTime(double run_time_iters) const override;
 
     protected:
     private:

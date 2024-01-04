@@ -56,7 +56,7 @@ namespace mpc {
 
         Trajectory CreateInitialRun(const vector_t& state);
 
-        Trajectory GetRealTimeUpdate(const vector_t& state, double init_time);
+        Trajectory GetRealTimeUpdate(double run_time_iters, const vector_t& state, double init_time);
 
         // TODO: Maybe move to private
         Trajectory Solve(const vector_t& state, double init_time);

@@ -238,10 +238,10 @@ namespace mpc {
         if (GetTotalTime() < final_time) {
             for (auto &end_effector_pos: end_effector_pos_) {
                 for (int coord = 0; coord < POS_VARS; coord++) {
-                    end_effector_pos.at(coord).AddPoly(0.35);
+                    end_effector_pos.at(coord).AddPoly(0.2);
                 }
             }
-            inputs_.AddPolys(0.35);
+            inputs_.AddPolys(0.2);
         }
         SetSwingPosZ();
         UpdatePosSplineVarsCount();
