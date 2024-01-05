@@ -10,8 +10,9 @@ namespace mpc {
 
     }
 
-    vector_t RKIntegrator::CalcIntegral(const vector_t& ic, const Inputs& input, double init_time, int num_steps,
-                                const CentroidalModel& model, const vector_t& ref_state) {
+    vector_t RKIntegrator::CalcIntegral(const vector_t& ic, const Inputs& input, double init_time,
+                                        int num_steps,
+                                        CentroidalModel& model, const vector_t& ref_state) {
         vector_t state = ic;
         for (int i = 0; i < num_steps; i++) {
             vector_t k1 = model.CalcDynamics(state, input, init_time, ref_state);
@@ -23,16 +24,19 @@ namespace mpc {
         return state;
     }
 
-    matrix_t RKIntegrator::CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx) {
-        return matrix_t::Identity(dfdx.rows(), dfdx.cols()) + (dt_*dt_/2)*(dfdx*dfdx) + dt_*dfdx;
+    void RKIntegrator::CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx,
+                                                       matrix_t& A) {
+        A.noalias() = matrix_t::Identity(dfdx.rows(), dfdx.cols()) + (dt_*dt_/2)*(dfdx*dfdx) + dt_*dfdx;
     }
 
-    matrix_t RKIntegrator::CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu, const matrix_t& dfdx) {
-        return (dt_*dt_/2)*(dfdx*dfdu) + dt_*dfdu;
+    void RKIntegrator::CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu, const matrix_t& dfdx,
+                                                       matrix_t& B) {
+        B.noalias() = (dt_*dt_/2)*(dfdx*dfdu) + dt_*dfdu;
     }
 
-    vector_t RKIntegrator::CalcLinearTermDiscretization(const vector_t& C, const vector_t& C2, const matrix_t& A) {
-        return dt_*C2 + (dt_*dt_/2)*A*C;
+    void RKIntegrator::CalcLinearTermDiscretization(const vector_t& C, const vector_t& C2, const matrix_t& A,
+                                                        vector_t& C_out) {
+        C_out.noalias() = dt_*C2 + (dt_*dt_/2)*A*C;
     }
 
     double RKIntegrator::GetDt() const {

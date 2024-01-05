@@ -36,7 +36,7 @@ namespace mpc {
          * @param time to query the input at
          * @return vector of joint velocities at that time.
          */
-        vector_t GetVels(double time) const;
+        const vector_t& GetVels(double time) const;
 
         /**
          *

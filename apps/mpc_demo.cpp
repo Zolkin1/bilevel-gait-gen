@@ -76,24 +76,31 @@ int main() {
     // TODO: Add better costs (more expressive). Add things like a better reference and nominal foothold locations
 
     matrix_t Q = 2*matrix_t::Identity(24, 24);
-    Q.topLeftCorner<6,6>() = matrix_t::Zero(6, 6); 
-//    Q(2,2) = 100;
+    Q.topLeftCorner<6,6>() = matrix_t::Zero(6, 6);
+    Q(0,0) = 0.0;
+    Q(1,1) = 0.0;
+    Q(2,2) = 10;
     Q(6,6) = 300; //300;
     Q(7,7) = 300; //300;
-    Q(8,8) = 700; //450;
-    Q(9,9) = 50;
-    Q(10,10) = 50;
-    Q(11,11) = 50;
+    Q(8,8) = 750; //450;
+    Q(9,9) = 200;
+    Q(10,10) = 200;
+    Q(11,11) = 200;
 
-    Q(12,12) = 500;
-    Q(15,15) = 500;
-    Q(18,18) = 500;
-    Q(21,21) = 500;
+    Q(12,12) = 600;
+    Q(15,15) = 600;
+    Q(18,18) = 600;
+    Q(21,21) = 600;
 
     Q(13,13) = 50;
     Q(16,16) = 50;
     Q(19,19) = 50;
     Q(22,22) = 50;
+
+    Q(14,14) = 10;
+    Q(17,17) = 10;
+    Q(20,20) = 10;
+    Q(23,23) = 10;
 
     // Desried state in the lie algebra
     const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(mpc_des_state, init_state);
@@ -101,9 +108,9 @@ int main() {
 
     // Add in costs
     mpc.AddQuadraticTrackingCost(des_alg, Q);
-    mpc.AddForceCost(0.001);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
-    mpc.SetQuadraticFinalCost(50*Q);
-    mpc.SetLinearFinalCost(-50*Q*des_alg);
+    mpc.AddForceCost(0.0);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
+    mpc.SetQuadraticFinalCost(500*Q);
+    mpc.SetLinearFinalCost(-500*Q*des_alg);
 
     // Create the MPC controller (only used here for the visualizer)
     std::unique_ptr<controller::Controller> mpc_controller;
@@ -133,10 +140,11 @@ int main() {
     // Visualize results
     simulation::Visualizer viz(config.ParseString("robot_xml"));
     robot->SetSimModel(viz.GetModel());
-    for (int i = 0; i < info.num_nodes+1+100; i++) {
+    for (int i = 0; i < info.num_nodes+1+200; i++) {
         vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
+        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
         mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
     }
 

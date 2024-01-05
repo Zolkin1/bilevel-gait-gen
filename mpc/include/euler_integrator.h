@@ -13,17 +13,18 @@ namespace mpc {
         EulerIntegrator(double dt);
 
         vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, double final_time,
-                              const CentroidalModel& model) override;
+                              CentroidalModel& model) override;
 
         vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, int num_steps,
-                              const CentroidalModel& model, const vector_t& ref_state) override;
+                              CentroidalModel& model, const vector_t& ref_state) override;
 
         // Only does a single step
-        matrix_t CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx) override;
+        void CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx,
+                                         Eigen::Ref<matrix_t> A) override;
 
         // Only does a single step
-        matrix_t CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu,
-                                             const matrix_t& dfdx) override;
+        void CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu,
+                                             const matrix_t& dfdx, Eigen::Ref<matrix_t> B) override;
     protected:
     private:
     };

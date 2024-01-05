@@ -43,7 +43,8 @@ namespace mpc {
         line_search_timer_("line search"),
         poly_update_timer_("spline update"),
         data_update_timer_("data update"),
-        qp_solve_timer_("QP solve") {
+        qp_solve_timer_("QP solve"),
+        stats_timer_("recording stats"){
 
         assert(info_.ee_frames.size() == num_ee_);
 
@@ -189,7 +190,9 @@ namespace mpc {
         // TODO: This conversion isn't perfect. Need to investigate
         prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, state);
 
+        stats_timer_.StartTimer();
         RecordStats(alpha, p, qp_solver->GetSolveQuality(), state);
+        stats_timer_.StopTimer();
 
         run_num_++;
 
@@ -200,6 +203,7 @@ namespace mpc {
         poly_update_timer_.PrintElapsedTime();
         data_update_timer_.PrintElapsedTime();
         qp_solve_timer_.PrintElapsedTime();
+        stats_timer_.PrintElapsedTime();
         solve_timer_.PrintElapsedTime();
         std::cout << "-----------" << std::endl;
 
@@ -263,27 +267,33 @@ namespace mpc {
         data_.dynamics_constants.head(num_states_) =
                 -CentroidalModel::ConvertManifoldStateToAlgebraState(state, state);
 
-        matrix_t A, B;
-        vector_t C;
+        const int force_spline_vars = prev_traj_.GetInputs().GetTotalForceSplineVars();
 
-        int force_spline_vars = prev_traj_.GetInputs().GetTotalForceSplineVars();
+        A_.resize(num_states_, num_states_);
+        B_.resize(num_states_, force_spline_vars + num_joints_);
+        C_.resize(num_states_);
+
+        utils::Timer get_dyn_timer("linear discrete dynamics");
 
         for (int node = 0; node < info_.num_nodes; node++) {
             double time = GetTime(node);
             // A can go in normally, B needs to be split
+            get_dyn_timer.StartTimer();
             model_.GetLinearDiscreteDynamics(prev_traj_.GetStates().at(node),
-                                             state, prev_traj_.GetInputs(), time, A, B, C);
-            data_.constraint_mat_.SetMatrix(A, (node + 1) * num_states_, node * num_states_);
+                                             state, prev_traj_.GetInputs(), time, A_, B_, C_);
+            get_dyn_timer.StopTimer();
+//            get_dyn_timer.PrintElapsedTime();
+            data_.constraint_mat_.SetMatrix(A_, (node + 1) * num_states_, node * num_states_);
 
             data_.constraint_mat_.SetDiagonalMatrix(-1, (node + 1) * num_states_,
                                                     (node + 1) * num_states_, num_states_);
 
-            matrix_t B_spline = B.leftCols(force_spline_vars);
-            matrix_t B_vels = B.rightCols(num_joints_);
+            const matrix_t B_spline = B_.leftCols(force_spline_vars);
+            const matrix_t B_vels = B_.rightCols(num_joints_);
 
             data_.constraint_mat_.SetMatrix(B_vels, (node + 1) * num_states_, GetVelocityIndex(node));
             data_.constraint_mat_.SetMatrix(B_spline, (node + 1) * num_states_, GetForceSplineStartIdx());
-            data_.dynamics_constants.segment((node + 1) * num_states_, num_states_) = -C;
+            data_.dynamics_constants.segment((node + 1) * num_states_, num_states_) = -C_;
         }
         constraint_idx_ = (info_.num_nodes+1)*num_states_;
     }
@@ -674,13 +684,13 @@ namespace mpc {
         return alpha;
     }
 
-    double MPC::GetMeritValue(const vector_t& x, double mu, const vector_t& init_state) const {
+    double MPC::GetMeritValue(const vector_t& x, double mu, const vector_t& init_state) {
         const Trajectory temp_traj = ConvertQPSolToTrajectory(x, init_state);
 
         return mu*GetEqualityConstraintValues(temp_traj, init_state).lpNorm<1>() + GetCostValue(x);
     }
 
-    double MPC::GetMeritValue(const Trajectory& traj, double mu, const mpc::vector_t& init_state) const {
+    double MPC::GetMeritValue(const Trajectory& traj, double mu, const mpc::vector_t& init_state) {
         return mu*GetEqualityConstraintValues(traj, init_state).lpNorm<1>() + GetCostValue(traj.ConvertToQPVector());
     }
 
@@ -692,7 +702,7 @@ namespace mpc {
     }
 
     // TODO: Optimize this and make it so it is called less
-    vector_t MPC::GetEqualityConstraintValues(const Trajectory& traj, const vector_t& init_state) const {
+    vector_t MPC::GetEqualityConstraintValues(const Trajectory& traj, const vector_t& init_state) {
         vector_t eq_constraints = vector_t::Zero(data_.num_dynamics_constraints - num_states_); // data_.num_fk_constraints_
 
         for (int node = 0; node < info_.num_nodes; node++) {
@@ -713,7 +723,7 @@ namespace mpc {
         return node * info_.integrator_dt + init_time_;
     }
 
-    double MPC::GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state) const {
+    double MPC::GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state) {
         const Trajectory temp_traj = ConvertQPSolToTrajectory(x, init_state);
 
         // TODO: Do more efficiently (should probably compute this once somewhere)

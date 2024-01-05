@@ -18,7 +18,9 @@ namespace utils {
 
         void StopTimer();
 
-        long GetElapsedTimeMilliseconds() const;
+        long GetElapsedTimeMicroseconds() const;
+
+        double GetElapsedTimeMilliseconds() const;
 
         double GetElapsedTimeSeconds() const;
 

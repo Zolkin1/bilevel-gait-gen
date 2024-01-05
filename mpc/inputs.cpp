@@ -98,7 +98,8 @@ namespace mpc {
         return position;
     }
 
-    vector_t Inputs::GetVels(double time) const {
+    // TODO: Consider going to back to returning a copy
+    const vector_t& Inputs::GetVels(double time) const {
         assert(time >= 0);
         assert(time <= joint_vels_.size()*node_dt_ + init_time_);
 

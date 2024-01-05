@@ -13,7 +13,7 @@ namespace mpc {
           A_(1000,1000){
 
         // Set solver settings
-        qp_solver_.settings()->setVerbosity(true);
+        qp_solver_.settings()->setVerbosity(false);
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
@@ -24,7 +24,7 @@ namespace mpc {
         qp_solver_.settings()->setRho(.01);
 //        qp_solver_.settings()->setAlpha(1.6);
         qp_solver_.settings()->setWarmStart(true);     // TODO: figure out warm starting with changing sizes
-        qp_solver_.settings()->setScaling(10);
+        qp_solver_.settings()->setScaling(3);
         qp_solver_.settings()->setLinearSystemSolver(1);
 
         prev_dual_sol_ = vector_t::Zero(data.GetTotalNumConstraints());
@@ -62,7 +62,7 @@ namespace mpc {
             }
 
             // Re-init
-            if (!qp_solver_.initSolver()) {
+            if (!qp_solver_.initSolver()) { // TODO: Dynamic memory is allocated here
                 throw std::runtime_error("Unable to initialize the solver.");
             }
             qp_solver_.setWarmStart(warm_start, prev_dual_sol_);
@@ -72,7 +72,7 @@ namespace mpc {
             qp_solver_.updateGradient(w_);
             qp_solver_.updateLinearConstraintsMatrix(A_);
             qp_solver_.updateBounds(lb_, ub_);
-            qp_solver_.setWarmStart(warm_start, prev_dual_sol_);
+//            qp_solver_.setWarmStart(warm_start, prev_dual_sol_);
         }
 
 //        for (int i = 0; i < A_.rows(); i++) {

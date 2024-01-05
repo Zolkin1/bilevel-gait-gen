@@ -14,19 +14,22 @@ namespace mpc {
         RKIntegrator(double dt);
 
         vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, double final_time,
-                              const CentroidalModel& model);
+                              CentroidalModel& model);
 
         vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, int num_steps,
-                              const CentroidalModel& model, const vector_t& ref_state);
+                              CentroidalModel& model, const vector_t& ref_state);
 
         // Only does a single step
-        matrix_t CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx);
+        void CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx,
+                                             matrix_t& A);
 
         // Only does a single step
-        matrix_t CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu,
-                                             const matrix_t& dfdx);
+        void CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu,
+                                             const matrix_t& dfdx,
+                                             matrix_t& B);
 
-        vector_t CalcLinearTermDiscretization(const vector_t& C, const vector_t& C2, const matrix_t& A);
+        void CalcLinearTermDiscretization(const vector_t& C, const vector_t& C2, const matrix_t& A,
+                                          vector_t& C_out);
 
         double GetDt() const;
     protected:

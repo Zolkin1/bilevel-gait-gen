@@ -144,18 +144,18 @@ namespace mpc {
 
         double LineSearch(const vector_t& direction, const vector_t& init_state);
 
-        double GetMeritValue(const vector_t& x, double mu, const vector_t& init_state) const;
+        double GetMeritValue(const vector_t& x, double mu, const vector_t& init_state);
 
-        double GetMeritValue(const Trajectory& traj, double mu, const vector_t& init_state) const;
+        double GetMeritValue(const Trajectory& traj, double mu, const vector_t& init_state);
 
         double GetCostValue(const vector_t& x) const;
 
-        vector_t GetEqualityConstraintValues(const Trajectory& traj, const vector_t& init_state) const;
+        vector_t GetEqualityConstraintValues(const Trajectory& traj, const vector_t& init_state);
 
         // Gets the time at a node
         double GetTime(int node) const;
 
-        double GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state) const;
+        double GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state);
 
         void RecordStats(double alpha, const vector_t& direction, const std::string& solve_type,
                          const vector_t& ref_state);
@@ -241,10 +241,14 @@ namespace mpc {
         utils::Timer poly_update_timer_;
         utils::Timer data_update_timer_;
         utils::Timer qp_solve_timer_;
+        utils::Timer stats_timer_;
 
         bool in_real_time_;
 
         int constraint_idx_;
+
+        matrix_t A_, B_;
+        vector_t C_;
     };
 } // mpc
 

@@ -10,7 +10,7 @@ namespace mpc {
     EulerIntegrator::EulerIntegrator(double dt) : Integrator(dt) {}
 
     vector_t EulerIntegrator::CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time,
-                                           double final_time, const CentroidalModel& model) {
+                                           double final_time, CentroidalModel& model) {
         if (final_time < init_time) {
             throw std::runtime_error("Final time for integration less than initial time.");
         }
@@ -30,7 +30,7 @@ namespace mpc {
     }
 
     vector_t EulerIntegrator::CalcIntegral(const mpc::vector_t& ic, const mpc::Inputs& input, double init_time,
-                                           int num_steps, const mpc::CentroidalModel& model, const vector_t& ref_state) {
+                                           int num_steps, mpc::CentroidalModel& model, const vector_t& ref_state) {
         vector_t val = ic;
         double time = init_time;
         for (int i = 0; i < num_steps; i++) {
@@ -40,11 +40,13 @@ namespace mpc {
         return val;
     }
 
-    matrix_t EulerIntegrator::CalcDerivWrtStateSingleStep(const mpc::vector_t &ic, const mpc::matrix_t &dfdx) {
-        return dfdx*dt_ + matrix_t::Identity(ic.size() - 1, ic.size() - 1);
+    void EulerIntegrator::CalcDerivWrtStateSingleStep(const mpc::vector_t &ic, const mpc::matrix_t &dfdx,
+                                                          Eigen::Ref<matrix_t> A) {
+        A.noalias() = dfdx*dt_ + matrix_t::Identity(ic.size() - 1, ic.size() - 1);
     }
 
-    matrix_t EulerIntegrator::CalcDerivWrtInputSingleStep(const mpc::vector_t &ic, const mpc::matrix_t &dfdu, const matrix_t& dfdx) {
-        return dfdu * dt_;
+    void EulerIntegrator::CalcDerivWrtInputSingleStep(const mpc::vector_t &ic, const mpc::matrix_t &dfdu,
+                                                          const matrix_t& dfdx, Eigen::Ref<matrix_t> B) {
+        B.noalias() = dfdu * dt_;
     }
 }

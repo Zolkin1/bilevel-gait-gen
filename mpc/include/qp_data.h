@@ -62,7 +62,7 @@ namespace mpc {
         }
 
         void InitQPMats() {
-            constraint_mat_.Reserve(18000);     // TODO: Make not hard coded
+            constraint_mat_.Reserve(25000);     // TODO: Make not hard coded
             cost_mat_.Reserve(2000);            // TODO: Make not hard coded
 
             dynamics_constants = vector_t::Zero(num_dynamics_constraints);

@@ -51,7 +51,8 @@ namespace mpc {
 
         matrix_3t GetFKJacobianForEndEffector(const vector_t& state, const std::string& frame, bool compute_jac);
 
-        Eigen::Vector3d GetEndEffectorLocationCOMFrame(const vector_t& state, const std::string& frame) const;
+        Eigen::Vector3d GetEndEffectorLocationCOMFrame(const vector_t& state,
+                                                       const std::string& frame) const;
 
         int GetPinocchioNumConfig() const;
 
@@ -62,7 +63,7 @@ namespace mpc {
 //        void SetDynamicsRefState(const vector_t& state);
 
         vector_t CalcDynamics(const vector_t& state, const Inputs& input, double time,
-                              const vector_t& ref_state) const;
+                              const vector_t& ref_state);
 
         static Eigen::Vector4d ConvertZYXRotToQuaternion(const Eigen::Vector3d& zyx_rot);
         static Eigen::Vector3d ConvertQuaternionToZYXRot(const Eigen::Vector4d& quat);
@@ -79,7 +80,7 @@ namespace mpc {
         double GetMass() const;
 
         vector_t GetDiscreteDynamics(const vector_t& state, const Inputs& input, double time,
-                                     const vector_t& ref_state) const;
+                                     const vector_t& ref_state);
 
         const std::string& GetEndEffectorFrame(int ee) const;
 
@@ -91,7 +92,8 @@ namespace mpc {
         vector_t ComputePinocchioVelocities(const vector_t& state, const vector_t& joint_vels, const matrix_t& CMMbinv,
                                             const matrix_t& CMMj) const;
 
-        vector_t ConvertMPCStateToPinocchioState(const vector_t& state) const;
+        // TODO: Should potentially templatize
+        void ConvertMPCStateToPinocchioState(const vector_t& state, Eigen::Ref<vector_t> q_pin) const;
         vector_t ConvertPinocchioStateToMPCState(const Eigen::Vector<double, MOMENTUM_OFFSET>& momentum,
                                                                   const vector_t& state) const;
 
@@ -122,6 +124,12 @@ namespace mpc {
         std::unique_ptr<RKIntegrator> integrator_;
 
         const Eigen::Vector3d GRAVITY;
+
+        // Pre-dynamically allocated values
+        matrix_t Ac_, Bc_;
+        vector_t Cc_, Cc2_;
+        vector_t xdot_;
+        vector_t q_pin_;
     };
 }
 
