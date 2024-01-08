@@ -20,20 +20,24 @@ namespace simulator {
         low_level_controller_->InitSolver();
     }
 
+    void SimulationRobot::InitController(const Eigen::VectorXd& state) {
+        low_level_controller_->InitSolver(state);
+    }
+
     void SimulationRobot::UpdateTargetConfig(const Eigen::VectorXd& q) {
         if (!joint_map_created_) {
             throw std::runtime_error("Can't assign target configuration until a joint map is created.");
         }
-        Eigen::VectorXd q_pin = ConvertMujocoVecConfigToPinocchio(q);
-        low_level_controller_->UpdateTargetConfig(q_pin);
+//        Eigen::VectorXd q_pin = ConvertMujocoVecConfigToPinocchio(q);
+        low_level_controller_->UpdateTargetConfig(q);
     }
 
     void SimulationRobot::UpdateTargetVel(const Eigen::VectorXd& v) {
         if (!joint_map_created_) {
             throw std::runtime_error("Can't assign target velocity until a joint map is created.");
         }
-        Eigen::VectorXd v_pin = ConvertMujocoVecVelLikeToPinocchio(v);
-        low_level_controller_->UpdateTargetVel(v_pin);
+//        Eigen::VectorXd v_pin = ConvertMujocoVecVelLikeToPinocchio(v);
+        low_level_controller_->UpdateTargetVel(v);
     }
 
     void SimulationRobot::SetSimModel(const mjModel* model) {

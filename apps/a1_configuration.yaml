@@ -12,13 +12,15 @@ collision_bodies: [4, 7, 10, 13]  # for mujoco
 foot_type: "POINT_FEET"
 
 ## ----------------------- Configurations ----------------------- ##
+# Note: All configs should match pinocchio!
+
 # initial joint config
 # xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
-init_config: [0., 0., 0.3541, 1., 0, 0, 0, # -0.0004, 0.004, 0.0001,
-              -0.02, 0.144, -0.976,     # front right
-              0.02, 0.2, -0.977,      # front left
-              -0.08, 0.45, -1.03,       # rear right
-              0.08, 0.45, -1.03]        # rear left
+init_config: [0., 0., 0.3541, 0, 0, 0, 1.0, # -0.0004, 0.004, 0.0001,
+              -0.02, 0.2, -0.977,       # front left
+              0.02, 0.2, -0.977,        # front right
+              0.08, 0.45, -1.03,        # rear left
+              -0.08, 0.45, -1.03]       # rear right
 #  [0., 0., 0.3341, 1., 0, 0, 0,
 #              -0.02, 1.5, -1.75, # -0.976,     # front right
 #              0.02, 0.2, -1.25, # -0.977,      # front left
@@ -37,12 +39,17 @@ init_vel: [0., 0., 0., 0., 0., 0.,
            0., 0., 0.,
            0., 0., 0.]
 
-standing_config: [0., 0., 0.36, 1., 0., 0., 0.,
-                 -0.05, 0.2, -0.91,
-                 0.05, 0.2, -0.91,
-                 -0.0788, 0.6, -.91,
-                 0.0798, 0.6, -.91]
+#standing_config: [0., 0., 0.36, 1., 0., 0., 0.,
+#                 -0.05, 0.2, -0.91,
+#                 0.05, 0.2, -0.91,
+#                 -0.0788, 0.6, -.91,
+#                 0.0798, 0.6, -.91]
 
+target_config: [0., 0., 0.3541, 0, 0, 0, 1.0,
+                -0.02, -1, -0.977,     # front left
+                0.02, 0.2, -0.977,     # front right
+                0.08, 0.45, -1.03,     # rear left
+                -0.08, 0.45, -1.03]    # rear right
 
 standing_vel: [0., 0., 0., 0., 0., 0.,
                0., 0., 0.,
@@ -52,35 +59,39 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
 
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
-control_rate: 400  # Hz
+control_rate: 250  # Hz
 torque_bounds: [100, 100, 100,
-                100, 100, 100,
-                100, 100, 100,
-                100, 100, 100] # 33.5
+                 100, 100, 100,
+                 100, 100, 100,
+                 100, 100, 100] # 33.5
+#  [100, 100, 100,
+#   100, 100, 100,
+#   100, 100, 100,
+#   100, 100, 100]
 friction_coef: 0.3
-base_pos_gains: [400, 400]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
-base_ang_gains: [0, 0]  # kd_ang, kp_ang
-joint_gains: [400, 1000]     # I can get these pretty high without getting close to the torque bounds
+base_pos_gains: [20, 2000]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
+base_ang_gains: [2, 200]  # kd_ang, kp_ang
+joint_gains: [30, 250]     # I can get these pretty high without getting close to the torque bounds
 
 # 400, 400, 0, 0, 400, 1000
 
 leg_tracking_weight: 10
-torso_tracking_weight: 1000
-force_tracking_weight: 0.0
+torso_tracking_weight: 10
+force_tracking_weight: 0
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
 num_nodes: 50
 integrator_dt: 0.015
 num_qp: 1
-#vel_bounds: [1, 1, 1,
-#             1, 1, 1,
-#             1, 1, 1,
-#             1, 1, 1]
-vel_bounds: [10, 10, 10,
-             10, 10, 10,
-             10, 10, 10,
-             10, 10, 10]
+vel_bounds: [3, 3, 3,
+             3, 3, 3,
+             3, 3, 3,
+             3, 3, 3]
+#vel_bounds: [10, 10, 10,
+#             10, 10, 10,
+#             10, 10, 10,
+#             10, 10, 10]
 joint_bounds_lb: [-0.802851, -1.0472, -2.69653,
                   -0.802851, -1.0472, -2.69653,
                   -0.802851, -1.0472, -2.69653,
@@ -98,8 +109,11 @@ swing_height: 0.065
 num_polys: 3
 
 x_des: 1
-y_des: 1
+y_des: 0
 
-run_time_iterations: 75
+run_time_iterations: 100
+
+foot_offset: 0.02
+
 ## --- Temp --- ##
-viz_rate: 0.015
+viz_rate: 0.15

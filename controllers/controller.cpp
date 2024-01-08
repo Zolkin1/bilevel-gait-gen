@@ -47,6 +47,8 @@ namespace controller {
 
     void Controller::InitSolver() {}
 
+    void Controller::InitSolver(const Eigen::VectorXd& state) {}
+
     double Controller::GetRate() const {
         return rate_;
     }
@@ -91,6 +93,8 @@ namespace controller {
             control(i) = vel_target_(i - num_inputs_ + FLOATING_VEL_OFFSET);
         }
     }
+
+    void Controller::UpdateDesiredContacts(const controller::Contact& contact) {}
 
     Contact::Contact() {}
 

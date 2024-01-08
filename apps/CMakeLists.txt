@@ -1,6 +1,5 @@
 
-add_executable(demo demo.cpp
-        mpc_sim_demo.cpp)
+add_executable(demo demo.cpp)
 add_executable(mpc_demo mpc_demo.cpp)
 add_executable(mpc_sim mpc_sim_demo.cpp)
 

@@ -19,7 +19,9 @@ namespace mpc {
     public:
         Trajectory(int len, int state_size, int num_joints,
                    const std::vector<std::vector<double>>& switching_times, double node_dt,
-                   double swing_height);
+                   double swing_height, double foot_offset);
+
+        Trajectory& operator=(const Trajectory& traj);
 
 //        Trajectory(const Trajectory& traj);
 
@@ -107,6 +109,7 @@ namespace mpc {
         int pos_spline_vars_;
 
         double swing_height_;
+        double foot_offset_;
     };
 } // mpc
 

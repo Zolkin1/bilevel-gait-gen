@@ -11,9 +11,10 @@ namespace mpc {
 
     Trajectory::Trajectory(int len, int state_size, int num_joints,
                            const std::vector<std::vector<double>>& switching_times, double node_dt,
-                           double swing_height) :
+                           double swing_height, double foot_offset) :
             inputs_(switching_times, num_joints, len, node_dt),
-            swing_height_(swing_height) {
+            swing_height_(swing_height),
+            foot_offset_(foot_offset) {
         for (int i = 0; i < len; i++) {
             states_.push_back(vector_t::Zero(state_size));
         }
@@ -30,6 +31,23 @@ namespace mpc {
 
         UpdatePosSplineVarsCount();
         SetSwingPosZ();
+    }
+
+    // TODO: Implement an equality operator
+    Trajectory& Trajectory::operator=(const Trajectory& traj) {
+        if (this == &traj) {
+            return *this;
+        }
+
+        this->pos_spline_vars_ = traj.pos_spline_vars_;
+        this->swing_height_ = traj.swing_height_;
+        this->foot_offset_ = traj.foot_offset_;
+        this-> states_ = traj.states_;
+        this->inputs_ = traj.inputs_;
+        this->end_effector_pos_ = traj.end_effector_pos_;
+        this->mut_flags_ = traj.mut_flags_;
+
+        return *this;
     }
 
     std::vector<vector_t> Trajectory::GetStates() const {
@@ -235,7 +253,7 @@ namespace mpc {
     }
 
     void Trajectory::AddPolys(double final_time) {
-        if (GetTotalTime() < final_time) {
+        while (GetTotalTime() < final_time) {
             for (auto &end_effector_pos: end_effector_pos_) {
                 for (int coord = 0; coord < POS_VARS; coord++) {
                     end_effector_pos.at(coord).AddPoly(0.2);
@@ -376,6 +394,8 @@ namespace mpc {
             for (int i = 0; i < poly_vars.size(); i++) {
                 if (poly_vars.at(i).size() == 2) {
                     end_effector_pos.at(coord).SetPolyVars(i, {swing_height_, 0});
+                } else {
+                    end_effector_pos.at(coord).SetPolyVars(i, {foot_offset_});
                 }
             }
         }

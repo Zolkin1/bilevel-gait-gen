@@ -76,7 +76,9 @@ namespace controller {
          */
         void SetJointGains(double kv, double kp);
 
-        void UpdateDesiredContacts(const Contact& contact);
+        void UpdateDesiredContacts(const Contact& contact) override;
+
+        void UpdateForceTargets(const Eigen::VectorXd& force);
 
     protected:
     private:

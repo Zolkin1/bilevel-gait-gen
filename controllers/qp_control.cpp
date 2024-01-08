@@ -59,8 +59,9 @@ namespace controller {
                                                     const Contact& contact,
                                                     double time) {
         Contact contact2(4);
-        contact2.in_contact_ = {true, true, true, true};
-        contact2.contact_frames_ = contact.contact_frames_;
+//        contact2.in_contact_ = {true, true, true, true};
+//        contact2.contact_frames_ = contact.contact_frames_;
+        contact2 = des_contact_;
         UpdateConstraintsAndCost(q, v, a, contact2);
 
         // Solve qp
@@ -234,6 +235,10 @@ namespace controller {
         Eigen::VectorXd target = force_target_;
 
         w_.segment(FLOATING_VEL_OFFSET + num_inputs_, CONSTRAINT_PER_FOOT*num_contacts) = -2*target*force_tracking_weight_;
+    }
+
+    void QPControl::UpdateForceTargets(const Eigen::VectorXd& force) {
+        force_target_ = force;
     }
 
     void QPControl::UpdateConstraintsAndCost(const Eigen::VectorXd& q,

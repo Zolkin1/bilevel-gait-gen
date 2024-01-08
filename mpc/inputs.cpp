@@ -101,7 +101,7 @@ namespace mpc {
     // TODO: Consider going to back to returning a copy
     const vector_t& Inputs::GetVels(double time) const {
         assert(time >= 0);
-        assert(time <= joint_vels_.size()*node_dt_ + init_time_);
+        assert(time <= forces_.at(0).at(0).GetEndTime());
 
         int idx = floor((time - init_time_)/node_dt_);
         if (idx == joint_vels_.size()) {

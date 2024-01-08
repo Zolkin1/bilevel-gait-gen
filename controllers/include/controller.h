@@ -50,6 +50,10 @@ namespace controller {
         void UpdateTargetVel(const Eigen::VectorXd& v);
         void UpdateTargetAcc(const Eigen::VectorXd& a);
 
+        virtual void InitSolver(const Eigen::VectorXd& state);
+
+        virtual void UpdateDesiredContacts(const Contact& contact);
+
     protected:
         /**
          * Assigns the configuration set point as the desired position

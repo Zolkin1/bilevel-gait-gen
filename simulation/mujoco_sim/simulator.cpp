@@ -49,7 +49,8 @@ namespace simulator {
         data_ = mj_makeData(model_);
 
         // Set state to current initial condition
-        this->SetState(robot->GetInitConfig(), robot->GetInitVelocities());
+        this->SetState(robot->ConvertPinocchioConfigToMujoco(robot->GetInitConfig()),
+                       robot->ConvertPinocchioVelToMujoco(robot->GetInitVelocities()));
 
     }
 

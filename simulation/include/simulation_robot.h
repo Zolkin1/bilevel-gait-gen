@@ -29,6 +29,8 @@ namespace simulator {
 
         void InitController();
 
+        void InitController(const Eigen::VectorXd& state);
+
         void UpdateTargetConfig(const Eigen::VectorXd& q);
 
         void UpdateTargetVel(const Eigen::VectorXd& v);

@@ -5,6 +5,10 @@
 #ifndef BILEVEL_GAIT_GEN_MPC_CONTROLLER_H
 #define BILEVEL_GAIT_GEN_MPC_CONTROLLER_H
 
+#include <thread>
+#include <queue>
+#include <mutex>
+
 #include "mpc.h"
 #include "qp_control.h"
 
@@ -36,15 +40,33 @@ namespace controller {
                                       double time) override;
                                       //double time) override;
 
+        void InitSolver(const vector_t& state) override;
+
     protected:
     private:
         vector_t ReconstructState(const vector_t& q, const vector_t& v, const vector_t& a) const;
 
+        void MPCUpdate();
+        
         double prev_time_;
 
         QPControl qp_controller_;
         mpc::MPC mpc_;
         bool computed_;
+
+        std::thread mpc_computations_;
+
+        vector_t state_;
+        double time_;
+        vector_t q_des_;
+        vector_t v_des_;
+        vector_t a_des_;
+        vector_t force_des_;
+        mpc::Trajectory traj_;
+
+        std::mutex state_time_mut_;
+        std::mutex mpc_res_mut_;
+
     };
 } // controller
 

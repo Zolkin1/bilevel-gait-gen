@@ -27,6 +27,7 @@ namespace mpc {
         integrator_dt = info.integrator_dt;
         force_bound = info.force_bound;
         swing_height = info.swing_height;
+        foot_offset = info.foot_offset;
     }
 
     MPC::MPC(const MPCInfo& info, const std::string& robot_urdf) :
@@ -36,8 +37,9 @@ namespace mpc {
         num_states_(model_.GetPinocchioNumConfig() + 5),
         num_ee_(model_.GetNumEndEffectors()),
         prev_traj_(info.num_nodes+1, num_states_+1, num_joints_,
-               CreateDefaultSwitchingTimes(info.num_switches, num_ee_, info.integrator_dt*(info.num_nodes)),
-               info.integrator_dt, info.swing_height),
+               CreateDefaultSwitchingTimes(info.num_switches, num_ee_,
+                    info.integrator_dt*(info.num_nodes)),
+                    info.integrator_dt, info.swing_height, info.foot_offset),
         solve_timer_("mpc solve"),
         constraint_costs_timer_("constraints and costs"),
         line_search_timer_("line search"),
@@ -66,6 +68,8 @@ namespace mpc {
         // state vector: [lcom, kcom, qb, q0, ..., qnj]
         // input vector: [f1, ..., fnee, v0, ..., vnj]. Note each f is a set of 3 splines.
 
+        init_time_ = 0;
+
         SetInitQPSizes();
 
         qp_solver = std::make_unique<OSQPInterface>(data_, false);
@@ -76,8 +80,6 @@ namespace mpc {
         Phi_w_ = vector_t::Zero(num_states_);
 
         prev_qp_sol = vector_t::Zero(data_.num_decision_vars);
-
-        init_time_ = 0;
 
         line_search_res_ = vector_t::Zero(data_.num_decision_vars);
         mu_ = 5000;
@@ -641,6 +643,10 @@ namespace mpc {
         return prev_traj_.GetStates().at(node).tail(num_states_ - 5);
     }
 
+    vector_t MPC::GetNextTargetConfig() const {
+        return prev_traj_.GetState(1).tail(num_states_ - 5);
+    }
+
     vector_t MPC::GetFullTargetState(double time) const {
         int node = floor((time - init_time_)/info_.integrator_dt);
         return prev_traj_.GetStates().at(node);
@@ -650,6 +656,19 @@ namespace mpc {
         int node = floor((time - init_time_)/info_.integrator_dt);
         return model_.ComputeBaseVelocities(prev_traj_.GetStates().at(node),
                                                    prev_traj_.GetInputs().GetVels(time));
+    }
+
+    vector_t MPC::GetForceTarget(double time) const {
+        controller::Contact contacts = GetDesiredContacts(time);
+        vector_t forces(contacts.GetNumContacts()*3);
+        int idx = 0;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            if (contacts.in_contact_.at(ee)) {
+                forces.segment(idx, POS_VARS) = prev_traj_.GetInputs().GetForce(ee, time);
+                idx += 3;
+            }
+        }
+        return forces;
     }
 
     // TODO: Check/think about this
@@ -791,6 +810,10 @@ namespace mpc {
         std::vector<int> contact_frames = model_.GetContactFrames();
         controller::Contact contact;
         contact.in_contact_ = in_contact;
+//        contact.in_contact_.at(3) = !contact.in_contact_.at(3); // RR
+//        contact.in_contact_.at(1) = !contact.in_contact_.at(1); // FR
+//        contact.in_contact_.at(2) = !contact.in_contact_.at(2); // RL
+//        contact.in_contact_.at(0) = !contact.in_contact_.at(0); // FL
         contact.contact_frames_ = contact_frames;
         return contact;
     }
@@ -814,6 +837,10 @@ namespace mpc {
 
     Trajectory MPC::GetTrajectory() const {
         return prev_traj_;
+    }
+
+    int MPC::GetNode(double time) const {
+        return std::ceil((time - init_time_)/info_.integrator_dt);
     }
 
 } // mpc

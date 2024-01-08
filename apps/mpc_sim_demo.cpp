@@ -45,12 +45,13 @@ int main() {
 
 
     vector_t standing = config.ParseEigenVector("init_config");
-    standing.segment<4>(3) = ConvertMujocoQuatToPinocchioQuat(standing.segment<4>(3));
-    vector_t mpc_des_state = vector_t::Zero(6 + standing.size());
-    mpc_des_state.tail(standing.size()) = standing;
 
-    std::vector<vector_t> warm_start_states(info.num_nodes+1, mpc_des_state);
+    vector_t mpc_init_state = vector_t::Zero(6 + standing.size());
+    mpc_init_state.tail(standing.size()) = standing;
 
+    std::vector<vector_t> warm_start_states(info.num_nodes+1, mpc_init_state);
+
+    vector_t mpc_des_state = mpc_init_state;
     mpc_des_state.segment<2>(6) << 1, 0;
 
     std::unique_ptr<controller::Controller> mpc_controller;
@@ -77,15 +78,16 @@ int main() {
     // Create a simulation object and populate the robot with mujoco data
     simulator::Simulator sim(robot);
 
+    // Set the robot's initial condition
+    vector_t init_config = config.ParseEigenVector("init_config");
+    vector_t init_vel = config.ParseEigenVector("init_vel");
+    robot->SetInitialCondition(init_config, init_vel);
+
     // Set up controller solver
-    robot->InitController();
+    robot->InitController(mpc_init_state);
     robot->DefineContacts(config.ParseStringVector("collision_frames"),
                           config.ParseStdVector<int>("collision_bodies"));
 
-    // Set the robot's initial condition
-    Eigen::VectorXd init_config = config.ParseEigenVector("init_config");
-    Eigen::VectorXd init_vel = config.ParseEigenVector("init_vel");
-    robot->SetInitialCondition(init_config, init_vel);
 //    robot->UpdateTargetConfig(config.ParseEigenVector("standing_config"));
 //    robot->UpdateTargetVel(config.ParseEigenVector("standing_vel"));
 

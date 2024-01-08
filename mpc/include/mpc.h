@@ -39,6 +39,7 @@ namespace mpc {
         double integrator_dt;
         double force_bound;
         double swing_height;
+        double foot_offset;
 
         MPCInfo();
         MPCInfo(const MPCInfo& info);
@@ -112,6 +113,12 @@ namespace mpc {
         vector_t GetFullTargetState(double time) const;
 
         Trajectory GetTrajectory() const;
+
+        vector_t GetNextTargetConfig() const;
+
+        vector_t GetForceTarget(double time) const;
+
+        int GetNode(double time) const;
 
     protected:
     private:
@@ -199,13 +206,6 @@ namespace mpc {
 
         matrix_t Q_forces_;
 
-        // index helpers
-        int cone_constraint_start_;
-        int box_constraint_start_;
-        int positive_force_start_;
-        int ground_positive_start_;
-        int foot_on_ground_start_;
-
         vector_t prev_qp_sol;
 
         double init_time_;
@@ -217,8 +217,6 @@ namespace mpc {
         int run_num_;
 
         vector_t line_search_res_;
-
-        double last_merit_value_;
 
         vector_t prev_dual_sol_;
 

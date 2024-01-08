@@ -210,7 +210,7 @@ namespace mpc {
         integrator_timer.StartTimer();
         integrator_->CalcDerivWrtStateSingleStep(state, Ac_, A);
         integrator_->CalcDerivWrtInputSingleStep(state, Bc_, Ac_, B);    // TODO: Technically this Ac should be evaluated at a different time
-        integrator_->CalcLinearTermDiscretization(Cc_, Cc_, Ac_, C);
+        integrator_->CalcLinearTermDiscretization(Cc_, Cc2_, Ac_, C);
         integrator_timer.StopTimer();
 
 //        A_timer.PrintElapsedTime();
@@ -289,7 +289,7 @@ namespace mpc {
                                                          const matrix_t& CMMbinv, const matrix_t& CMMj) const {
         vector_t v_pin = vector_t::Zero(FLOATING_VEL_OFFSET + num_joints_);
 
-        v_pin.head<FLOATING_VEL_OFFSET>().noalias() = CMMbinv * (state.head<MOMENTUM_OFFSET>() - CMMj*joint_vels);
+//        v_pin.head<FLOATING_VEL_OFFSET>().noalias() = CMMbinv * (state.head<MOMENTUM_OFFSET>() - CMMj*joint_vels);
 
         v_pin.tail(num_joints_) = joint_vels;
 
@@ -399,17 +399,17 @@ namespace mpc {
                                            const vector_t& ref_state) {
         assert(state.size() == pin_model_.nv + 6);
 
-//        const vector_t state_man = ConvertAlgebraStateToManifoldState(state, ref_state);
+        const vector_t state_man = ConvertAlgebraStateToManifoldState(state, ref_state);
 
         xdot_.topRows<3>().noalias() = robot_mass_*GRAVITY;
         xdot_.segment<3>(3) = vector_t::Zero(3);
 
         // Pinocchio calls
-        ConvertMPCStateToPinocchioState(state, q_pin_);
+        ConvertMPCStateToPinocchioState(state_man, q_pin_);
         pinocchio::forwardKinematics(pin_model_, *pin_data_, q_pin_);
         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin_);
 
-        const Eigen::Vector3d com_pos = GetCOMPosition(state);
+        const Eigen::Vector3d com_pos = GetCOMPosition(state_man);
 
         for (int i = 0; i < num_ee_; i++) {
             const Eigen::Vector3d force = input.GetForce(i, time);

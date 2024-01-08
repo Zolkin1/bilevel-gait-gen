@@ -42,13 +42,13 @@ int main() {
     info.num_contacts = info.ee_frames.size();
     info.force_bound = config.ParseNumber<double>("force_bound");
     info.swing_height = config.ParseNumber<double>("swing_height");
+    info.foot_offset = config.ParseNumber<double>("foot_offset");
 
     mpc::MPC mpc(info, config.ParseString("robot_urdf"));
 
 
     // Read in the inital config and parse it for MPC.
     vector_t standing = config.ParseEigenVector("init_config");
-    standing.segment<4>(3) = ConvertMujocoQuatToPinocchioQuat(standing.segment<4>(3));
     vector_t init_state = vector_t::Zero(6 + standing.size());
     init_state.tail(standing.size()) = standing;
 
@@ -140,7 +140,7 @@ int main() {
     // Visualize results
     simulation::Visualizer viz(config.ParseString("robot_xml"));
     robot->SetSimModel(viz.GetModel());
-    for (int i = 0; i < info.num_nodes+1+200; i++) {
+    for (int i = 0; i < info.num_nodes + 200; i++) {
         vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
