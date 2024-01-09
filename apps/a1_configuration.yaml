@@ -69,14 +69,14 @@ torque_bounds: [100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100]
 friction_coef: 0.3
-base_pos_gains: [20, 2000]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
-base_ang_gains: [2, 200]  # kd_ang, kp_ang
-joint_gains: [30, 250]     # I can get these pretty high without getting close to the torque bounds
+base_pos_gains: [0, 0]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
+base_ang_gains: [0, 0]  # kd_ang, kp_ang
+joint_gains: [1, 100]     # I can get these pretty high without getting close to the torque bounds
 
 # 400, 400, 0, 0, 400, 1000
 
 leg_tracking_weight: 10
-torso_tracking_weight: 10
+torso_tracking_weight: 1
 force_tracking_weight: 0
 
 ## ----------------------- MPC ----------------------- ##
@@ -84,14 +84,14 @@ discretization_steps: 1
 num_nodes: 50
 integrator_dt: 0.015
 num_qp: 1
-vel_bounds: [3, 3, 3,
-             3, 3, 3,
-             3, 3, 3,
-             3, 3, 3]
-#vel_bounds: [10, 10, 10,
-#             10, 10, 10,
-#             10, 10, 10,
-#             10, 10, 10]
+#vel_bounds: [3, 3, 3,
+#             3, 3, 3,
+#             3, 3, 3,
+#             3, 3, 3]
+vel_bounds: [10, 10, 10,
+             10, 10, 10,
+             10, 10, 10,
+             10, 10, 10]
 joint_bounds_lb: [-0.802851, -1.0472, -2.69653,
                   -0.802851, -1.0472, -2.69653,
                   -0.802851, -1.0472, -2.69653,
@@ -104,16 +104,16 @@ joint_bounds_ub:  [0.802851, 4.18879, -0.916298,
 num_switches: 2
 force_bound: 300
 
-swing_height: 0.065
+swing_height: 0.12
 
 num_polys: 3
 
 x_des: 1
 y_des: 0
 
-run_time_iterations: 100
+run_time_iterations: 200
 
 foot_offset: 0.02
 
 ## --- Temp --- ##
-viz_rate: 0.15
+viz_rate: 0.015

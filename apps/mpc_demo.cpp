@@ -142,10 +142,15 @@ int main() {
     robot->SetSimModel(viz.GetModel());
     for (int i = 0; i < info.num_nodes + 200; i++) {
         vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
+//        temp_state(14) = temp_state(14) + 0.01;
+//        temp_state(17) = temp_state(17) - 0.01;
+//        temp_state(21) = temp_state(21) - 0.04;
+//        temp_state(22) = temp_state(22) + 0.01;
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
+        viz.GetTrajViz(mpc.GetTrajectory().CreateVizData(mpc.GetModel()));
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
         mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
-        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
+//        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
     }
 
     // Print the final trajectory to a file for viewing

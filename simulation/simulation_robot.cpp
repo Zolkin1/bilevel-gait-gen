@@ -316,4 +316,8 @@ namespace simulator {
         return muj_control;
     }
 
+    std::vector<std::vector<Eigen::Vector3d>> SimulationRobot::GetTrajViz() {
+        return low_level_controller_->GetTrajViz();
+    }
+
 } // simulator

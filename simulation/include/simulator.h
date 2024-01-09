@@ -64,6 +64,8 @@ namespace simulator {
 
     private:
 
+        static void UpdateVizGeoms(mujoco::Simulate* sim, const std::vector<std::vector<Eigen::Vector3d>>& viz_data);
+
         static void SimulateLoop(mujoco::Simulate* sim, SimulationRobot* robot);
 
         // ----------------------- Member Variables ----------------------- //

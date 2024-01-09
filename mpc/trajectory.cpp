@@ -14,9 +14,11 @@ namespace mpc {
                            double swing_height, double foot_offset) :
             inputs_(switching_times, num_joints, len, node_dt),
             swing_height_(swing_height),
-            foot_offset_(foot_offset) {
+            foot_offset_(foot_offset),
+            fk_traj_(5)  { // TODO: Make not hard coded
         for (int i = 0; i < len; i++) {
             states_.push_back(vector_t::Zero(state_size));
+            full_velocities_.push_back(vector_t::Zero(state_size));
         }
 
         for (const auto& switching_time : switching_times) {
@@ -31,6 +33,10 @@ namespace mpc {
 
         UpdatePosSplineVarsCount();
         SetSwingPosZ();
+
+        for (auto& ee_traj : fk_traj_) {
+            ee_traj.resize(len);
+        }
     }
 
     // TODO: Implement an equality operator
@@ -42,10 +48,12 @@ namespace mpc {
         this->pos_spline_vars_ = traj.pos_spline_vars_;
         this->swing_height_ = traj.swing_height_;
         this->foot_offset_ = traj.foot_offset_;
-        this-> states_ = traj.states_;
+        this->states_ = traj.states_;
         this->inputs_ = traj.inputs_;
         this->end_effector_pos_ = traj.end_effector_pos_;
         this->mut_flags_ = traj.mut_flags_;
+        this->full_velocities_ = traj.full_velocities_;
+        this->fk_traj_ = traj.fk_traj_;
 
         return *this;
     }
@@ -399,6 +407,36 @@ namespace mpc {
                 }
             }
         }
+    }
+
+    void Trajectory::UpdateFullVelocity(int node, const vector_t& vel) {
+        full_velocities_.at(node) = vel;
+    }
+
+    vector_t Trajectory::GetFullVelocity(int node) {
+        return full_velocities_.at(node);
+    }
+
+    vector_t Trajectory::GetAcc(int node, double dt) {
+        return -0.5*(full_velocities_.at(node+1) - full_velocities_.at(node))/dt;
+    }
+
+    std::vector<std::vector<Eigen::Vector3d>> Trajectory::CreateVizData(const CentroidalModel& model) {
+        for (int ee = 0; ee < 5; ee++) {
+            for (int node = 0; node < states_.size(); node++) {
+                if (ee == 4) {
+                    fk_traj_.at(ee).at(node) = model.GetCOMPosition(GetState(node));
+                } else {
+                    fk_traj_.at(ee).at(node) =
+                            model.GetEndEffectorLocationCOMFrame(GetState(node),
+                                                                 model.GetEndEffectorFrame(ee))
+                            + model.GetCOMPosition(GetState(node));
+                }
+            }
+        }
+
+
+        return fk_traj_;
     }
 
 } // mpc

@@ -2062,6 +2062,14 @@ void Simulate::Sync() {
   // update scene
   if (!is_passive_) {
     mjv_updateScene(m_, d_, &this->opt, &this->pert, &this->cam, mjCAT_ALL, &this->scn);
+    // Note these memcpy lines are custom!
+      int ngeom = user_scn->ngeom;
+      if (ngeom > 0) {
+          std::memcpy(scn.geoms + scn.ngeom,
+                      user_scn->geoms,
+                      sizeof(mjvGeom) * ngeom);
+          scn.ngeom += ngeom;
+      }
   } else {
     mjv_updateSceneState(m_, d_, &this->opt, &scnstate_);
 

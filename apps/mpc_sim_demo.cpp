@@ -41,6 +41,8 @@ int main() {
     info.integrator_dt = config.ParseNumber<double>("integrator_dt");
     info.num_contacts = info.ee_frames.size();
     info.force_bound = config.ParseNumber<double>("force_bound");
+    info.swing_height = config.ParseNumber<double>("swing_height");
+    info.foot_offset = config.ParseNumber<double>("foot_offset");
 
 
 

@@ -100,4 +100,8 @@ namespace controller {
 
     Contact::Contact(int num_contacts) : in_contact_(num_contacts, true), contact_frames_(num_contacts, 0) {}
 
+    std::vector<std::vector<Eigen::Vector3d>> Controller::GetTrajViz() {
+        return {};
+    }
+
 } // controller

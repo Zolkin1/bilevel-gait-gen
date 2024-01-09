@@ -42,12 +42,18 @@ namespace controller {
 
         void InitSolver(const vector_t& state) override;
 
+        std::vector<std::vector<Eigen::Vector3d>> GetTrajViz() override;
+
+        void UpdateTrajViz();
+
     protected:
     private:
         vector_t ReconstructState(const vector_t& q, const vector_t& v, const vector_t& a) const;
 
         void MPCUpdate();
-        
+
+        vector_t NormalizeQuat(const vector_t& state);
+
         double prev_time_;
 
         QPControl qp_controller_;
@@ -66,6 +72,9 @@ namespace controller {
 
         std::mutex state_time_mut_;
         std::mutex mpc_res_mut_;
+        std::mutex traj_viz_mut_;
+
+        std::vector<std::vector<Eigen::Vector3d>> fk_traj_;
 
     };
 } // controller

@@ -54,6 +54,8 @@ namespace controller {
 
         virtual void UpdateDesiredContacts(const Contact& contact);
 
+        virtual std::vector<std::vector<Eigen::Vector3d>> GetTrajViz();
+
     protected:
         /**
          * Assigns the configuration set point as the desired position

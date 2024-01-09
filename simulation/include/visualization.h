@@ -20,10 +20,15 @@ namespace simulation {
 
         void UpdateState(const vector_t& config);
         void UpdateViz(double dt);
+        void GetTrajViz(const std::vector<std::vector<Eigen::Vector3d>>& traj_viz);
 
         const mjModel* GetModel() const;
     protected:
     private:
+        void UpdateTrajViz();
+
+        std::vector<std::vector<Eigen::Vector3d>> traj_viz_;
+
     };
 } // simulation
 

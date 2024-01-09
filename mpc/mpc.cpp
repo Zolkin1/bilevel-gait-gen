@@ -191,6 +191,9 @@ namespace mpc {
 
         // TODO: This conversion isn't perfect. Need to investigate
         prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, state);
+        for (int node = 0; node < info_.num_nodes; node++) {
+            prev_traj_.UpdateFullVelocity(node, GetTargetVelocity(GetTime(node)));
+        }
 
         stats_timer_.StartTimer();
         RecordStats(alpha, p, qp_solver->GetSolveQuality(), state);

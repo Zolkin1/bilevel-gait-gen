@@ -171,6 +171,7 @@ namespace simulation {
 
             // update scene and render
             mjv_updateScene(m, d, &opt, NULL, &cam, mjCAT_ALL, &scn);
+            UpdateTrajViz();
             mjr_render(viewport, &scn, &con);
 
             // swap OpenGL buffers (blocking call due to v-sync)
@@ -201,4 +202,44 @@ namespace simulation {
     const mjModel* Visualizer::GetModel() const {
         return m;
     }
+
+    void Visualizer::UpdateTrajViz() {
+        if (!traj_viz_.empty()) {
+//            scn.ngeom = 0;
+            const mjtNum mat[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+            const float rgba_va[4] = {1, 1, 0, 1};
+            const mjtNum size[3] = {1, 1, 1};
+            const mjtNum pos[3] = {1, 1, 1};
+            mjtNum from[3];
+            mjtNum to[3];
+
+            for (int ee = 0; ee < traj_viz_.size(); ee++) { // end effectors
+                for (int node = 0; node < traj_viz_.at(ee).size() - 1; node++) {   // node
+                    for (int coord = 0; coord < 3; coord++) {   // coordinate
+                        from[coord] = traj_viz_.at(ee).at(node)(coord);
+                        to[coord] = traj_viz_.at(ee).at(node+1)(coord);
+                    }
+
+                    scn.ngeom += 1;
+                    mjv_initGeom(&scn.geoms[scn.ngeom - 1],
+                                 mjtGeom::mjGEOM_CAPSULE,
+                                 size,
+                                 pos,
+                                 nullptr,
+                                 rgba_va);
+
+                    mjv_connector(&scn.geoms[scn.ngeom - 1],
+                                  mjtGeom::mjGEOM_CAPSULE,
+                                  0.005,
+                                  from,
+                                  to);
+                }
+            }
+        }
+    }
+
+    void Visualizer::GetTrajViz(const std::vector<std::vector<Eigen::Vector3d>>& traj_viz) {
+        traj_viz_ = traj_viz;
+    }
+
 }

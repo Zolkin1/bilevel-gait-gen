@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 
 #include "inputs.h"
+#include "centroidal_model.h"
 
 namespace mpc {
     using vector_t = Eigen::VectorXd;
@@ -94,6 +95,14 @@ namespace mpc {
 
         bool IsSplineMutable(int ee, int coord) const;
 
+        void UpdateFullVelocity(int node, const vector_t& vel);
+
+        vector_t GetFullVelocity(int node);
+
+        vector_t GetAcc(int node, double dt);
+
+        std::vector<std::vector<Eigen::Vector3d>> CreateVizData(const CentroidalModel& model);
+
     protected:
     private:
         void UpdatePosSplineVarsCount();
@@ -110,6 +119,9 @@ namespace mpc {
 
         double swing_height_;
         double foot_offset_;
+        std::vector<vector_t> full_velocities_; // TODO: Do this cleaner
+
+        std::vector<std::vector<Eigen::Vector3d>> fk_traj_;
     };
 } // mpc
 
