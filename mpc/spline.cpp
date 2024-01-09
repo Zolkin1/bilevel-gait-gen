@@ -20,8 +20,6 @@ namespace mpc {
         total_poly_ = 0;
         num_constant_ = 0;
 
-        // On 12/13/23 at 11:29am: making it so that in the initialization we don't always start on a constant
-
         poly_vars_.push_back(ZERO_CONSTANT);
         poly_times_.push_back(0);
 
@@ -244,7 +242,6 @@ namespace mpc {
         return vars;
     }
 
-    // TODO: Change for mutability
     vector_t Spline::GetAllPolyVars() const {
         vector_t all_vars = vector_t::Zero(num_all_poly_vars);
         int idx = 0;
@@ -529,7 +526,7 @@ namespace mpc {
 
                 } else if (poly_vars_.at(i).size() == 1) {
                     // Then we are removing the last part of a constant segment
-                    total_poly_--;  // TODO: Do I need to update this for the force spline too?
+                    total_poly_--;
                     num_constant_--;
                     if (type_ == Normal) {
                         num_all_poly_vars--;

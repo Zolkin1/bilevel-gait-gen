@@ -71,10 +71,6 @@ int main() {
     mpc.SetStateTrajectoryWarmStart(warm_start);
 
     // Create weights
-    // TODO: Can probably tune this to get better performance
-
-    // TODO: Add better costs (more expressive). Add things like a better reference and nominal foothold locations
-
     matrix_t Q = 2*matrix_t::Identity(24, 24);
     Q.topLeftCorner<6,6>() = matrix_t::Zero(6, 6);
     Q(0,0) = 0.0;
@@ -109,8 +105,8 @@ int main() {
     // Add in costs
     mpc.AddQuadraticTrackingCost(des_alg, Q);
     mpc.AddForceCost(0.0);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
-    mpc.SetQuadraticFinalCost(500*Q);
-    mpc.SetLinearFinalCost(-500*Q*des_alg);
+    mpc.SetQuadraticFinalCost(5000*Q);
+    mpc.SetLinearFinalCost(-5000*Q*des_alg);
 
     // Create the MPC controller (only used here for the visualizer)
     std::unique_ptr<controller::Controller> mpc_controller;
@@ -122,13 +118,15 @@ int main() {
                                                                  config.ParseNumber<double>("friction_coef"),
                                                                  config.ParseStdVector<double>("base_pos_gains"),
                                                                  config.ParseStdVector<double>("base_ang_gains"),
-                                                                 config.ParseStdVector<double>("joint_gains"),
+                                                                 config.ParseEigenVector("kp_joint_gains"),
+                                                                 config.ParseEigenVector("kd_joint_gains"),
                                                                  config.ParseNumber<double>("leg_tracking_weight"),
                                                                  config.ParseNumber<double>("torso_tracking_weight"),
                                                                  config.ParseNumber<double>("force_tracking_weight"),
                                                                  info,
                                                                  warm_start,
-                                                                 mpc_des_state);
+                                                                 mpc_des_state,
+                                                                 config.ParseNumber<int>("num_polys"));
 
     // Make the robot for visualization
     auto robot_file = config.ParseString("robot_xml");

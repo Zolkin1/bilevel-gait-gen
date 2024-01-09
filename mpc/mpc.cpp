@@ -116,7 +116,6 @@ namespace mpc {
         }
     }
 
-    // TODO: Optimize constraints time and qp setup time
     Trajectory MPC::Solve(const vector_t &state, double init_time) {
         solve_timer_.StartTimer();
 
@@ -147,8 +146,6 @@ namespace mpc {
         AddFinalCost();
 
         // -------------------- Constraints ---------------------- //
-        // TODO: Only update the ones that change (?)
-        // TODO: Consider multi-threading
         constraint_idx_ = 0;
         utils::Timer dynamics_timer("dynamics constraints");
         dynamics_timer.StartTimer();
@@ -158,7 +155,7 @@ namespace mpc {
         AddFKConstraints(state);
         AddFrictionConeConstraints();
         AddBoxConstraints();
-        AddForceBoxConstraints(); // TODO: Can just do this in the z axis and will be enforced via the cone
+        AddForceBoxConstraints();
         constraint_costs_timer_.StopTimer();
 
         // ----------------------- Solve ------------------------- //
@@ -189,7 +186,6 @@ namespace mpc {
 
         prev_qp_sol = ((alpha * p) + prev_qp_sol).eval();
 
-        // TODO: This conversion isn't perfect. Need to investigate
         prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, state);
         for (int node = 0; node < info_.num_nodes; node++) {
             prev_traj_.UpdateFullVelocity(node, GetTargetVelocity(GetTime(node)));
@@ -433,9 +429,8 @@ namespace mpc {
         for (int node = 0; node < info_.num_nodes+1; node++) {
             double time = GetTime(node);
             for (int ee = 0; ee < num_ee_; ee++) {
-                // TODO: Consider using only the z coordinate
-//                const int coord = 2;
-                for (int coord = 0; coord < POS_VARS; coord++) {
+                const int coord = 2;
+//                for (int coord = 0; coord < POS_VARS; coord++) {
                     if (prev_traj_.GetInputs().IsForceMutable(ee, coord, time)) {
                         int vars_index, vars_affecting;
                         std::tie(vars_index, vars_affecting) = prev_traj_.GetInputs().GetForceSplineIndex(ee, time,
@@ -453,7 +448,7 @@ namespace mpc {
                         data_.force_box_ub_(row_idx) = info_.force_bound;
                         row_idx++;
                     }
-                }
+//                }
             }
         }
         constraint_idx_ += row_idx;
@@ -825,13 +820,12 @@ namespace mpc {
         int count = 0;
         for (int node = 0; node < info_.num_nodes+1; node++) {
             for (int ee = 0; ee < num_ee_; ee++) {
-                // TODO: Consider changing this back to z only
-//                const int coord = 2;
-                for (int coord = 0; coord < POS_VARS; coord++) {
+                const int coord = 2;
+//                for (int coord = 0; coord < POS_VARS; coord++) {
                     if (prev_traj_.GetInputs().IsForceMutable(ee, coord, GetTime(node))) {
                         count++;
                     }
-                }
+//                }
             }
         }
 

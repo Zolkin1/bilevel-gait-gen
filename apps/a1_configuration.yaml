@@ -69,14 +69,16 @@ torque_bounds: [100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100]
 friction_coef: 0.3
+
+# TODO: Tune
 base_pos_gains: [0, 0]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
 base_ang_gains: [0, 0]  # kd_ang, kp_ang
-joint_gains: [1, 100]     # I can get these pretty high without getting close to the torque bounds
-
+kp_joint_gains: [0, 0, 0, 200, 200, 200, 200, 200, 200, 0, 0, 0]
+kd_joint_gains: [0, 0, 0, 20, 20, 20, 20, 20, 20, 0, 0, 0]
 # 400, 400, 0, 0, 400, 1000
 
-leg_tracking_weight: 10
-torso_tracking_weight: 1
+leg_tracking_weight: 0.1
+torso_tracking_weight: 10
 force_tracking_weight: 0
 
 ## ----------------------- MPC ----------------------- ##
@@ -108,8 +110,8 @@ swing_height: 0.12
 
 num_polys: 3
 
-x_des: 1
-y_des: 0
+x_des: 2
+y_des: 1
 
 run_time_iterations: 200
 

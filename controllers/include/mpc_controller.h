@@ -25,13 +25,15 @@ namespace controller {
                   const Eigen::VectorXd& torque_bounds, double friction_coef,
                   const std::vector<double>& base_pos_gains,
                   const std::vector<double>& base_ang_gains,
-                  const std::vector<double>& joint_gains,
+                  const vector_t& kp_joint_gains,
+                  const vector_t& kd_joint_gains,
                   double leg_weight,
                   double torso_weight,
                   double force_weight,
                   mpc::MPCInfo info,
                   const std::vector<vector_t>& warm_start_states,
-                  const vector_t& state_des);
+                  const vector_t& state_des,
+                  int num_polys);
 
         vector_t ComputeControlAction(const vector_t& q,
                                       const vector_t& v,

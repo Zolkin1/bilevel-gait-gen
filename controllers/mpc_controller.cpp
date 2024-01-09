@@ -8,15 +8,19 @@ namespace controller {
     MPCController::MPCController(double control_rate, std::string robot_urdf, const std::string &foot_type, int nv,
                                  const Eigen::VectorXd &torque_bounds, double friction_coef,
                                  const std::vector<double>& base_pos_gains, const std::vector<double>& base_ang_gains,
-                                 const std::vector<double>& joint_gains, double leg_weight, double torso_weight,
+                                 const vector_t& kp_joint_gains,
+                                 const vector_t& kd_joint_gains,
+                                 double leg_weight, double torso_weight,
                                  double force_weight, mpc::MPCInfo info,
                                  const std::vector<vector_t>& warm_start_states,
-                                 const vector_t& state_des) : Controller(control_rate, robot_urdf, foot_type),
+                                 const vector_t& state_des,
+                                 int num_polys) : Controller(control_rate, robot_urdf, foot_type),
                                  qp_controller_(control_rate, robot_urdf, foot_type, nv,
                                                torque_bounds, friction_coef,
                                                base_pos_gains,
                                                base_ang_gains,
-                                               joint_gains,
+                                               kp_joint_gains,
+                                               kd_joint_gains,
                                                leg_weight,
                                                torso_weight,
                                                force_weight,
@@ -24,7 +28,7 @@ namespace controller {
                                  mpc_(info, robot_urdf),
                                  traj_(10, 24, 12, mpc_.CreateDefaultSwitchingTimes(2,4,1.0),
                                         0.015, 0.75, 0.0),
-                                 fk_traj_(5) {
+                                 fk_traj_(5) {  // TODO: Not hard coded
 
         // TODO: Get this from IC
         std::array<std::array<double, 3>, 4> ee_pos{};
@@ -35,7 +39,7 @@ namespace controller {
 
         mpc_.SetStateTrajectoryWarmStart(warm_start_states);
 
-        mpc_.SetDefaultGaitTrajectory(mpc::Gaits::Trot, 3, ee_pos); // TODO: Get this from the config file
+        mpc_.SetDefaultGaitTrajectory(mpc::Gaits::Trot, num_polys, ee_pos);
 
         matrix_t Q = 2*matrix_t::Identity(24, 24);
         Q.topLeftCorner<6,6>() = matrix_t::Zero(6, 6);
@@ -76,14 +80,13 @@ namespace controller {
         prev_time_ = 0;
         computed_ = false;
 
-        for (int ee = 0; ee < 4; ee++) {    // TODO make not hard coded
-            fk_traj_.at(ee).resize(info.num_nodes + 1);
+        for (auto& ee : fk_traj_) {
+            ee.resize(info.num_nodes + 1);
         }
     }
 
     void MPCController::InitSolver(const vector_t& state) {
         state_ = state;
-//        state_(14) = -0.5;
 
         mpc_.CreateInitialRun(state_);
         mpc_.PrintStats();
@@ -103,35 +106,22 @@ namespace controller {
     vector_t MPCController::ComputeControlAction(const vector_t& q, const vector_t& v,
                                                  const vector_t& a, const controller::Contact& contact,
                                                  double time) {
-        // TODO: Investigate all the conversions - may be causing an issue
         const vector_t state = ReconstructState(q, v, a);
         state_time_mut_.lock();
         state_ = state;
         time_ = time;
         state_time_mut_.unlock();
 
-//        if (time - prev_time_ >= 0.015) {
-//            mpc_.GetRealTimeUpdate(50, state, time);
-//            prev_time_ = time;
-//            std::cout << "movement error at " << time << "s \n" << traj_.GetState(1) - state << std::endl;
-//        }
-//        traj_ = mpc_.GetTrajectory();
-
-//        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
         mpc_res_mut_.lock();
         int node = mpc_.GetNode(time)+1;
 
         qp_controller_.UpdateTargetConfig(traj_.GetState(node).tail(num_inputs_ + FLOATING_BASE_OFFSET));
         qp_controller_.UpdateTargetVel(traj_.GetFullVelocity(node)); // TODO: Fix
-        qp_controller_.UpdateTargetAcc(traj_.GetAcc(node, 0.015)); // TODO: Make not hard coded
+//        qp_controller_.UpdateTargetAcc(traj_.GetAcc(node, 0.015)); // TODO: Make not hard coded
         qp_controller_.UpdateForceTargets(force_des_);
         mpc_res_mut_.unlock();
 
         Contact contact1 = mpc_.GetDesiredContacts(time);
-//        contact1.in_contact_ = {false, true, true, false};
-//        contact1.contact_frames_ = {14, 24, 34, 44};
-
         qp_controller_.UpdateDesiredContacts(contact1);
 
         return qp_controller_.ComputeControlAction(q, v, a, contact, time);
@@ -178,7 +168,7 @@ namespace controller {
         vector_t state;
         double time = -1;
 
-        while(true) {   // TODO: Add an end condition
+        while(true) {
             state_time_mut_.lock();
             double time_act = time_;
             state_time_mut_.unlock();
@@ -193,10 +183,6 @@ namespace controller {
 //                std::this_thread::sleep_for(std::chrono::milliseconds(40));
 
                 mpc_res_mut_.lock();
-//            q_des_ = mpc_.GetNextTargetConfig();
-//                v_des_ = mpc_.GetTargetVelocity(time);
-//            a_des_ = mpc_.GetTargetAcc(time);
-//            force_des_ = mpc_.GetForceTarget(time);
                 traj_ = mpc_.GetTrajectory();
                 UpdateTrajViz();
                 mpc_res_mut_.unlock();

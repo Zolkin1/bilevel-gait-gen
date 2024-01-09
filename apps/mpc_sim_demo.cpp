@@ -65,13 +65,15 @@ int main() {
                                               config.ParseNumber<double>("friction_coef"),
                                               config.ParseStdVector<double>("base_pos_gains"),
                                               config.ParseStdVector<double>("base_ang_gains"),
-                                              config.ParseStdVector<double>("joint_gains"),
+                                              config.ParseEigenVector("kp_joint_gains"),
+                                              config.ParseEigenVector("kd_joint_gains"),
                                               config.ParseNumber<double>("leg_tracking_weight"),
                                               config.ParseNumber<double>("torso_tracking_weight"),
                                               config.ParseNumber<double>("force_tracking_weight"),
                                               info,
                                               warm_start_states,
-                                              mpc_des_state);
+                                              mpc_des_state,
+                                              config.ParseNumber<int>("num_polys"));
 
     // Make the robot for simulation
     auto robot_file = config.ParseString("robot_xml");

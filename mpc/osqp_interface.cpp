@@ -3,8 +3,6 @@
 //
 #include "osqp_interface.h"
 
-// TODO: Consider pre-conditioning
-
 namespace mpc {
     OSQPInterface::OSQPInterface(QPData data, bool verbose)
         : QPInterface(data.num_decision_vars), verbose_(verbose), osqp_interface_timer_("osqp setup"),
@@ -23,7 +21,7 @@ namespace mpc {
         qp_solver_.settings()->setMaxIteration(1000);
         qp_solver_.settings()->setRho(.01);
 //        qp_solver_.settings()->setAlpha(1.6);
-        qp_solver_.settings()->setWarmStart(true);     // TODO: figure out warm starting with changing sizes
+        qp_solver_.settings()->setWarmStart(true);
         qp_solver_.settings()->setScaling(3);
         qp_solver_.settings()->setLinearSystemSolver(1);
 
@@ -117,12 +115,6 @@ namespace mpc {
 
         if (verbose_) {
             vector_t temp = A_ * qp_sol - ub_;
-//            std::cout << "diff on upper bound: \n ---------- Dynamics ----------\n"
-//                      << (temp).head(data.num_dynamics_constraints) <<
-//                      "\n---------- Equality ----------\n"
-//                      << (temp).segment(data.num_dynamics_constraints, data.num_equality_constraints) <<
-//                      "\n---------- Inequality ----------\n" << (temp).tail(data.num_inequality_constraints)
-//                      << std::endl;
 
             std::cout << "--- Solve Stats ---" << std::endl;
             std::cout << "max diff: " << temp.maxCoeff() << std::endl;
@@ -139,11 +131,8 @@ namespace mpc {
             std::cout << std::endl;
         }
 
-//        std::cout << "diff on uper bound: \n" << A_*qp_sol - ub_ << std::endl;
-
         run++;
 
-//        qp_sol.head(data.num_dynamics_constraints) = qp_sol.head(data.num_dynamics_constraints)/10;
         return qp_sol;
     }
 

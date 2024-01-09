@@ -48,12 +48,14 @@
 
 namespace controller {
     class QPControl : public Controller {
+        using vector_t = Eigen::VectorXd;
     public:
         QPControl(double control_rate, std::string robot_urdf, const std::string& foot_type, int nv,
                   const Eigen::VectorXd& torque_bounds, double friction_coef,
-                  std::vector<double> base_pos_gains,
-                  std::vector<double> base_ang_gains,
-                  std::vector<double> joint_gains,
+                  const std::vector<double>& base_pos_gains,
+                  const std::vector<double>& base_ang_gains,
+                  const vector_t& kp_joint_gains,
+                  const vector_t& kd_joint_gains,
                   double leg_weight,
                   double torso_weight,
                   double force_weight,
@@ -74,7 +76,7 @@ namespace controller {
          * @param kv
          * @param kp
          */
-        void SetJointGains(double kv, double kp);
+        void SetJointGains(const vector_t& kv, const vector_t& kp);
 
         void UpdateDesiredContacts(const Contact& contact) override;
 
@@ -187,8 +189,8 @@ namespace controller {
         double kp_ang_{};
 
         // Joint gains
-        double kv_joint_{};
-        double kp_joint_{};
+        Eigen::VectorXd kv_joint_;
+        Eigen::VectorXd kp_joint_;
 
         double friction_coef_;
 

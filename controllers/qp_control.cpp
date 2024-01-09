@@ -17,9 +17,10 @@ namespace controller {
     // TODO: Need a way to update the desired forces and make sure it is using the correct number of contacts
     QPControl::QPControl(double control_rate, std::string robot_urdf, const std::string &foot_type, int nv,
                          const Eigen::VectorXd& torque_bounds, double friction_coef,
-                         std::vector<double> base_pos_gains,
-                         std::vector<double> base_ang_gains,
-                         std::vector<double> joint_gains,
+                         const std::vector<double>& base_pos_gains,
+                         const std::vector<double>& base_ang_gains,
+                         const vector_t& kp_joint_gains,
+                         const vector_t& kd_joint_gains,
                          double leg_weight,
                          double torso_weight,
                          double force_weight,
@@ -36,7 +37,7 @@ namespace controller {
         // Set gains
         SetBasePosGains(base_pos_gains.at(0), base_pos_gains.at(1));
         SetBaseAngleGains(base_ang_gains.at(0), base_ang_gains.at(1));
-        SetJointGains(joint_gains.at(0), joint_gains.at(1));
+        SetJointGains(kd_joint_gains, kp_joint_gains);
 
         // Initialize these to 0
         config_target_ = Eigen::VectorXd::Zero(num_vel_ + 1);
@@ -94,7 +95,7 @@ namespace controller {
         kp_ang_ = kp;
     }
 
-    void QPControl::SetJointGains(double kv, double kp) {
+    void QPControl::SetJointGains(const vector_t & kv, const vector_t& kp) {
         kv_joint_ = kv;
         kp_joint_ = kp;
     }
@@ -199,8 +200,8 @@ namespace controller {
                  leg_tracking_weight_ * 2*Eigen::MatrixXd::Identity(num_inputs_, num_inputs_);
 
         Eigen::VectorXd target = acc_target_.tail(num_inputs_) +
-                                 kv_joint_*(vel_target_.tail(num_inputs_) - v.tail(num_inputs_)) +
-                                 kp_joint_*(config_target_.tail(num_inputs_) - q.tail(num_inputs_));
+                                 kv_joint_.cwiseProduct(vel_target_.tail(num_inputs_) - v.tail(num_inputs_)) +
+                                 kp_joint_.cwiseProduct(config_target_.tail(num_inputs_) - q.tail(num_inputs_));
 
         w_.segment(FLOATING_VEL_OFFSET, num_inputs_) = -2*target*leg_tracking_weight_;
     }

@@ -39,7 +39,6 @@ namespace mpc {
         }
     }
 
-    // TODO: Implement an equality operator
     Trajectory& Trajectory::operator=(const Trajectory& traj) {
         if (this == &traj) {
             return *this;
@@ -254,10 +253,8 @@ namespace mpc {
         return num_constants;
     }
 
-    // TODO: think about this more
     double Trajectory::GetTotalTime() const {
-//        assert(end_effector_pos_.at(0).at(0).GetEndTime() == inputs_.GetForces().at(0).at(0).GetEndTime());
-        return std::min(end_effector_pos_.at(0).at(0).GetEndTime(), inputs_.GetForces().at(0).at(0).GetEndTime());
+        return std::min(end_effector_pos_.at(0).at(0).GetEndTime(), inputs_.GetForces().at(0).at(0).GetEndTime());  // In theory this is redundant
     }
 
     void Trajectory::AddPolys(double final_time) {
@@ -305,13 +302,13 @@ namespace mpc {
             end_effector_pos_.at(ee).at(coord) = pos_spline;
             inputs_.SetForceSpline(ee, coord, force_spline);
         }
-        // TODO: Consider doing this differently
+
         SetSwingPosZ();
     }
 
     vector_t Trajectory::ConvertToQPVector() const {
         vector_t qp_vec = vector_t::Zero(pos_spline_vars_ + inputs_.GetTotalForceSplineVars()
-                + inputs_.GetAllVels().at(0).size()*(inputs_.GetAllVels().size()-1) // TODO: Why?
+                + inputs_.GetAllVels().at(0).size()*(inputs_.GetAllVels().size()-1)
                 + (states_.at(0).size()-1)*states_.size());
 
         for (int i = 0; i < states_.size(); i++) {
@@ -414,11 +411,11 @@ namespace mpc {
     }
 
     vector_t Trajectory::GetFullVelocity(int node) {
-        return full_velocities_.at(node);
+        return -full_velocities_.at(node);
     }
 
     vector_t Trajectory::GetAcc(int node, double dt) {
-        return -0.5*(full_velocities_.at(node+1) - full_velocities_.at(node))/dt;
+        return -(full_velocities_.at(node+1) - full_velocities_.at(node))/dt;
     }
 
     std::vector<std::vector<Eigen::Vector3d>> Trajectory::CreateVizData(const CentroidalModel& model) {

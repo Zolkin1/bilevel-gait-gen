@@ -59,7 +59,6 @@ namespace mpc {
 
         Trajectory GetRealTimeUpdate(double run_time_iters, const vector_t& state, double init_time);
 
-        // TODO: Maybe move to private
         Trajectory Solve(const vector_t& state, double init_time);
 
         void SetWarmStartTrajectory(const Trajectory& trajectory);
@@ -74,14 +73,6 @@ namespace mpc {
         void SetLinearFinalCost(const vector_t& w);
 
         void AddQuadraticTrackingCost(const vector_t& state_des, const matrix_t& Q);
-
-        // TODO: Support gauss newton on the cost. For now just accept quadratic cost
-        // TODO: Make private
-        void AddHessianApproxCost();
-
-        void AddGradientCost();
-
-        void AddFinalCost();
 
         /**
          * Creates a default switching time vector for use in initialization
@@ -171,6 +162,13 @@ namespace mpc {
 
         void SetInitQPSizes();
 
+        // TODO: Support gauss newton on the cost. For now just accept quadratic cost
+        void AddHessianApproxCost();
+
+        void AddGradientCost();
+
+        void AddFinalCost();
+
         // ---------------- Member Variables ---------------- //
         // Centroidal model
         CentroidalModel model_;
@@ -180,14 +178,9 @@ namespace mpc {
         // MPC info
         const MPCInfo info_;
 
-        // TODO: make const
-        int num_states_;    // number of states in the MPC model, not in the underlying pinocchio model
-        int num_joints_;
-        int num_ee_;
-
-        // force parameterization
-
-        // position parameterization
+        const int num_states_;    // number of states in the MPC model, not in the underlying pinocchio model
+        const int num_joints_;
+        const int num_ee_;
 
         // friction pyramid
         Eigen::Matrix<double, 4, 3> friction_pyramid_;
