@@ -122,6 +122,8 @@ namespace mpc {
 
         void AddFKConstraints(const vector_t& state);
 
+        void AddFKConstraintsProjection(const vector_t& state);
+
         void AddBoxConstraints();
 
         void AddForceBoxConstraints();
@@ -156,7 +158,7 @@ namespace mpc {
         double GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state);
 
         void RecordStats(double alpha, const vector_t& direction, const std::string& solve_type,
-                         const vector_t& ref_state);
+                         const vector_t& ref_state, double solve_time);
 
         int GetNodeIntersectMutableForces() const;
 
@@ -225,6 +227,7 @@ namespace mpc {
         std::vector<double> merit_directional_deriv_;
         std::vector<std::string> solve_type_;
         std::vector<vector_t> ref_state_;
+        std::vector<double> solve_time_;
 
         utils::Timer solve_timer_;
         utils::Timer constraint_costs_timer_;
@@ -240,6 +243,8 @@ namespace mpc {
 
         matrix_t A_, B_;
         vector_t C_;
+
+        const bool constraint_projection_;
     };
 } // mpc
 

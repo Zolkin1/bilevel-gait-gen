@@ -7,8 +7,7 @@ namespace mpc {
     OSQPInterface::OSQPInterface(QPData data, bool verbose)
         : QPInterface(data.num_decision_vars), verbose_(verbose), osqp_interface_timer_("osqp setup"),
           sparse_conversion_timer_("sparse conversion"),
-          matrix_gather_timer_("matrix formation"),
-          A_(1000,1000){
+          matrix_gather_timer_("matrix formation") {
 
         // Set solver settings
         qp_solver_.settings()->setVerbosity(false);
@@ -32,12 +31,14 @@ namespace mpc {
         prev_num_decision_ = 0;
     }
 
-    void OSQPInterface::SetupQP(const mpc::QPData &data, const vector_t& warm_start) {
+    void OSQPInterface::SetupQP(QPData& data, const vector_t& warm_start) {
         osqp_interface_timer_.StartTimer();
 
-        ConvertDataToOSQPConstraints(data);
-        ConvertDataToOSQPCost(data);
+//        ConvertDataToOSQPConstraints(data);
+//        ConvertDataToOSQPCost(data);
 
+        // TODO: I will have an "inefficient start" in both branches if the sparsity pattern is NOT preserved.
+        // TODO: Figure out a way to have the sparsity pattern preserved
         if (prev_num_constraints_ != data.GetTotalNumConstraints() || prev_num_decision_ != data.num_decision_vars) {
             qp_solver_.data()->setNumberOfVariables(data.num_decision_vars);
             qp_solver_.data()->setNumberOfConstraints(data.GetTotalNumConstraints());
@@ -49,13 +50,14 @@ namespace mpc {
             qp_solver_.data()->clearHessianMatrix();
             qp_solver_.clearSolver();
 
-            if (!(qp_solver_.data()->setLinearConstraintsMatrix(A_) &&
-                  qp_solver_.data()->setBounds(lb_, ub_))) {
+            if (!(qp_solver_.data()->setLinearConstraintsMatrix(data.sparse_constraint_) &&
+                  qp_solver_.data()->setBounds(data.lb_, data.ub_))) {
                 throw std::runtime_error("Unable to add the constraints to the QP solver.");
             }
 
             // Set solver costs
-            if (!(qp_solver_.data()->setHessianMatrix(P_) && qp_solver_.data()->setGradient(w_))) {
+            if (!(qp_solver_.data()->setHessianMatrix(data.sparse_cost_) &&
+            qp_solver_.data()->setGradient(data.cost_linear))) {
                 throw std::runtime_error("Unable to add the costs to the QP solver.");
             }
 
@@ -64,12 +66,12 @@ namespace mpc {
                 throw std::runtime_error("Unable to initialize the solver.");
             }
             qp_solver_.setWarmStart(warm_start, prev_dual_sol_);
-            std::cerr << "Inefficient start." << std::endl;
+//            std::cerr << "Inefficient start." << std::endl;
         } else {
-            qp_solver_.updateHessianMatrix(P_);
-            qp_solver_.updateGradient(w_);
-            qp_solver_.updateLinearConstraintsMatrix(A_);
-            qp_solver_.updateBounds(lb_, ub_);
+            qp_solver_.updateHessianMatrix(data.sparse_cost_);
+            qp_solver_.updateGradient(data.cost_linear);
+            qp_solver_.updateLinearConstraintsMatrix(data.sparse_constraint_);
+            qp_solver_.updateBounds(data.lb_, data.ub_);
 //            qp_solver_.setWarmStart(warm_start, prev_dual_sol_);
         }
 
@@ -94,7 +96,7 @@ namespace mpc {
 //        }
 
         osqp_interface_timer_.StopTimer();
-        std::cout << std::endl;
+//        std::cout << std::endl;
         osqp_interface_timer_.PrintElapsedTime();
 //        sparse_conversion_timer_.PrintElapsedTime();
 //        matrix_gather_timer_.PrintElapsedTime();
@@ -114,7 +116,7 @@ namespace mpc {
         prev_dual_sol_ = qp_solver_.getDualSolution();
 
         if (verbose_) {
-            vector_t temp = A_ * qp_sol - ub_;
+            vector_t temp = data.sparse_constraint_ * qp_sol - data.ub_;
 
             std::cout << "--- Solve Stats ---" << std::endl;
             std::cout << "max diff: " << temp.maxCoeff() << std::endl;
@@ -136,41 +138,45 @@ namespace mpc {
         return qp_sol;
     }
 
-    void OSQPInterface::ConvertDataToOSQPConstraints(const mpc::QPData& data) {
-        if (A_.rows() != data.GetTotalNumConstraints() || A_.cols() != data.num_decision_vars) {
-            A_.resize(data.GetTotalNumConstraints(), data.num_decision_vars);
-        }
+//    void OSQPInterface::ConvertDataToOSQPConstraints(const mpc::QPData& data) {
+//        if (A_.rows() != data.GetTotalNumConstraints() || A_.cols() != data.num_decision_vars) {
+//            A_.resize(data.GetTotalNumConstraints(), data.num_decision_vars);
+//        }
+//
+//        A_.setFromTriplets(data.constraint_mat_.GetTriplet().begin(), data.constraint_mat_.GetTriplet().end());
+//
+////        Eigen::ColPivHouseholderQR<matrix_t> qr_mat(A_.middleRows(data.num_dynamics_constraints + data.num_fk_ineq_constraints_, data.num_fk_constraints_));
+////        std::cout << "rank: " << qr_mat.rank() << ", rows: " << qr_mat.rows() << ", cols: " << qr_mat.cols() << std::endl;
+//
+//
+//        lb_.resize(data.GetTotalNumConstraints());
+//        ub_.resize(data.GetTotalNumConstraints());
+//
+//        lb_ << data.dynamics_constants,
+//                data.fk_lb_,
+//                data.fk_constants_,
+//                data.friction_cone_lb_,
+//                data.box_lb_,
+//                data.force_box_lb_;
+//
+//        ub_ << data.dynamics_constants,
+//                data.fk_ub_,
+//                data.fk_constants_,
+//                data.friction_cone_ub_,
+//                data.box_ub_,
+//                data.force_box_ub_;
+//    }
 
-        A_.setFromTriplets(data.constraint_mat_.GetTriplet().begin(), data.constraint_mat_.GetTriplet().end());
-
-        lb_.resize(data.GetTotalNumConstraints());
-        ub_.resize(data.GetTotalNumConstraints());
-
-        lb_ << data.dynamics_constants,
-                data.fk_lb_,
-                data.fk_constants_,
-                data.friction_cone_lb_,
-                data.box_lb_,
-                data.force_box_lb_;
-
-        ub_ << data.dynamics_constants,
-                data.fk_ub_,
-                data.fk_constants_,
-                data.friction_cone_ub_,
-                data.box_ub_,
-                data.force_box_ub_;
-    }
-
-    void OSQPInterface::ConvertDataToOSQPCost(const mpc::QPData& data) {
-        if (P_.rows() != data.num_decision_vars || P_.cols() != data.num_decision_vars) {
-            P_.resize(data.num_decision_vars, data.num_decision_vars);
-        }
-
-        P_.setFromTriplets(data.cost_mat_.GetTriplet().begin(), data.cost_mat_.GetTriplet().end());
-
-        w_.resize(data.num_decision_vars);
-        w_ << data.cost_linear;
-    }
+//    void OSQPInterface::ConvertDataToOSQPCost(const mpc::QPData& data) {
+//        if (P_.rows() != data.num_decision_vars || P_.cols() != data.num_decision_vars) {
+//            P_.resize(data.num_decision_vars, data.num_decision_vars);
+//        }
+//
+//        P_.setFromTriplets(data.cost_mat_.GetTriplet().begin(), data.cost_mat_.GetTriplet().end());
+//
+//        w_.resize(data.num_decision_vars);
+//        w_ << data.cost_linear;
+//    }
 
     vector_t OSQPInterface::GetInfinity(int size) const {
         vector_t infty = vector_t::Constant(size, OsqpEigen::INFTY);

@@ -21,6 +21,7 @@ add_library(mpc mpc.cpp
         euler_integrator.cpp
         osqp_interface.cpp
         rk_integrator.cpp
+        qp_data.cpp
         ${MPC_HEADER_LIST})
 target_include_directories(mpc PUBLIC include)
 

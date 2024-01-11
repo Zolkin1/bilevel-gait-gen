@@ -46,7 +46,9 @@ namespace mpc {
         poly_update_timer_("spline update"),
         data_update_timer_("data update"),
         qp_solve_timer_("QP solve"),
-        stats_timer_("recording stats"){
+        stats_timer_("recording stats"),
+        constraint_projection_(false),
+        data_(false, 25000, 2000) {
 
         assert(info_.ee_frames.size() == num_ee_);
 
@@ -151,12 +153,22 @@ namespace mpc {
         dynamics_timer.StartTimer();
         AddDynamicsConstraints(state);  // TODO: Speed up
         dynamics_timer.StopTimer();
-        dynamics_timer.PrintElapsedTime();
-        AddFKConstraints(state);
+//        dynamics_timer.PrintElapsedTime();
+        if (constraint_projection_) {
+            AddFKConstraintsProjection(state);
+        } else {
+            AddFKConstraints(state);
+        }
         AddFrictionConeConstraints();
         AddBoxConstraints();
         AddForceBoxConstraints();
         constraint_costs_timer_.StopTimer();
+
+        data_.ConstructSparseMats();
+        data_.ConstructVectors();
+        if (constraint_projection_) {
+            data_.ApplyProjection();
+        }
 
         // ----------------------- Solve ------------------------- //
         qp_solver->SetupQP(data_, prev_qp_sol);
@@ -191,20 +203,21 @@ namespace mpc {
             prev_traj_.UpdateFullVelocity(node, GetTargetVelocity(GetTime(node)));
         }
 
+        solve_timer_.StopTimer();
+
         stats_timer_.StartTimer();
-        RecordStats(alpha, p, qp_solver->GetSolveQuality(), state);
+        RecordStats(alpha, p, qp_solver->GetSolveQuality(), state,
+                    solve_timer_.GetElapsedTimeMilliseconds());
         stats_timer_.StopTimer();
 
         run_num_++;
-
-        solve_timer_.StopTimer();
 
         constraint_costs_timer_.PrintElapsedTime();
         line_search_timer_.PrintElapsedTime();
         poly_update_timer_.PrintElapsedTime();
         data_update_timer_.PrintElapsedTime();
         qp_solve_timer_.PrintElapsedTime();
-        stats_timer_.PrintElapsedTime();
+//        stats_timer_.PrintElapsedTime();
         solve_timer_.PrintElapsedTime();
         std::cout << "-----------" << std::endl;
 
@@ -373,6 +386,81 @@ namespace mpc {
             }
         }
         constraint_idx_ = constraint_idx_ + idx_eq + data_.num_fk_ineq_constraints_;
+    }
+
+    void MPC::AddFKConstraintsProjection(const vector_t& state) {
+        matrix_t G;
+        vector_t g;
+
+        const int spline_offset = GetPosSplineStartIdx();
+        int idx_eq = 0;
+        int idx_ineq = 0;
+        const double margin = .01;
+
+        for (int node = 0; node < info_.num_nodes+1; node++) {
+            double time = GetTime(node);
+            vector_t state1 = prev_traj_.GetStates().at(node);
+            if (node == 0) {
+                state1 = state;
+            }
+
+            for (int ee = 0; ee < num_ee_; ee++) {
+                model_.GetFKLinearization(state1, state, prev_traj_.GetInputs(), ee, G, g);
+                if (node >= num_ineq_fk_) {
+                    data_.constraint_projections_.constraint_mat_.block(idx_eq,
+                node * num_states_ + CentroidalModel::MOMENTUM_OFFSET, G.rows(), G.cols()) = G;
+
+                    data_.constraint_projections_.b_.segment(idx_eq, POS_VARS) = -g;
+                } else {
+                    // We only need the margin in the z direction, in x and y we can treat it as an equality
+                    data_.constraint_mat_.SetMatrix(G.bottomRows<1>(),
+                                                    constraint_idx_ + idx_ineq,
+                                                    node * num_states_ + CentroidalModel::MOMENTUM_OFFSET);
+
+                    data_.fk_lb_(idx_ineq) = -g(2) - ((num_ineq_fk_ - node)*margin);
+                    data_.fk_ub_(idx_ineq) = -g(2) + ((num_ineq_fk_ - node)*margin);
+
+
+                    data_.constraint_mat_.SetMatrix(G.topRows<2>(),
+                                                    constraint_idx_ + idx_eq + data_.num_fk_ineq_constraints_,
+                                                    node * num_states_ + CentroidalModel::MOMENTUM_OFFSET);
+
+                    data_.fk_constants_.segment(idx_eq, 2) = -g.head<2>();
+                }
+
+                for (int coord = 0; coord < POS_VARS; coord++) {
+                    if (prev_traj_.IsSplineMutable(ee, coord)) {
+                        int vars_index, vars_affecting;
+                        std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, time, coord);
+
+                        if (node >= num_ineq_fk_ || coord != 2) {
+                            data_.constraint_projections_.constraint_mat_.block(
+                                    idx_eq, spline_offset + vars_index - vars_affecting,
+                                    1, vars_affecting) = -prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose();
+                            idx_eq++;
+                        } else {
+                            data_.constraint_mat_.SetMatrix(-prev_traj_.GetPositions().at(ee).at(coord).GetPolyVarsLin(time).transpose(),
+                                                            constraint_idx_ + idx_ineq,
+                                                            spline_offset + vars_index - vars_affecting);
+                            idx_ineq++;
+                        }
+                    } else {
+                        if (node >= num_ineq_fk_ || coord != 2) {
+                            data_.constraint_projections_.b_(idx_eq) +=
+                                    prev_traj_.GetPositions().at(ee).at(coord).ValueAt(time);
+                            idx_eq++;
+                        } else {
+                            data_.fk_lb_(idx_ineq) +=
+                                    prev_traj_.GetPositions().at(ee).at(coord).ValueAt(time);
+                            data_.fk_ub_(idx_ineq) +=
+                                    prev_traj_.GetPositions().at(ee).at(coord).ValueAt(time);
+                            idx_ineq++;
+                        }
+                    }
+                }
+            }
+        }
+        constraint_idx_ = constraint_idx_ + data_.num_fk_ineq_constraints_;
     }
 
     void MPC::AddFrictionConeConstraints() {
@@ -712,10 +800,7 @@ namespace mpc {
     }
 
     double MPC::GetCostValue(const vector_t& x) const {
-        // TODO: Do more efficiently
-        Eigen::SparseMatrix<double> P(x.size(), x.size());
-        P.setFromTriplets(data_.cost_mat_.GetTriplet().begin(), data_.cost_mat_.GetTriplet().end());
-        return 0.5*x.dot(P*(x)) + data_.cost_linear.dot(x);
+        return 0.5*x.dot(data_.sparse_cost_*(x)) + data_.cost_linear.dot(x);
     }
 
     // TODO: Optimize this and make it so it is called less
@@ -743,11 +828,7 @@ namespace mpc {
     double MPC::GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state) {
         const Trajectory temp_traj = ConvertQPSolToTrajectory(x, init_state);
 
-        // TODO: Do more efficiently (should probably compute this once somewhere)
-        Eigen::SparseMatrix<double> P(x.size(), x.size());
-        P.setFromTriplets(data_.cost_mat_.GetTriplet().begin(), data_.cost_mat_.GetTriplet().end());
-
-        return (P*x + data_.cost_linear).dot(p)
+        return (data_.sparse_cost_*x + data_.cost_linear).dot(p)
         - mu * GetEqualityConstraintValues(temp_traj, init_state).lpNorm<1>();
     }
 
@@ -757,7 +838,7 @@ namespace mpc {
     }
 
     void MPC::RecordStats(double alpha, const vector_t& direction, const std::string& solve_type,
-                          const vector_t& ref_state) {
+                          const vector_t& ref_state, double solve_time) {
         equality_constraint_violations_.push_back(GetEqualityConstraintValues(prev_traj_, ref_state).lpNorm<1>());
         step_norm_.push_back(direction.norm());
         alpha_.push_back(alpha);
@@ -766,6 +847,7 @@ namespace mpc {
         merit_directional_deriv_.push_back(GetMeritGradient(prev_qp_sol - alpha*direction, direction, mu_, ref_state));
         solve_type_.push_back(solve_type);
         ref_state_.push_back(ref_state);
+        solve_time_.push_back(solve_time);
     }
 
     void MPC::PrintStats() {
@@ -773,7 +855,7 @@ namespace mpc {
         using std::setfill;
 
         const int col_width = 15;
-        const int table_width = 8*col_width;
+        const int table_width = 9*col_width;
 
         std::cout << setfill('-') << setw(table_width) << "" << std::endl;
         std::cout << std::left << setfill(' ') << setw(table_width/2 - 7) << "" << "MPC Statistics" << std::endl;
@@ -781,6 +863,7 @@ namespace mpc {
 
         std::cout << setfill(' ');
         std::cout << setw(col_width) << "Solve #"
+                << setw(col_width) << "Time (ms)"
                 << setw(col_width) << "Constraints"
                 << setw(col_width) << "Step Norm"
                 << setw(col_width) << "Alpha"
@@ -792,6 +875,7 @@ namespace mpc {
         std::cout << setfill(' ');
         for (int i = 0; i < alpha_.size(); i++) {
             std::cout << setw(col_width) << i
+                      << setw(col_width) << solve_time_.at(i)
                       << setw(col_width) << equality_constraint_violations_.at(i)
                       << setw(col_width) << step_norm_.at(i)
                       << setw(col_width) << alpha_.at(i)

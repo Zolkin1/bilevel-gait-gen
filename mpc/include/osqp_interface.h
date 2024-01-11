@@ -17,7 +17,7 @@ namespace mpc {
     public:
         OSQPInterface(QPData data, bool verbose);
 
-        void SetupQP(const QPData& data, const vector_t& warm_start) override;
+        void SetupQP(QPData& data, const vector_t& warm_start) override;
 
         // TODO: remove data
         vector_t Solve(const QPData& data) override;
@@ -32,19 +32,16 @@ namespace mpc {
 
         void ConfigureForRealTime(double run_time_iters) const override;
 
+
+
     protected:
     private:
-        void ConvertDataToOSQPConstraints(const QPData& data);
+//        void ConvertDataToOSQPConstraints(const QPData& data);
 
-        void ConvertDataToOSQPCost(const QPData& data);
+//        void ConvertDataToOSQPCost(const QPData& data);
 
         // QP Solver
         OsqpEigen::Solver qp_solver_;
-
-        // OSQP specific vectors and matricies
-//        matrix_t P_;
-        Eigen::SparseMatrix<double> A_, P_;
-        vector_t lb_, ub_, w_;
 
         vector_t prev_dual_sol_;
 
