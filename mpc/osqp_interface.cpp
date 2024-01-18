@@ -5,12 +5,16 @@
 
 namespace mpc {
     OSQPInterface::OSQPInterface(QPData data, bool verbose)
-        : QPInterface(data.num_decision_vars), verbose_(verbose), osqp_interface_timer_("osqp setup"),
-          sparse_conversion_timer_("sparse conversion"),
-          matrix_gather_timer_("matrix formation") {
+        : sparse_conversion_timer_("sparse conversion"),
+          matrix_gather_timer_("matrix formation"),
+          osqp_interface_timer_("osqp setup") {
+
+        prev_qp_sol_ = vector_t::Zero(data.num_decision_vars);
+        dldx = vector_t::Zero(data.num_decision_vars);
+        verbose_ = verbose;
 
         // Set solver settings
-        qp_solver_.settings()->setVerbosity(false);
+        qp_solver_.settings()->setVerbosity(true);
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
@@ -21,7 +25,7 @@ namespace mpc {
         qp_solver_.settings()->setRho(.01);
 //        qp_solver_.settings()->setAlpha(1.6);
         qp_solver_.settings()->setWarmStart(true);
-        qp_solver_.settings()->setScaling(3);
+        qp_solver_.settings()->setScaling(10); // TODO: This has a pretty big effect on the timing and the solution quality
         qp_solver_.settings()->setLinearSystemSolver(1);
 
         prev_dual_sol_ = vector_t::Zero(data.GetTotalNumConstraints());
@@ -39,7 +43,7 @@ namespace mpc {
 
         // TODO: I will have an "inefficient start" in both branches if the sparsity pattern is NOT preserved.
         // TODO: Figure out a way to have the sparsity pattern preserved
-        if (prev_num_constraints_ != data.GetTotalNumConstraints() || prev_num_decision_ != data.num_decision_vars) {
+//        if (prev_num_constraints_ != data.GetTotalNumConstraints() || prev_num_decision_ != data.num_decision_vars) {
             qp_solver_.data()->setNumberOfVariables(data.num_decision_vars);
             qp_solver_.data()->setNumberOfConstraints(data.GetTotalNumConstraints());
             prev_num_constraints_ = data.GetTotalNumConstraints();
@@ -67,13 +71,13 @@ namespace mpc {
             }
             qp_solver_.setWarmStart(warm_start, prev_dual_sol_);
 //            std::cerr << "Inefficient start." << std::endl;
-        } else {
-            qp_solver_.updateHessianMatrix(data.sparse_cost_);
-            qp_solver_.updateGradient(data.cost_linear);
-            qp_solver_.updateLinearConstraintsMatrix(data.sparse_constraint_);
-            qp_solver_.updateBounds(data.lb_, data.ub_);
-//            qp_solver_.setWarmStart(warm_start, prev_dual_sol_);
-        }
+//        } else {
+//            qp_solver_.updateHessianMatrix(data.sparse_cost_);
+//            qp_solver_.updateGradient(data.cost_linear);
+//            qp_solver_.updateLinearConstraintsMatrix(data.sparse_constraint_);
+//            qp_solver_.updateBounds(data.lb_, data.ub_);
+////            qp_solver_.setWarmStart(warm_start, prev_dual_sol_);
+//        }
 
 //        for (int i = 0; i < A_.rows(); i++) {
 //            for (int j = 0; j < A_.cols(); j++) {
@@ -109,6 +113,8 @@ namespace mpc {
             throw std::runtime_error("Could not solve QP.");
         }
 
+//        std::cout << "A constraint: \n" << data.sparse_constraint_.toDense().topLeftCorner<48+24,48+24>() << std::endl;
+
         vector_t qp_sol = qp_solver_.getSolution();
 
         prev_qp_sol_ = qp_sol;
@@ -116,21 +122,21 @@ namespace mpc {
         prev_dual_sol_ = qp_solver_.getDualSolution();
 
         if (verbose_) {
-            vector_t temp = data.sparse_constraint_ * qp_sol - data.ub_;
-
-            std::cout << "--- Solve Stats ---" << std::endl;
-            std::cout << "max diff: " << temp.maxCoeff() << std::endl;
-            int ind = 0;
-            for (int i = 0; i < temp.size(); i++) {
-                if (temp(i) == temp.maxCoeff()) {
-                    ind = i;
-                }
-            }
-
-            std::cout << "index of max: " << ind << std::endl;
-            std::cout << "num dynamics constraints: " << data.num_dynamics_constraints << std::endl;
-            std::cout << "num decision variables: " << data.num_decision_vars << std::endl;
-            std::cout << std::endl;
+//            vector_t temp = data.sparse_constraint_ * qp_sol - data.ub_;
+//
+//            std::cout << "--- Solve Stats ---" << std::endl;
+//            std::cout << "max diff: " << temp.maxCoeff() << std::endl;
+//            int ind = 0;
+//            for (int i = 0; i < temp.size(); i++) {
+//                if (temp(i) == temp.maxCoeff()) {
+//                    ind = i;
+//                }
+//            }
+//
+//            std::cout << "index of max: " << ind << std::endl;
+//            std::cout << "num dynamics constraints: " << data.num_dynamics_constraints << std::endl;
+//            std::cout << "num decision variables: " << data.num_decision_vars << std::endl;
+//            std::cout << std::endl;
         }
 
         run++;
@@ -229,9 +235,52 @@ namespace mpc {
 
     void OSQPInterface::ConfigureForRealTime(double run_time_iters) const {
         qp_solver_.settings()->setPolish(false);
-        qp_solver_.settings()->setAbsoluteTolerance(1e-4);
-        qp_solver_.settings()->setRelativeTolerance(1e-4);
+        qp_solver_.settings()->setAbsoluteTolerance(1e-5);
+        qp_solver_.settings()->setRelativeTolerance(1e-6);
         qp_solver_.settings()->setMaxIteration(run_time_iters);
+    }
+
+    void OSQPInterface::SetupDerivativeCalcs(vector_t& dx, vector_t& dy_l, vector_t& dy_u) {
+        // TODO: Deal with return errors
+        qp_solver_.computeAdjointDerivative(dx, dy_l, dy_u);
+    }
+
+    void OSQPInterface::CalcDerivativeWrtMats(Eigen::SparseMatrix<double>& dP, Eigen::SparseMatrix<double>& dA) {
+        // TODO: Deal with return errors
+        OsqpEigen::ErrorExitFlag flag = qp_solver_.adjointDerivativeGetMat(dP, dA);
+//        assert(!dA.toDense().array().isNaN());
+
+        std::cout << "deriv mat result: ";
+
+        switch (flag) {
+            case OsqpEigen::ErrorExitFlag::DataValidationError :
+                std::cout << "Data Validation error." << std::endl;
+                break;
+            case OsqpEigen::ErrorExitFlag::WorkspaceNotInitError :
+                std::cout << "Workspace Not Initialized error." << std::endl;
+                break;
+            case OsqpEigen::ErrorExitFlag::NoError :
+                std::cout << "No error." << std::endl;
+                break;
+            default:
+                std::cout << "Other result." << std::endl;
+                break;
+        }
+    }
+
+    void OSQPInterface::CalcDerivativeWrtVecs(vector_t& dq, vector_t dl, vector_t du) {
+        // TODO: Deal with return errors
+        qp_solver_.adjointDerivativeGetVec(dq, dl, du);
+    }
+
+    void OSQPInterface::Computedx(const Eigen::SparseMatrix<double>& P, const vector_t& q,
+                                  const vector_t& xstar) {
+        dldx.noalias() = P*xstar + q;
+//        std::cout << "reconstructed cost: " << 0.5*xstar.transpose()*P*xstar + q.dot(xstar) << std::endl;
+    }
+
+    vector_t OSQPInterface::Getdx() const {
+        return dldx;
     }
 
 } // mpc

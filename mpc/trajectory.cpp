@@ -31,6 +31,9 @@ namespace mpc {
             mut_flags_.emplace_back(mut_arr);
         }
 
+        contact_times_.resize(end_effector_pos_.size());
+        UpdateContactTimes();
+
         UpdatePosSplineVarsCount();
         SetSwingPosZ();
 
@@ -268,6 +271,7 @@ namespace mpc {
         }
         SetSwingPosZ();
         UpdatePosSplineVarsCount();
+        UpdateContactTimes();
     }
 
     void Trajectory::RemoveUnusedPolys(double init_time) {
@@ -280,6 +284,7 @@ namespace mpc {
         inputs_.RemoveUnusedPolys(init_time);
 
         UpdatePosSplineVarsCount();
+        UpdateContactTimes();
     }
 
     void Trajectory::SetInitTime(double time) {
@@ -434,6 +439,21 @@ namespace mpc {
 
 
         return fk_traj_;
+    }
+
+    int Trajectory::GetNumContactNodes(int ee) const {
+        return contact_times_.at(ee).size();
+    }
+
+    void Trajectory::UpdateContactTimes() {
+        for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
+            contact_times_.at(ee).resize(end_effector_pos_.at(ee).at(0).GetNumPolyTimes());
+            contact_times_.at(ee) = end_effector_pos_.at(ee).at(0).GetPolyTimes();
+        }
+    }
+
+    std::vector<std::vector<double>> Trajectory::GetContactTimes() const {
+        return contact_times_;
     }
 
 } // mpc

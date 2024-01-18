@@ -86,6 +86,26 @@ namespace mpc {
 
         std::vector<int> GetContactFrames() const;
 
+        /**
+         * Computes the partial derivative of the linearization wrt the contact time (given by ee and idx).
+         * Computes this partial only for the linearization at the given time and about the given input and state
+         * @param dA
+         * @param dB
+         * @param dC
+         * @param state
+         * @param inputs
+         * @param time
+         * @param ee
+         * @param idx
+         */
+        void ComputeLinearizationPartialWrtContactTimes(matrix_t& dA,
+                                                        matrix_t& dB,
+                                                        vector_t& dC,
+                                                        const vector_t& state,
+                                                        const Inputs& inputs,
+                                                        double time,
+                                                        int ee, int idx);
+
     protected:
     private:
 

@@ -11,6 +11,7 @@
 
 #include "mpc.h"
 #include "qp_control.h"
+#include "gait_optimizer.h"
 
 namespace controller {
     /**
@@ -78,6 +79,7 @@ namespace controller {
 
         std::vector<std::vector<Eigen::Vector3d>> fk_traj_;
 
+        mpc::GaitOptimizer gait_optimizer_;
     };
 } // controller
 

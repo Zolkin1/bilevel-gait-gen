@@ -153,12 +153,14 @@ namespace mpc {
         dynamics_timer.StartTimer();
         AddDynamicsConstraints(state);  // TODO: Speed up
         dynamics_timer.StopTimer();
+
 //        dynamics_timer.PrintElapsedTime();
         if (constraint_projection_) {
             AddFKConstraintsProjection(state);
         } else {
             AddFKConstraints(state);
         }
+
         AddFrictionConeConstraints();
         AddBoxConstraints();
         AddForceBoxConstraints();
@@ -182,7 +184,22 @@ namespace mpc {
 //            throw std::runtime_error("Bad solve.");
         }
 
+        std::cout << "Solve type: " << qp_solver->GetSolveQuality() << std::endl;
+
         const vector_t p = sol - prev_qp_sol;
+        double max = 0;
+        int max_idx = 0;
+        for (int i = 0; i < p.size(); i++) {
+            if (std::abs(sol(i) - prev_qp_sol(i)) > max) {
+                max = std::abs(sol(i) - prev_qp_sol(i));
+                max_idx = i;
+            }
+        }
+
+//        std::cout << "max difference is: " << max << " and occurs at index: " << max_idx << std::endl;
+//        std::cout << "dynamics variables: " << num_states_*(info_.num_nodes+1) << std::endl;
+//        std::cout << "force variables: " << GetVelocityIndex(0) << std::endl;
+
         double alpha = 0;
         if (sol.size() == prev_qp_sol.size()) {
             line_search_timer_.StartTimer();
@@ -220,6 +237,8 @@ namespace mpc {
 //        stats_timer_.PrintElapsedTime();
         solve_timer_.PrintElapsedTime();
         std::cout << "-----------" << std::endl;
+
+//        prev_traj_.PrintTrajectoryToFile("mpc_demo_traj.txt");
 
         return prev_traj_;
     }
@@ -556,6 +575,25 @@ namespace mpc {
             data_.cost_mat_.SetMatrix(Q_, node*num_states_, node*num_states_);
         }
         if (Q_forces_.size() > 0) {
+//            const Inputs& input = prev_traj_.GetInputs();
+//            matrix_t force_map(info_.num_nodes+1, prev_traj_.GetInputs().GetTotalForceSplineVars());
+//            for (int node = 0; node < info_.num_nodes + 1; node++) {
+//                for (int ee = 0; ee < num_ee_; ee++) {
+//                    for (int coord = 0; coord < POS_VARS; coord++) {
+//                        if (input.IsForceMutable(ee, coord, GetTime(node))) {
+//                            int vars_idx, vars_affecting;
+//                            std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee,
+//                                                                                                            GetTime(node),
+//                                                                                                            coord);
+//
+//                            force_map.block(node, vars_idx - vars_affecting, 1,
+//                                            vars_affecting) =
+//                                    input.GetForces().at(ee).at(coord).GetPolyVarsLin(GetTime(node)).transpose();
+//                        }
+//                    }
+//                }
+//            }
+//            matrix_t temp = force_map.transpose() * Q_forces_ * force_map;
             data_.cost_mat_.SetMatrix(Q_forces_, GetForceSplineStartIdx(), GetForceSplineStartIdx());
         }
     }
@@ -832,9 +870,13 @@ namespace mpc {
         - mu * GetEqualityConstraintValues(temp_traj, init_state).lpNorm<1>();
     }
 
+    // TODO: Make this weight only on force values, so we don't hit the derivatives
     void MPC::AddForceCost(double weight) {
-        int num_forces = prev_traj_.GetInputs().GetTotalForceSplineVars();
-        Q_forces_ = weight*matrix_t::Identity(num_forces, num_forces);
+        const int num_forces = prev_traj_.GetInputs().GetTotalForceSplineVars();
+        Q_forces_.resize(num_forces, num_forces);
+        for (int i = 0; i < num_forces; i++) {
+            Q_forces_(i,i) = weight * ((i+1) % 2);
+        }
     }
 
     void MPC::RecordStats(double alpha, const vector_t& direction, const std::string& solve_type,
@@ -922,6 +964,122 @@ namespace mpc {
 
     int MPC::GetNode(double time) const {
         return std::ceil((time - init_time_)/info_.integrator_dt);
+    }
+
+    int MPC::GetNumDecisionVars() const {
+        return data_.num_decision_vars;
+    }
+
+    int MPC::GetNumConstraints() const {
+        return data_.GetTotalNumConstraints();
+    }
+
+    vector_t MPC::Getdx() {
+        if (solve_type_.at(solve_type_.size()-1) == "Solved") { // TODO: Change to not be text based
+            return qp_solver->Getdx();
+        } else {
+            return vector_t::Zero(data_.num_decision_vars); // TODO: Change this return
+        }
+    }
+
+    bool MPC::ComputeDerivativeTerms() {
+        if (solve_type_.at(solve_type_.size()-1) == "Solved") { // TODO: Change to not be text based
+           qp_solver->Computedx(data_.sparse_cost_, data_.cost_linear, prev_qp_sol);
+           vector_t dx = qp_solver->Getdx();
+           vector_t dy_lu = vector_t::Zero(data_.GetTotalNumConstraints());
+           qp_solver->SetupDerivativeCalcs(dx, dy_lu, dy_lu);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool MPC::GetQPPartials(QPPartials& partials) const {
+        if (solve_type_.at(solve_type_.size()-1) == "Solved") {
+            partials.dP.setZero();
+            partials.dA.setZero();
+            partials.dq.setZero();
+            partials.dl.setZero();
+            partials.du.setZero();
+
+            qp_solver->CalcDerivativeWrtMats(partials.dP, partials.dA);
+            qp_solver->CalcDerivativeWrtVecs(partials.dq, partials.dl, partials.du);
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool MPC::ComputeParamPartials(QPPartials& partials, int ee, int idx) {
+        if (solve_type_.at(solve_type_.size()-1) == "Solved") {
+            // For now the cost terms are not effected by the contact times
+
+            partials.dP.resize(data_.num_decision_vars, data_.num_decision_vars);
+            partials.dq.resize(data_.num_decision_vars);
+            partials.dA.resize(data_.GetTotalNumConstraints(), data_.num_decision_vars);
+            partials.du.resize(data_.GetTotalNumConstraints());
+            partials.dl.resize(data_.GetTotalNumConstraints());
+
+            // TODO: Make this more general
+            partials.dP *= 0;
+            partials.dq *= 0;
+
+
+            // Box constraints have no effect
+            // Force box constraints have no effect
+            // Cone constraints have on effect
+
+            // FK constraints have an effect
+            // Dynamics constraints have an effect
+            utils::SparseMatrixBuilder A;
+            A.Reserve(data_.sparse_constraint_.nonZeros());
+//        const int contact_nodes = prev_traj_.GetNumContactNodes(ee);
+            matrix_t Adyn_deriv, Bdyn_deriv;
+            vector_t Cdyn_deriv;
+
+            for (int node = 0; node < info_.num_nodes; node++) {
+                model_.ComputeLinearizationPartialWrtContactTimes(Adyn_deriv, Bdyn_deriv, Cdyn_deriv,
+                                                                  prev_traj_.GetState(node),
+                                                                  prev_traj_.GetInputs(), GetTime(node),
+                                                                  ee, idx);
+                A.SetMatrix(Adyn_deriv, (node + 1) * num_states_, node * num_states_);
+
+                const matrix_t B_spline = Bdyn_deriv.leftCols(prev_traj_.GetInputs().GetTotalForceSplineVars());
+                const matrix_t B_vels = Bdyn_deriv.rightCols(num_joints_);
+
+                A.SetMatrix(B_vels, (node + 1) * num_states_, GetVelocityIndex(node));
+                A.SetMatrix(B_spline, (node + 1) * num_states_, GetForceSplineStartIdx());
+
+                partials.du.segment((node + 1) * num_states_, num_states_) = -Cdyn_deriv;
+                partials.dl.segment((node + 1) * num_states_, num_states_) = -Cdyn_deriv;
+
+
+                // TODO: Compute FK partials
+
+            }
+
+
+//        matrix_t Afk_deriv = ComputedAfkdcontact(ee, idx);            // Place in the correct spot
+//        vector_t bfk_deriv = Computedbfkdcontact(ee, idx);            // Place in the correct spot
+
+//        A.SetMatrix(, 0, 0);
+//        A.SetMatrix(ComputeFKDerivs, x, y);
+
+            partials.dA.setFromTriplets(A.GetTriplet().begin(), A.GetTriplet().end());
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    void MPC::ComputeFKPartials(int ee, int idx, double time) {
+
+    }
+
+    vector_t MPC::GetQPSolution() const {
+        return prev_qp_sol;
     }
 
 } // mpc

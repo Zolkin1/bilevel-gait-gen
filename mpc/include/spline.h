@@ -157,8 +157,22 @@ namespace mpc {
 
         bool IsMutable(int idx) const;
 
+        double ComputePartialWrtTime(double time, int time_idx) const;
+
+        vector_t ComputeCoefPartialWrtTime(double time, int time_idx) const;
+
     protected:
     private:
+        double Getx0Coef(double time, double DeltaT) const;
+        double Getx1Coef(double time, double DeltaT) const;
+        double Getx0dotCoef(double time, double DeltaT) const;
+        double Getx1dotCoef(double time, double DeltaT) const;
+
+        double Getx0CoefPartial(double time, double DeltaT, bool wrt_t1) const;
+        double Getx1CoefPartial(double time, double DeltaT, bool wrt_t1) const;
+        double Getx0dotCoefPartial(double time, double DeltaT, bool wrt_t1) const;
+        double Getx1dotCoefPartial(double time, double DeltaT, bool wrt_t1) const;
+
         bool IsConstantPoly(int idx) const;
 
         // Time should be [0, DeltaT]

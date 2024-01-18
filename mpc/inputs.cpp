@@ -347,4 +347,13 @@ namespace mpc {
     bool Inputs::IsForceMutable(int ee, int coord, int idx) const {
         return forces_.at(ee).at(coord).IsMutable(idx);
     }
+
+    Eigen::Vector3d Inputs::GetForcePartialWrtContact(int ee, double time, int contact_idx) const {
+        Eigen::Vector3d force_partials = Eigen::Vector3d::Zero();
+        for (int coord = 0; coord < POS_VARS; coord++) {
+            force_partials(coord) = forces_.at(ee).at(coord).ComputePartialWrtTime(time, contact_idx);
+        }
+
+        return force_partials;
+    }
 }

@@ -294,86 +294,61 @@ namespace mpc {
             if (poly_vars_.at(i).size() == 1) {
                 // Final time derivative is fixed at 0
                 vector_t vars = vector_t::Zero(3);
-                vars(0) = 1 - (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) +
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);     // x0 coef
-                vars(2) = (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) -
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);         // x1 coef
-
-                vars(1) = time - (1 / DeltaT) * 2 * pow(time, 2) +
-                          (1 / pow(DeltaT, 2)) * pow(time, 3);           // x0dot coef
+                vars(0) = Getx0Coef(time, DeltaT);          // x0 coef
+                vars(2) = Getx1Coef(time, DeltaT);         // x1 coef
+                vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
                 return vars;
             } else if (poly_vars_.at(i - 1).size() == 1) {
                 // Initial time derivative is fixed at 0
                 vector_t vars = vector_t::Zero(3);
-                vars(0) = 1 - (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) +
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);     // x0 coef
-                vars(1) = (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) -
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);         // x1 coef
-
-                vars(2) = -(1 / DeltaT) * pow(time, 2) +
-                          (1 / pow(DeltaT, 2)) * pow(time, 3);                   // x1dot coef
+                vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
+                vars(1) = Getx1Coef(time, DeltaT);         // x1 coef
+                vars(2) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
 
                 return vars;
             } else {
                 vector_t vars = vector_t::Zero(4);
-                vars(0) = 1 - (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) +
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);     // x0 coef
-                vars(2) = (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) -
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);         // x1 coef
+                vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
+                vars(2) = Getx1Coef(time, DeltaT);         // x1 coef
 
-                vars(1) = time - (1 / DeltaT) * 2 * pow(time, 2) +
-                          (1 / pow(DeltaT, 2)) * pow(time, 3);           // x0dot coef
-                vars(3) = -(1 / DeltaT) * pow(time, 2) +
-                          (1 / pow(DeltaT, 2)) * pow(time, 3);                   // x1dot coef
+                vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
+                vars(3) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
                 return vars;
             }
         } else if (mut_flags_.at(i)) {
             if (poly_vars_.at(i).size() == 1) {
                 // Final time derivative is fixed at 0
                 vector_t vars = vector_t::Zero(1);
-                vars(0) = (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) -
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);         // x1 coef
+                vars(0) = Getx1Coef(time, DeltaT);         // x1 coef
                 return vars;
             } else if (poly_vars_.at(i-1).size() == 1) {
                 // Initial time derivative is fixed at 0
                 vector_t vars = vector_t::Zero(2);
-                vars(0) = (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) -
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);         // x1 coef
-
-                vars(1) = -(1 / DeltaT) * pow(time, 2) +
-                          (1 / pow(DeltaT, 2)) * pow(time, 3);                   // x1dot coef
+                vars(0) = Getx1Coef(time, DeltaT);         // x1 coef
+                vars(1) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
                 return vars;
             } else {
                 vector_t vars = vector_t::Zero(2);
-                vars(0) = (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) -
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);         // x1 coef
-
-                vars(1) = -(1 / DeltaT) * pow(time, 2) +
-                          (1 / pow(DeltaT, 2)) * pow(time, 3);                   // x1dot coef
+                vars(0) = Getx1Coef(time, DeltaT);         // x1 coef
+                vars(1) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
                 return vars;
             }
         } else if (mut_flags_.at(i-1)) {
             if (poly_vars_.at(i).size() == 1) {
                 // Final time derivative is fixed at 0
                 vector_t vars = vector_t::Zero(2);
-                vars(0) = 1 - (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) +
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);     // x0 coef
-                vars(1) = time - (1 / DeltaT) * 2 * pow(time, 2) +
-                          (1 / pow(DeltaT, 2)) * pow(time, 3);           // x0dot coef
+                vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
+                vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
                 return vars;
             } else if (poly_vars_.at(i - 1).size() == 1) {
                 // Initial time derivative is fixed at 0
                 vector_t vars = vector_t::Zero(1);
-                vars(0) = 1 - (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) +
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);     // x0 coef
+                vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
                 return vars;
             } else {
                 vector_t vars = vector_t::Zero(2);
-                vars(0) = 1 - (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) +
-                          (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);     // x0 coef
-
-                vars(1) = time - (1 / DeltaT) * 2 * pow(time, 2) +
-                          (1 / pow(DeltaT, 2)) * pow(time, 3);           // x0dot coef
+                vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
+                vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
                 return vars;
             }
         }
@@ -550,6 +525,148 @@ namespace mpc {
 
     bool Spline::IsMutable(int idx) const {
         return mut_flags_.at(idx);
+    }
+
+    double Spline::ComputePartialWrtTime(double time, int time_idx) const {
+        const int idx = GetPolyIdx(time);
+        const double time_spline = time - poly_times_.at(idx-1);
+        const double DeltaT = poly_times_.at(idx) - poly_times_.at(idx-1);
+
+        if (time_idx == idx) {
+            const double x0 = poly_vars_.at(idx-1).at(0);
+            const double x1 = poly_vars_.at(idx).at(0);
+            double x0dot = 0;
+            double x1dot = 0;
+            if (poly_vars_.at(idx-1).size() == 2) {
+                x0dot = poly_vars_.at(idx-1).at(1);
+            }
+            if (poly_vars_.at(idx).size() == 2) {
+                x1dot = poly_vars_.at(idx).at(1);
+            }
+
+            const double da2dt2 = 2*pow(DeltaT, -3)*(3*(x0 - x1) + DeltaT*(2*x0dot - x1dot)) -
+                                  pow(DeltaT, -2)*(3*(x0 - x1) + (2*x0dot + x1dot));
+            const double da3dt2 = -3*pow(DeltaT, -4)*(2*(x0 - x1) + DeltaT*(x0dot + x1dot)) +
+                                  pow(DeltaT, -3)*(2*(x0 - x1) + (x0dot + x1dot));
+
+            return da2dt2*pow(time_spline,2) + da3dt2* pow(time_spline, 3);
+
+        } else if (time_idx == idx - 1) {
+            const double x0 = poly_vars_.at(idx-1).at(0);
+            const double x1 = poly_vars_.at(idx).at(0);
+            double x0dot = 0;
+            double x1dot = 0;
+            if (poly_vars_.at(idx-1).size() == 2) {
+                x0dot = poly_vars_.at(idx-1).at(1);
+            }
+            if (poly_vars_.at(idx).size() == 2) {
+                x1dot = poly_vars_.at(idx).at(1);
+            }
+
+            const double da2dt1 = -2*pow(DeltaT, -3)*(3*(x0 - x1) + DeltaT*(2*x0dot - x1dot)) -
+                                  pow(DeltaT, -2)*(3*(x0 - x1) - (2*x0dot + x1dot));
+            const double da3dt1 = 3*pow(DeltaT, -4)*(2*(x0 - x1) + DeltaT*(x0dot + x1dot)) +
+                                  pow(DeltaT, -3)*(2*(x0 - x1) - (x0dot + x1dot));
+
+            return da2dt1*pow(time_spline,2) + da3dt1* pow(time_spline, 3);
+
+        } else {
+            return 0;
+        }
+    }
+
+    vector_t Spline::ComputeCoefPartialWrtTime(double time, int time_idx) const {
+        const int idx = GetPolyIdx(time);
+
+        bool wrt_end = false;
+        if (idx == time_idx) {
+            wrt_end = true;
+        }
+
+        const double time_spline = time - poly_times_.at(idx-1);
+        const double DeltaT = poly_times_.at(idx) - poly_times_.at(idx-1);
+
+        int vars_index, vars_affecting;
+        std::tie(vars_index, vars_affecting) = GetVarsIndexEnd(time);
+
+        vector_t coef_partials(vars_affecting);
+        if (time_idx != idx || time_idx != idx-1) {
+            coef_partials.setZero();
+            return coef_partials;
+        }
+
+        coef_partials(0) = Getx0CoefPartial(time, DeltaT, !wrt_end);
+        // Now need to determine if it is x0dot, or x1 next
+        if (poly_vars_.at(idx-1).size() == 2) {
+            coef_partials(1) = Getx0dotCoefPartial(time, DeltaT, !wrt_end);
+            coef_partials(2) = Getx1CoefPartial(time, DeltaT, wrt_end);
+            if (poly_vars_.at(idx).size() == 2) {
+                coef_partials(3) = Getx1dotCoefPartial(time, DeltaT, wrt_end);
+            }
+        } else {
+            coef_partials(1) = Getx1CoefPartial(time, DeltaT, wrt_end);
+            if (poly_vars_.at(idx).size() == 2) {
+                coef_partials(2) = Getx1dotCoefPartial(time, DeltaT, wrt_end);
+            }
+        }
+
+        return coef_partials;
+    }
+
+    double Spline::Getx0Coef(double time, double DeltaT) const {
+        return 1 - (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) +
+        (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);
+    }
+
+    double Spline::Getx1Coef(double time, double DeltaT) const {
+        return (1 / pow(DeltaT, 2)) * 3 * pow(time, 2) -
+        (1 / pow(DeltaT, 3)) * 2 * pow(time, 3);
+    }
+
+    double Spline::Getx0dotCoef(double time, double DeltaT) const {
+        return time - (1 / DeltaT) * 2 * pow(time, 2) +
+        (1 / pow(DeltaT, 2)) * pow(time, 3);
+    }
+
+    double Spline::Getx1dotCoef(double time, double DeltaT) const {
+        return -(1 / DeltaT) * pow(time, 2) +
+        (1 / pow(DeltaT, 2)) * pow(time, 3);
+    }
+
+    double Spline::Getx0CoefPartial(double time, double DeltaT, bool wrt_t1) const {
+        if (wrt_t1) {
+            return -6*pow(DeltaT, -3)* pow(time, 2) + 6*pow(DeltaT, -2)*time
+            - 6*pow(DeltaT, 2)*pow(time,3) - 6*pow(DeltaT, 3)* pow(time, 2);
+        } else {
+            return 6*pow(DeltaT, -3)* pow(time, 2) + 6* pow(DeltaT, 2)* pow(time, 3);
+        }
+    }
+
+    double Spline::Getx1CoefPartial(double time, double DeltaT, bool wrt_t1) const {
+        if (wrt_t1) {
+            return 6*pow(DeltaT, -3)* pow(time, 2) - 6* pow(DeltaT, -2)*time
+                    - 6* pow(DeltaT, -4)* pow(time, 3) + 6*pow(DeltaT, -3)* pow(time, 2);
+        } else {
+            return -6* pow(DeltaT, -3)* pow(time, 2) + 6* pow(DeltaT, -4)* pow(time, 3);
+        }
+    }
+
+    double Spline::Getx0dotCoefPartial(double time, double DeltaT, bool wrt_t1) const {
+        if (wrt_t1) {
+            return -1 -2*pow(DeltaT,-2)*pow(time, 2) + 4* pow(DeltaT, -1)*time
+                + 2* pow(DeltaT, -3)* pow(time, 3) - 3*pow(DeltaT, -2)*pow(time, 2);
+        } else {
+            return 2*pow(DeltaT, -2)* pow(time, 2) - 2* pow(DeltaT, -3)* pow(time, 3);
+        }
+    }
+
+    double Spline::Getx1dotCoefPartial(double time, double DeltaT, bool wrt_t1) const {
+        if (wrt_t1) {
+            return -pow(DeltaT, -2)* pow(time, 2) + 2*pow(DeltaT, -1)*time
+                + 2*pow(DeltaT,-3)*pow(time, 3) - 3*pow(DeltaT, -2)*pow(time, 2);
+        } else {
+            return -pow(DeltaT, -2)* pow(time, 2) - 2*pow(DeltaT, -3)*pow(time, 3);
+        }
     }
 
 } // mpc

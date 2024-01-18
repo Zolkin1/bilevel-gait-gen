@@ -10,11 +10,12 @@
 #include <Eigen/Core>
 
 #include "centroidal_model.h"
-#include "qp_interface.h"
+#include "osqp_interface.h"
 #include "trajectory.h"
 #include "qp_data.h"
 #include "controller.h"
 #include "timer.h"
+#include "gait_optimizer.h"
 
 namespace mpc {
     /**
@@ -111,6 +112,26 @@ namespace mpc {
 
         int GetNode(double time) const;
 
+        int GetNumDecisionVars() const;
+
+        int GetNumConstraints() const;
+
+        vector_t Getdx();
+
+        bool ComputeDerivativeTerms();
+
+        bool GetQPPartials(QPPartials& partials) const;
+
+        /**
+         * Computes how each term in the QP changes wrt the impact time given by ee and idx
+         * @param partials
+         * @param ee
+         * @param idx
+         */
+        bool ComputeParamPartials(QPPartials& partials, int ee, int idx);
+
+        vector_t GetQPSolution() const;
+
     protected:
     private:
         // ---------------- Private Member Functions ---------------- //
@@ -171,6 +192,8 @@ namespace mpc {
 
         void AddFinalCost();
 
+        void ComputeFKPartials(int ee, int idx, double time);
+
         // ---------------- Member Variables ---------------- //
         // Centroidal model
         CentroidalModel model_;
@@ -188,7 +211,7 @@ namespace mpc {
         Eigen::Matrix<double, 4, 3> friction_pyramid_;
 
         // QP Interface
-        std::unique_ptr<QPInterface> qp_solver;
+        std::unique_ptr<OSQPInterface> qp_solver;
 
         // previous trajectory
         Trajectory prev_traj_;

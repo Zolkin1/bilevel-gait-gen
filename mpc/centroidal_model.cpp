@@ -79,7 +79,7 @@ namespace mpc {
         pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin_);
 
         A_timer.StartTimer();
-        Ac_ = matrix_t::Zero(num_total_states_, num_total_states_);
+        Ac_ = matrix_t::Zero(num_total_states_, num_total_states_); // TODO: resize then set 0 instead?
 
         matrix_3t J = matrix_t::Zero(3, pin_model_.nv);
         for (int i = 0; i < num_ee_; i++) {
@@ -449,6 +449,69 @@ namespace mpc {
         }
 
         return frames;
+    }
+
+    void CentroidalModel::ComputeLinearizationPartialWrtContactTimes(matrix_t& dA, matrix_t& dB,
+                                                                     vector_t& dC, const vector_t& state,
+                                                                     const Inputs& input, double time,
+                                                                     int ee, int idx) {
+        // TODO: Can do this quicker by using the stuff computed for the original linearization
+        const int num_inputs = input.GetNumInputs();
+
+        dA.resize(num_total_states_, num_total_states_);
+        dB.resize(num_total_states_, num_inputs);
+        dC.resize(num_total_states_);
+
+        dA.setZero();
+        dB.setZero();
+        dC.setZero();
+
+        // dA
+        ConvertMPCStateToPinocchioState(state, q_pin_);
+        for (int i = 0; i < num_ee_; i++) {
+            // Get the jacobian of the FK
+            matrix_3t J = matrix_t::Zero(3, pin_model_.nv);
+            J = GetFKJacobianForEndEffector(q_pin_, frames_.at(i), false);
+            Eigen::Vector3d force_partial = input.GetForcePartialWrtContact(i, time, idx);
+            for (int j = 0; j < pin_model_.nv; j++) {
+                // Cross product with the corresponding input force, add these for all the end effectors
+                dA.block<3,1>(POS_VARS, MOMENTUM_OFFSET + j) +=
+                        static_cast<Eigen::Vector3d>(J.col(j)).cross(force_partial);
+            }
+        }
+
+        // dB
+        const Eigen::Matrix3d Id = Eigen::Matrix3d::Identity();
+        const Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
+        for (int coord = 0; coord < 3; coord++) {
+            if (input.IsForceMutable(ee, coord, time)) {
+                vector_t coef_partials = input.GetForces().at(ee).at(coord).ComputeCoefPartialWrtTime(time, idx);
+
+                int vars_idx, vars_affecting;
+                std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
+
+                // linear momentum
+                dB.block(coord, vars_idx - vars_affecting, 1, vars_affecting) =
+                        coef_partials.transpose();
+
+                // Angular momentum
+                for (int poly = 0; poly < coef_partials.size(); poly++) {
+                    dB.block(3, vars_idx - vars_affecting + poly, 3, 1).noalias() =
+                            ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * coef_partials(poly);
+                }
+            }
+        }
+
+        // dC
+        Eigen::Vector3d force_partial = input.GetForcePartialWrtContact(ee, time, idx);
+        dC.segment<POS_VARS>(0) = force_partial;
+        for (int coord = 0; coord < POS_VARS; coord++) {
+            for (int poly = 0; poly < force_partial.size(); poly++) {
+                dC.segment<POS_VARS>(POS_VARS).noalias() =
+                        ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * force_partial(poly);
+            }
+        }
+
     }
 
 } // mpc

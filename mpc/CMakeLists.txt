@@ -9,7 +9,8 @@ set(MPC_HEADER_LIST "include/mpc.h"
         "include/euler_integrator.h"
         "include/qp_data.h"
         "include/osqp_interface.h"
-        "include/rk_integrator.h")
+        "include/rk_integrator.h"
+        "gait_optimizer.cpp")
 
 add_library(mpc mpc.cpp
         qp_interface.cpp
@@ -22,6 +23,7 @@ add_library(mpc mpc.cpp
         osqp_interface.cpp
         rk_integrator.cpp
         qp_data.cpp
+        gait_optimizer.cpp
         ${MPC_HEADER_LIST})
 target_include_directories(mpc PUBLIC include)
 

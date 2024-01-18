@@ -28,7 +28,8 @@ namespace controller {
                                  mpc_(info, robot_urdf),
                                  traj_(10, 24, 12, mpc_.CreateDefaultSwitchingTimes(2,4,1.0),
                                         0.015, 0.75, 0.0),
-                                 fk_traj_(5) {  // TODO: Not hard coded
+                                 fk_traj_(5),
+                                 gait_optimizer_(4, 10, 10, 10, 1, 0.05){  // TODO: Not hard coded
 
         // TODO: Get this from IC
         std::array<std::array<double, 3>, 4> ee_pos{};
@@ -186,6 +187,19 @@ namespace controller {
                 traj_ = mpc_.GetTrajectory();
                 UpdateTrajViz();
                 mpc_res_mut_.unlock();
+
+                gait_optimizer_.UpdateSizes(mpc_.GetNumDecisionVars(), mpc_.GetNumConstraints());
+                mpc_.ComputeDerivativeTerms();
+                mpc_.GetQPPartials(gait_optimizer_.GetPartials());
+
+//                gait_optimizer_.SetParameterPartials()
+
+                gait_optimizer_.ComputeCostFcnDerivWrtContactTimes();
+
+                gait_optimizer_.OptimizeContactTimes();
+
+//                mpc_.UpdateContactTimes(gait_optimizer_.GetContactTimes());
+
             }
         }
     }

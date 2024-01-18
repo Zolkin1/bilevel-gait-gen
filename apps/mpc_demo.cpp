@@ -9,6 +9,7 @@
 #include "mpc_controller.h"
 #include "visualization.h"
 #include "simulation_robot.h"
+#include "gait_optimizer.h"
 
 using vector_t = Eigen::VectorXd;
 using matrix_t = Eigen::MatrixXd;
@@ -70,33 +71,7 @@ int main() {
     mpc.SetDefaultGaitTrajectory(mpc::Gaits::Trot, config.ParseNumber<int>("num_polys"), ee_pos);
     mpc.SetStateTrajectoryWarmStart(warm_start);
 
-    // Create weights
-    matrix_t Q = 2*matrix_t::Identity(24, 24);
-    Q.topLeftCorner<6,6>() = matrix_t::Zero(6, 6);
-    Q(0,0) = 0.0;
-    Q(1,1) = 0.0;
-    Q(2,2) = 10;
-    Q(6,6) = 300; //300;
-    Q(7,7) = 300; //300;
-    Q(8,8) = 750; //450;
-    Q(9,9) = 200;
-    Q(10,10) = 200;
-    Q(11,11) = 200;
-
-    Q(12,12) = 600;
-    Q(15,15) = 600;
-    Q(18,18) = 600;
-    Q(21,21) = 600;
-
-    Q(13,13) = 50;
-    Q(16,16) = 50;
-    Q(19,19) = 50;
-    Q(22,22) = 50;
-
-    Q(14,14) = 10;
-    Q(17,17) = 10;
-    Q(20,20) = 10;
-    Q(23,23) = 10;
+    matrix_t Q(config.ParseEigenVector("Q_diag").asDiagonal());
 
     // Desried state in the lie algebra
     const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(mpc_des_state, init_state);
@@ -104,7 +79,7 @@ int main() {
 
     // Add in costs
     mpc.AddQuadraticTrackingCost(des_alg, Q);
-    mpc.AddForceCost(0.001);  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
+    mpc.AddForceCost(config.ParseNumber<double>("force_cost"));  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
     mpc.SetQuadraticFinalCost(5000*Q);
     mpc.SetLinearFinalCost(-5000*Q*des_alg);
 
@@ -135,20 +110,42 @@ int main() {
     mpc.CreateInitialRun(init_state);
     mpc.PrintStats();
 
+    mpc::GaitOptimizer gait_optimizer(4, 10, 10, 10, 1, 0.05);
+
     // Visualize results
     simulation::Visualizer viz(config.ParseString("robot_xml"));
     robot->SetSimModel(viz.GetModel());
     for (int i = 0; i < info.num_nodes + 200; i++) {
         vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
-//        temp_state(14) = temp_state(14) + 0.01;
-//        temp_state(17) = temp_state(17) - 0.01;
-//        temp_state(21) = temp_state(21) - 0.04;
-//        temp_state(22) = temp_state(22) + 0.01;
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.GetTrajViz(mpc.GetTrajectory().CreateVizData(mpc.GetModel()));
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
         mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
+
+        if (i == 0) {
+            gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
+        }
+        // Gait optimization
+        gait_optimizer.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
+        if (mpc.ComputeDerivativeTerms()) {
+            mpc.GetQPPartials(gait_optimizer.GetPartials());
+            const mpc::Trajectory traj = mpc.GetTrajectory();
+            for (int ee = 0; ee < 4; ee++) {
+                gait_optimizer.SetNumContactTimes(ee, traj.GetNumContactNodes(ee));
+                for (int idx = 0; idx < traj.GetNumContactNodes(ee); idx++) {
+                    mpc.ComputeParamPartials(gait_optimizer.GetParameterPartials(ee, idx), ee, idx);
+                }
+            }
+
+            gait_optimizer.ModifyQPPartials(mpc.GetQPSolution());
+            gait_optimizer.ComputeCostFcnDerivWrtContactTimes();
+
+            gait_optimizer.OptimizeContactTimes();
+
+//                mpc.UpdateContactTimes(gait_optimizer_.GetContactTimes());
+
 //        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
+        }
     }
 
     // Print the final trajectory to a file for viewing

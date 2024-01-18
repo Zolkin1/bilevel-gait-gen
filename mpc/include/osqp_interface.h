@@ -13,26 +13,41 @@
 #include "timer.h"
 
 namespace mpc {
-    class OSQPInterface : public QPInterface {
+    class OSQPInterface {
     public:
         OSQPInterface(QPData data, bool verbose);
 
-        void SetupQP(QPData& data, const vector_t& warm_start) override;
+        void SetupQP(QPData& data, const vector_t& warm_start);
 
         // TODO: remove data
-        vector_t Solve(const QPData& data) override;
+        vector_t Solve(const QPData& data);
 
-        vector_t GetInfinity(int size) const override;
+        vector_t GetInfinity(int size) const;
 
-        std::string GetSolveQuality() const override;
+        std::string GetSolveQuality() const;
 
-        vector_t GetDualSolution() const override;
+        vector_t GetDualSolution() const;
 
-        void ConfigureForInitialRun() const override;
+        void ConfigureForInitialRun() const;
 
-        void ConfigureForRealTime(double run_time_iters) const override;
+        void ConfigureForRealTime(double run_time_iters) const;
 
+        void SetupDerivativeCalcs(vector_t& dx, vector_t& dy_l, vector_t& dy_u);
 
+        void CalcDerivativeWrtMats(Eigen::SparseMatrix<double>& dP, Eigen::SparseMatrix<double>& dA);
+
+        void CalcDerivativeWrtVecs(vector_t& dq, vector_t dl, vector_t du);
+
+        void Computedx(const Eigen::SparseMatrix<double>& P, const vector_t& q, const vector_t& xstar);
+
+        /**
+         * Calculates the partial of the quadratic cost fcn wrt the decision variables, x.
+         * Cost fcn of the form (1/2)*x^T*P*x + q^T*x
+         * @param P cost fcn hessian term
+         * @param q cost fcn gradient term
+         * @param xstar optimal solution to the QP
+         */
+        vector_t Getdx() const;
 
     protected:
     private:
@@ -44,6 +59,9 @@ namespace mpc {
         OsqpEigen::Solver qp_solver_;
 
         vector_t prev_dual_sol_;
+        vector_t prev_qp_sol_;
+
+        vector_t dldx;
 
         int run;
 

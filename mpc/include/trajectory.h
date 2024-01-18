@@ -32,9 +32,9 @@ namespace mpc {
 
         const std::vector<std::array<Spline, 3>>& GetPositions() const;
 
-        void UpdatePosition(int end_effector, int coord, const std::vector<std::array<double, Spline::POLY_ORDER>>& vars);
+//        void UpdatePosition(int end_effector, int coord, const std::vector<std::array<double, Spline::POLY_ORDER>>& vars);
 
-        void UpdateForce(int end_effector, int coord, const std::vector<std::array<double, Spline::POLY_ORDER>>& vars);
+//        void UpdateForce(int end_effector, int coord, const std::vector<std::array<double, Spline::POLY_ORDER>>& vars);
 
         /**
          * Resets all states_ and inputs to 0
@@ -103,11 +103,17 @@ namespace mpc {
 
         std::vector<std::vector<Eigen::Vector3d>> CreateVizData(const CentroidalModel& model);
 
+        int GetNumContactNodes(int ee) const;
+
+        std::vector<std::vector<double>> GetContactTimes() const;
+
     protected:
     private:
         void UpdatePosSplineVarsCount();
 
         void SetSwingPosZ();
+
+        void UpdateContactTimes();
 
 
         std::vector<vector_t> states_;
@@ -122,6 +128,8 @@ namespace mpc {
         std::vector<vector_t> full_velocities_; // TODO: Do this cleaner
 
         std::vector<std::vector<Eigen::Vector3d>> fk_traj_;
+
+        std::vector<std::vector<double>> contact_times_;
     };
 } // mpc
 

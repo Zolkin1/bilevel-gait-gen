@@ -164,6 +164,8 @@ namespace mpc {
 
         bool IsForceMutable(int ee, int coord, int idx) const;
 
+        Eigen::Vector3d GetForcePartialWrtContact(int ee, double time, int contact_idx) const;
+
     protected:
     private:
         void UpdateForceSplineVarsCount();
