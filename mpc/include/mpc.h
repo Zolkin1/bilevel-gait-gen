@@ -128,7 +128,7 @@ namespace mpc {
          * @param ee
          * @param idx
          */
-        bool ComputeParamPartials(QPPartials& partials, int ee, int idx);
+        bool ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx);
 
         vector_t GetQPSolution() const;
 
@@ -191,8 +191,6 @@ namespace mpc {
         void AddGradientCost();
 
         void AddFinalCost();
-
-        void ComputeFKPartials(int ee, int idx, double time);
 
         // ---------------- Member Variables ---------------- //
         // Centroidal model

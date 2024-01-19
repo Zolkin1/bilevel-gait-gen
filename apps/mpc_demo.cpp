@@ -109,6 +109,7 @@ int main() {
 
     mpc.CreateInitialRun(init_state);
     mpc.PrintStats();
+    mpc::Trajectory prev_traj = mpc.GetTrajectory();
 
     mpc::GaitOptimizer gait_optimizer(4, 10, 10, 10, 1, 0.05);
 
@@ -122,30 +123,33 @@ int main() {
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
         mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
 
-        if (i == 0) {
-            gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
-        }
         // Gait optimization
-        gait_optimizer.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
-        if (mpc.ComputeDerivativeTerms()) {
-            mpc.GetQPPartials(gait_optimizer.GetPartials());
-            const mpc::Trajectory traj = mpc.GetTrajectory();
-            for (int ee = 0; ee < 4; ee++) {
-                gait_optimizer.SetNumContactTimes(ee, traj.GetNumContactNodes(ee));
-                for (int idx = 0; idx < traj.GetNumContactNodes(ee); idx++) {
-                    mpc.ComputeParamPartials(gait_optimizer.GetParameterPartials(ee, idx), ee, idx);
-                }
-            }
-
-            gait_optimizer.ModifyQPPartials(mpc.GetQPSolution());
-            gait_optimizer.ComputeCostFcnDerivWrtContactTimes();
-
-            gait_optimizer.OptimizeContactTimes();
+//        if (i == 0) {
+//            gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
+//        }
+        // TODO: Is this being performed with linearizations from the new trajectory and/or is that messing up the calcs?
+//        gait_optimizer.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
+//        if (mpc.ComputeDerivativeTerms()) {
+//            mpc.GetQPPartials(gait_optimizer.GetPartials());
+//            const mpc::Trajectory traj = mpc.GetTrajectory();
+//            for (int ee = 0; ee < 4; ee++) {
+//                gait_optimizer.SetNumContactTimes(ee, traj.GetNumContactNodes(ee));
+//                for (int idx = 0; idx < traj.GetNumContactNodes(ee); idx++) {
+//                    mpc.ComputeParamPartials(prev_traj, gait_optimizer.GetParameterPartials(ee, idx), ee, idx);
+//                }
+//            }
+//
+//            gait_optimizer.ModifyQPPartials(mpc.GetQPSolution());
+//            gait_optimizer.ComputeCostFcnDerivWrtContactTimes();
+//
+//            gait_optimizer.OptimizeContactTimes();
 
 //                mpc.UpdateContactTimes(gait_optimizer_.GetContactTimes());
 
 //        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
-        }
+//        }
+
+        prev_traj = mpc.GetTrajectory();
     }
 
     // Print the final trajectory to a file for viewing

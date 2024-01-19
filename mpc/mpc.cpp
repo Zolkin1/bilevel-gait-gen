@@ -1011,8 +1011,11 @@ namespace mpc {
         }
     }
 
-    bool MPC::ComputeParamPartials(QPPartials& partials, int ee, int idx) {
+    bool MPC::ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) {
         if (solve_type_.at(solve_type_.size()-1) == "Solved") {
+            QPData partial_data = data_;
+            partial_data.InitQPMats();
+
             // For now the cost terms are not effected by the contact times
 
             partials.dP.resize(data_.num_decision_vars, data_.num_decision_vars);
@@ -1030,52 +1033,93 @@ namespace mpc {
             // Force box constraints have no effect
             // Cone constraints have on effect
 
-            // FK constraints have an effect
             // Dynamics constraints have an effect
-            utils::SparseMatrixBuilder A;
-            A.Reserve(data_.sparse_constraint_.nonZeros());
+//            utils::SparseMatrixBuilder A;
+            partial_data.constraint_mat_.Reserve(data_.sparse_constraint_.nonZeros());
 //        const int contact_nodes = prev_traj_.GetNumContactNodes(ee);
             matrix_t Adyn_deriv, Bdyn_deriv;
             vector_t Cdyn_deriv;
 
             for (int node = 0; node < info_.num_nodes; node++) {
-                model_.ComputeLinearizationPartialWrtContactTimes(Adyn_deriv, Bdyn_deriv, Cdyn_deriv,
-                                                                  prev_traj_.GetState(node),
-                                                                  prev_traj_.GetInputs(), GetTime(node),
-                                                                  ee, idx);
-                A.SetMatrix(Adyn_deriv, (node + 1) * num_states_, node * num_states_);
+                matrix_t A, B;
+                vector_t C;
+                model_.GetLinearDiscreteDynamics(traj.GetState(node), traj.GetState(0), traj.GetInputs(),
+                                                 GetTime(node), A, B, C);
 
-                const matrix_t B_spline = Bdyn_deriv.leftCols(prev_traj_.GetInputs().GetTotalForceSplineVars());
+                model_.ComputeLinearizationPartialWrtContactTimes(Adyn_deriv, Bdyn_deriv, Cdyn_deriv,
+                                                                  traj.GetState(node),
+                                                                  traj.GetInputs(), GetTime(node),
+                                                                  ee, idx);
+                // TODO: Is this sparsity pattern legit?
+//                std::cout << "A: \n" << A << std::endl;
+//                std::cout << "Adyn_deriv: \n" << Adyn_deriv << std::endl;
+//                std::cout << "Bdyn_deriv: \n" << Bdyn_deriv << std::endl;
+
+                partial_data.constraint_mat_.SetMatrix(Adyn_deriv, (node + 1) * num_states_, node * num_states_);
+
+                const matrix_t B_spline = Bdyn_deriv.leftCols(traj.GetInputs().GetTotalForceSplineVars());
                 const matrix_t B_vels = Bdyn_deriv.rightCols(num_joints_);
 
-                A.SetMatrix(B_vels, (node + 1) * num_states_, GetVelocityIndex(node));
-                A.SetMatrix(B_spline, (node + 1) * num_states_, GetForceSplineStartIdx());
+                partial_data.constraint_mat_.SetMatrix(B_vels, (node + 1) * num_states_, GetVelocityIndex(node));
+                partial_data.constraint_mat_.SetMatrix(B_spline, (node + 1) * num_states_, GetForceSplineStartIdx());
 
-                partials.du.segment((node + 1) * num_states_, num_states_) = -Cdyn_deriv;
-                partials.dl.segment((node + 1) * num_states_, num_states_) = -Cdyn_deriv;
-
-
-                // TODO: Compute FK partials
-
+                partial_data.dynamics_constants.segment((node + 1) * num_states_, num_states_) = -Cdyn_deriv;
+                partial_data.dynamics_constants.segment((node + 1) * num_states_, num_states_) = -Cdyn_deriv;
             }
 
 
-//        matrix_t Afk_deriv = ComputedAfkdcontact(ee, idx);            // Place in the correct spot
-//        vector_t bfk_deriv = Computedbfkdcontact(ee, idx);            // Place in the correct spot
+            // FK constraints have an effect
+            const int spline_offset = GetPosSplineStartIdx();
+            int idx_eq = 0;
+            int idx_ineq = 0;
 
-//        A.SetMatrix(, 0, 0);
-//        A.SetMatrix(ComputeFKDerivs, x, y);
+            for (int node = 0; node < info_.num_nodes+1; node++) {
+                const int time = GetTime(node);
+                for (int coord = 0; coord < POS_VARS; coord++) {
+                    if (traj.IsSplineMutable(ee, coord)) {
+                        int vars_index, vars_affecting;
+                        std::tie(vars_index, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
 
-            partials.dA.setFromTriplets(A.GetTriplet().begin(), A.GetTriplet().end());
+                        if (node >= num_ineq_fk_ || coord != 2) {
+                            partial_data.constraint_mat_.SetMatrix(
+                                    -traj.GetPositions().at(ee).at(coord).ComputeCoefPartialWrtTime(time, idx).transpose(),
+                                    constraint_idx_ + idx_eq + data_.num_fk_ineq_constraints_,
+                                    spline_offset + vars_index - vars_affecting);
+                            idx_eq++;
+                        } else {
+                            partial_data.constraint_mat_.SetMatrix(
+                                    -traj.GetPositions().at(ee).at(coord).ComputeCoefPartialWrtTime(time, idx).transpose(),
+                                    constraint_idx_ + idx_ineq,
+                                    spline_offset + vars_index - vars_affecting);
+                            idx_ineq++;
+                        }
+                    } else {
+                        if (node >= num_ineq_fk_ || coord != 2) {
+                            partial_data.fk_constants_(idx_eq) +=
+                                    traj.GetPositions().at(ee).at(coord).ComputePartialWrtTime(time, idx);
+                            idx_eq++;
+                        } else {
+                            partial_data.fk_lb_(idx_ineq) +=
+                                    traj.GetPositions().at(ee).at(coord).ComputePartialWrtTime(time, idx);
+                            partial_data.fk_ub_(idx_ineq) +=
+                                    traj.GetPositions().at(ee).at(coord).ComputePartialWrtTime(time, idx);
+                            idx_ineq++;
+                        }
+                    }
+                }
+            }
+
+            partial_data.ConstructSparseMats();
+            partial_data.ConstructVectors();
+
+            partials.dA = partial_data.sparse_constraint_;
+            partials.dl = partial_data.lb_;
+            partials.du = partial_data.ub_;
 
             return true;
         } else {
             return false;
         }
-    }
-
-    void MPC::ComputeFKPartials(int ee, int idx, double time) {
-
     }
 
     vector_t MPC::GetQPSolution() const {

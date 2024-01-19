@@ -121,11 +121,11 @@ num_polys: 3
 x_des: 1
 y_des: 1
 
-run_time_iterations: 10000
+run_time_iterations: 100
 
 foot_offset: 0.02
 
-force_cost: 0.01
+force_cost: 0.00
 
 #Q_diag: [1, 1, 1,          # linear momentum
 #         1, 1, 1,           # angular momentum

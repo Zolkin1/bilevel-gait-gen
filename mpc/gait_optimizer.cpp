@@ -8,6 +8,13 @@
 #include "gait_optimizer.h"
 
 namespace mpc {
+    // TODO: Things to try:
+    // Confirm parameter partials (write unit tests for spline partials, check parameter partials)
+    // Check that the dHdth term is correct
+    // Sanity check derivatives by adjusting the time and checking the cost change
+    // Check LP math
+    // Better costs
+
     GaitOptimizer::GaitOptimizer(int num_ee, int num_contact_nodes, int num_decision_vars, int num_constraints,
                                  double contact_time_ub, double min_time) :
     num_ee_(num_ee), num_decision_vars_(num_decision_vars),
@@ -85,7 +92,6 @@ namespace mpc {
 //                assert(!param_partial.dA.toDense().array().isNaN());
 
                 std::cout << "max param partial dA: " << param_partial.dA.coeffs().maxCoeff() << std::endl;
-                std::cout << "max qp partial dA: " << qp_partials_.dA.coeffs().maxCoeff() << std::endl;
 
 //                std::cout << "qp partial dA: \n" << qp_partials_.dA.toDense().topLeftCorner<48+24,48+24>() << std::endl;
 
@@ -93,12 +99,14 @@ namespace mpc {
                 dldPth = qp_partials_.dP.cwiseProduct(param_partial.dP);
                 // TODO: Fix du nans
                 dHdth(GetNumTimeNodes(ee) + idx) = dldAth.sum() + dldPth.sum() +
-                                                     qp_partials_.dl.dot(param_partial.dl) + //qp_partials_.du.dot(param_partial.du) +
+                                                     qp_partials_.dl.dot(param_partial.dl) + qp_partials_.du.dot(param_partial.du) +
                                                      qp_partials_.dq.dot(param_partial.dq);
             }
         }
+        std::cout << "max qp partial dA: " << qp_partials_.dA.coeffs().maxCoeff() << std::endl;
 
-        dHdth.normalize();
+
+//        dHdth.normalize();
     }
 
     void GaitOptimizer::OptimizeContactTimes() {
