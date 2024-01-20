@@ -9,7 +9,7 @@
 #include <queue>
 #include <mutex>
 
-#include "mpc.h"
+#include "mpc_single_rigid_body.h"
 #include "qp_control.h"
 #include "gait_optimizer.h"
 
@@ -60,7 +60,7 @@ namespace controller {
         double prev_time_;
 
         QPControl qp_controller_;
-        mpc::MPC mpc_;
+        mpc::MPCSingleRigidBody mpc_;
         bool computed_;
 
         std::thread mpc_computations_;

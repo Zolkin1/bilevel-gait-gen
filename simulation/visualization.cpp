@@ -230,7 +230,7 @@ namespace simulation {
 
                     mjv_connector(&scn.geoms[scn.ngeom - 1],
                                   mjtGeom::mjGEOM_CAPSULE,
-                                  0.005,
+                                  0.001,
                                   from,
                                   to);
                 }

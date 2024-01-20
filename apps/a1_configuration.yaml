@@ -118,7 +118,7 @@ swing_height: 0.1
 
 num_polys: 3
 
-x_des: 1
+x_des: 2
 y_des: 1
 
 run_time_iterations: 100
@@ -127,23 +127,23 @@ foot_offset: 0.02
 
 force_cost: 0.00
 
-#Q_diag: [1, 1, 1,          # linear momentum
-#         1, 1, 1,           # angular momentum
-#         300, 300, 7500,      # COM position
-#         200, 200, 200,     # body angle
-#         60000, 500, 10,         # FL leg
-#         60000, 500, 10,       # FR leg
-#         60000, 500, 10,       # RL leg
-#         60000, 500, 10]       # RR leg
-
 Q_diag: [1, 1, 1,          # linear momentum
          1, 1, 1,           # angular momentum
          300, 300, 7500,      # COM position
          200, 200, 200,     # body angle
-         1000, 500, 10,         # FL leg
-         1000, 500, 10,       # FR leg
-         1000, 500, 10,       # RL leg
-         1000, 500, 10]
+         60000, 500, 10,         # FL leg
+         60000, 500, 10,       # FR leg
+         60000, 500, 10,       # RL leg
+         60000, 500, 10]       # RR leg
+
+#Q_diag: [1, 1, 1,          # linear momentum
+#         1, 1, 1,           # angular momentum
+#         300, 300, 7500,      # COM position
+#         200, 200, 200,     # body angle
+#         1000, 500, 10,         # FL leg
+#         1000, 500, 10,       # FR leg
+#         1000, 500, 10,       # RL leg
+#         1000, 500, 10]
 
 ## --- Temp --- ##
 viz_rate: 0.015

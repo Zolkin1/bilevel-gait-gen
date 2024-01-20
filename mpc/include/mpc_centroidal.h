@@ -1,67 +1,26 @@
 //
-// Copyright (c) 2023 Zachary Olkin. All rights reserved.
+// Created by zolkin on 1/19/24.
 //
 
-#ifndef BILEVEL_GAIT_GEN_MPC_H
-#define BILEVEL_GAIT_GEN_MPC_H
-
-#include <memory>
+#ifndef BILEVEL_GAIT_GEN_MPC_CENTROIDAL_H
+#define BILEVEL_GAIT_GEN_MPC_CENTROIDAL_H
 
 #include <Eigen/Core>
-
-#include "centroidal_model.h"
-#include "osqp_interface.h"
-#include "trajectory.h"
-#include "qp_data.h"
-#include "controller.h"
-#include "timer.h"
-#include "gait_optimizer.h"
-#include "single_rigid_body_model.h"
+#include "mpc.h"
 
 namespace mpc {
-    /**
-     * This is the MPC class.
-     * TODO: Eventually make this multi threaded and check for cache friendliness
-     */
-
     using vector_t = Eigen::VectorXd;
     using matrix_t =  Eigen::MatrixXd;
 
-    struct MPCInfo {
-        int num_nodes;
-        int num_qp_iterations;
-        int num_contacts;
-        double friction_coef;
-        vector_t vel_bounds;
-        vector_t joint_bounds_lb;
-        vector_t joint_bounds_ub;
-        std::vector<std::string> ee_frames;
-        int discretization_steps;
-        int num_switches;
-        double integrator_dt;
-        double force_bound;
-        double swing_height;
-        double foot_offset;
-
-        MPCInfo();
-        MPCInfo(const MPCInfo& info);
-    };
-
-    enum Gaits {
-        Trot = 0,
-        Amble = 1,
-        Static_Walk = 2
-    };
-
-    class MPC {
+    class MPCCentroidal {
     public:
-        MPC(const MPCInfo& info, const std::string& robot_urdf);
+        MPCCentroidal(const MPCInfo& info, const std::string& robot_urdf);
 
         Trajectory CreateInitialRun(const vector_t& state);
 
         Trajectory GetRealTimeUpdate(double run_time_iters, const vector_t& state, double init_time);
 
-        virtual Trajectory Solve(const vector_t& state, double init_time) = 0;
+        virtual Trajectory Solve(const vector_t& state, double init_time);
 
         void SetWarmStartTrajectory(const Trajectory& trajectory);
 
@@ -79,28 +38,36 @@ namespace mpc {
         /**
          * Creates a default switching time vector for use in initialization
          */
-        static std::vector<std::vector<double>> CreateDefaultSwitchingTimes(int num_switches, int num_ee, double horizon);
+        static std::vector <std::vector<double>>
+        CreateDefaultSwitchingTimes(int num_switches, int num_ee, double horizon);
 
         void SetDefaultGaitTrajectory(Gaits gait, int num_polys, const std::array<std::array<double, 3>, 4>& ee_pos);
 
-        void SetStateTrajectoryWarmStart(const std::vector<vector_t>& states);
+        void SetStateTrajectoryWarmStart(const std::vector <vector_t>& states);
 
         // Gets the first target config. Assumes solve has already been called.
         // Currently, does not return any momentum info
         vector_t GetTargetConfig(double time) const;
 
-        const Model* GetModel() const;
+        // Gets first target velocity. Gets the target body velocities and joints
+        vector_t GetTargetVelocity(double time) const;
+
+        // Computes an approximate target acceleration
+        vector_t GetTargetAcc(double time) const;
+
+        const CentroidalModel& GetModel() const;
 
         void AddForceCost(double weight);
 
         void PrintStats();
 
-        // TODO: Do I really need this?
         controller::Contact GetDesiredContacts(double time) const;
 
         vector_t GetFullTargetState(double time) const;
 
         Trajectory GetTrajectory() const;
+
+        vector_t GetNextTargetConfig() const;
 
         vector_t GetForceTarget(double time) const;
 
@@ -127,12 +94,13 @@ namespace mpc {
         vector_t GetQPSolution() const;
 
     protected:
-        // ---------------- Protected Member Functions ---------------- //
+    private:
+        // ---------------- Private Member Functions ---------------- //
         // Assumes flat ground and constant coef of friction
         // Since we have flat ground and a constant coefficient of friction, we can just make one pyramid
         void SetFrictionPyramid();
 
-        virtual void AddDynamicsConstraints(const vector_t& state) = 0;
+        void AddDynamicsConstraints(const vector_t& state);
 
         void AddFKConstraints(const vector_t& state);
 
@@ -144,11 +112,17 @@ namespace mpc {
 
         void AddFrictionConeConstraints();
 
-        virtual int GetForceSplineStartIdx() const = 0;
+        int GetForceSplineStartIdx() const;
 
-        virtual int GetPosSplineStartIdx() const = 0;
+        int GetVelocityIndex(int node) const;
+
+        int GetJointIndex(int node) const;
+
+        int GetPosSplineStartIdx() const;
 
         Trajectory ConvertQPSolToTrajectory(const vector_t& qp_sol, const vector_t& init_state) const;
+
+        void UpdateQPSizes();
 
         double LineSearch(const vector_t& direction, const vector_t& init_state);
 
@@ -170,9 +144,7 @@ namespace mpc {
 
         int GetNodeIntersectMutableForces() const;
 
-        virtual void SetInitQPSizes() = 0;
-
-        void UpdateQPSizes();
+        void SetInitQPSizes();
 
         // TODO: Support gauss newton on the cost. For now just accept quadratic cost
         void AddHessianApproxCost();
@@ -180,8 +152,6 @@ namespace mpc {
         void AddGradientCost();
 
         void AddFinalCost();
-
-        int UpdateNumInputs();
 
         // ---------------- Member Variables ---------------- //
         // Centroidal model
@@ -194,13 +164,12 @@ namespace mpc {
 
         const int num_states_;    // number of states in the MPC model, not in the underlying pinocchio model
         const int num_ee_;
-        int num_inputs_;
 
         // friction pyramid
         Eigen::Matrix<double, 4, 3> friction_pyramid_;
 
         // QP Interface
-        std::unique_ptr<OSQPInterface> qp_solver;
+        std::unique_ptr <OSQPInterface> qp_solver;
 
         // previous trajectory
         Trajectory prev_traj_;
@@ -237,8 +206,8 @@ namespace mpc {
         std::vector<double> cost_result_;
         std::vector<double> merit_result_;
         std::vector<double> merit_directional_deriv_;
-        std::vector<std::string> solve_type_;
-        std::vector<vector_t> ref_state_;
+        std::vector <std::string> solve_type_;
+        std::vector <vector_t> ref_state_;
         std::vector<double> solve_time_;
 
         bool in_real_time_;
@@ -249,9 +218,8 @@ namespace mpc {
         vector_t C_;
 
         const bool constraint_projection_;
-    private:
     };
 } // mpc
 
 
-#endif //BILEVEL_GAIT_GEN_MPC_H
+#endif //BILEVEL_GAIT_GEN_MPC_CENTROIDAL_H

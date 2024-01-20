@@ -93,6 +93,7 @@ namespace mpc {
             }
         }
 
+        // TODO: Investigate the angle representations. Might be part of the reason it doesn't work with the CMM
         // Deal with centroidal dynamics
 //        matrix6x_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q_pin_);
 //
@@ -381,9 +382,10 @@ namespace mpc {
 
     void CentroidalModel::CreateFrameMap(const std::vector<std::string>& frames) {
         for (int i = 0; i < num_ee_; i++) {
-            for (int j = 0; j < pin_model_.frames.size(); j++)
-            if (pin_model_.frames.at(j).name == frames.at(i)) {
-                frame_map_.insert(std::pair<std::string, int>(frames.at(i), pin_model_.getFrameId(frames.at(i))));
+            for (int j = 0; j < pin_model_.frames.size(); j++) {
+                if (pin_model_.frames.at(j).name == frames.at(i)) {
+                    frame_map_.insert(std::pair<std::string, int>(frames.at(i), pin_model_.getFrameId(frames.at(i))));
+                }
             }
         }
     }

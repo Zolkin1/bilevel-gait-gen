@@ -10,7 +10,11 @@ set(MPC_HEADER_LIST "include/mpc.h"
         "include/qp_data.h"
         "include/osqp_interface.h"
         "include/rk_integrator.h"
-        "gait_optimizer.cpp")
+        "include/gait_optimizer.h"
+        "include/single_rigid_body_model.h"
+        "include/model.h"
+        "include/mpc_single_rigid_body.h"
+        "include/mpc_centroidal.h")
 
 add_library(mpc mpc.cpp
         qp_interface.cpp
@@ -24,6 +28,10 @@ add_library(mpc mpc.cpp
         rk_integrator.cpp
         qp_data.cpp
         gait_optimizer.cpp
+        single_rigid_body_model.cpp
+        model.cpp
+        mpc_single_rigid_body.cpp
+        mpc_centroidal.cpp
         ${MPC_HEADER_LIST})
 target_include_directories(mpc PUBLIC include)
 

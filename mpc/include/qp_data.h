@@ -14,6 +14,14 @@ namespace mpc {
     using vector_t = Eigen::VectorXd;
     using matrix_t = Eigen::MatrixXd;
 
+    enum Constraints {
+        Dynamics,
+        JointForwardKinematics,
+        EndEffectorLocation,
+        ForceBox,
+        JointBox,
+        FrictionCone
+    };
 
     struct QPSettings {
         const bool constraint_projection_;
@@ -38,6 +46,7 @@ namespace mpc {
     struct QPData {
         QPSettings settings_;
         QPConstraintProjection constraint_projections_;
+        const std::vector<Constraints> constraints_;
 
         // Eigen triplet for filling the sparse matrix
         utils::SparseMatrixBuilder constraint_mat_;
@@ -67,6 +76,9 @@ namespace mpc {
         vector_t force_box_lb_;
         vector_t force_box_ub_;
 
+        vector_t ee_location_lb_;
+        vector_t ee_location_ub_;
+
         int num_dynamics_constraints;
         int num_decision_vars;
 
@@ -75,11 +87,14 @@ namespace mpc {
         int num_fk_constraints_;
         int num_force_box_constraints_;
         int num_fk_ineq_constraints_;
+        int num_ee_location_constraints_;
 
         QPData();
-        QPData(bool constraint_projection, int constraint_mat_nnz, int cost_mat_nnz);
-        QPData(const QPSettings settings);
-        QPData(const QPSettings settings, int projection_rows, int projection_cols);
+        QPData(bool constraint_projection, int constraint_mat_nnz, int cost_mat_nnz,
+               std::vector<Constraints> constraints);
+        QPData(const QPSettings settings, std::vector<Constraints> constraints);
+        QPData(const QPSettings settings, int projection_rows, int projection_cols,
+               std::vector<Constraints> constraints);
 
         int GetTotalNumConstraints() const;
 

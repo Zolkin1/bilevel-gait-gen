@@ -94,8 +94,7 @@ namespace controller {
 
         time_ = 0;
         q_des_ = mpc_.GetTargetConfig(time_);
-        v_des_ = mpc_.GetTargetVelocity(time_);
-        a_des_ = mpc_.GetTargetAcc(time_);
+//        v_des_ = mpc_.GetTargetVelocity(time_);
         force_des_ = mpc_.GetForceTarget(time_);
         traj_viz_mut_.lock();
         traj_ = mpc_.GetTrajectory();
@@ -132,9 +131,9 @@ namespace controller {
                                              const controller::vector_t& a) const {
 
         vector_t state = vector_t::Zero(q.size() + 6);
-        state.head<3>() = v.head<3>() * mpc_.GetModel().GetMass();
+        state.head<3>() = v.head<3>() * mpc_.GetModel()->GetMass();
 
-        state.segment<3>(3) = v.segment<3>(3) * mpc_.GetModel().GetMass();
+        state.segment<3>(3) = v.segment<3>(3) * mpc_.GetModel()->GetMass();
 
         Eigen::Quaterniond quat(static_cast<Eigen::Vector4d>(q.segment<4>(3)));
         // Note the warning on the pinocchio function!
@@ -213,7 +212,7 @@ namespace controller {
 
     void MPCController::UpdateTrajViz() {
         traj_viz_mut_.lock();
-        const mpc::CentroidalModel& model = mpc_.GetModel();
+        const mpc::Model* model = mpc_.GetModel();
         fk_traj_ = traj_.CreateVizData(model);
         traj_viz_mut_.unlock();
     }

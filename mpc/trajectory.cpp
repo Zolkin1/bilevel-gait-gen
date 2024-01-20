@@ -5,17 +5,17 @@
 #include <fstream>
 
 #include "trajectory.h"
-#include "centroidal_model.h"
+#include "model.h"
 
 namespace mpc {
 
-    Trajectory::Trajectory(int len, int state_size, int num_joints,
+    Trajectory::Trajectory(int len, int state_size, bool using_joints,
                            const std::vector<std::vector<double>>& switching_times, double node_dt,
                            double swing_height, double foot_offset) :
-            inputs_(switching_times, num_joints, len, node_dt),
             swing_height_(swing_height),
             foot_offset_(foot_offset),
-            fk_traj_(5)  { // TODO: Make not hard coded
+            fk_traj_(5),
+            using_joints_(using_joints) { // TODO: Make not hard coded
         for (int i = 0; i < len; i++) {
             states_.push_back(vector_t::Zero(state_size));
             full_velocities_.push_back(vector_t::Zero(state_size));
@@ -40,6 +40,8 @@ namespace mpc {
         for (auto& ee_traj : fk_traj_) {
             ee_traj.resize(len);
         }
+
+        assert(forces_.size() = end_effector_pos_.size());
     }
 
     Trajectory& Trajectory::operator=(const Trajectory& traj) {
@@ -51,21 +53,17 @@ namespace mpc {
         this->swing_height_ = traj.swing_height_;
         this->foot_offset_ = traj.foot_offset_;
         this->states_ = traj.states_;
-        this->inputs_ = traj.inputs_;
         this->end_effector_pos_ = traj.end_effector_pos_;
         this->mut_flags_ = traj.mut_flags_;
         this->full_velocities_ = traj.full_velocities_;
         this->fk_traj_ = traj.fk_traj_;
+        this->forces_ = traj.forces_;
 
         return *this;
     }
 
     std::vector<vector_t> Trajectory::GetStates() const {
         return states_;
-    }
-
-    const Inputs& Trajectory::GetInputs() const {
-        return inputs_;
     }
 
     const std::vector<std::array<Spline, 3>>& Trajectory::GetPositions() const {
@@ -87,12 +85,10 @@ namespace mpc {
         states_.at(idx) = state;
     }
 
-    void Trajectory::SetInput(const Inputs& input) {
-        inputs_ = input;
-    }
-
     void Trajectory::SetInputVels(int idx, const vector_t& joint_vels) {
-        inputs_.SetJointVelsNoTime(joint_vels, idx);
+        if (!using_joints_) {
+            throw std::runtime_error("Cannot set input velocities");
+        }
     }
 
     int Trajectory::GetTotalPosSplineVars() const {
@@ -101,11 +97,11 @@ namespace mpc {
 
     void Trajectory::UpdateForceSpline(int end_effector, int coord, const vector_t& vars) {
         int idx = 0;
-        for (int i = 0; i < inputs_.GetForces().at(end_effector).at(coord).GetNumPolyTimes(); i++) {
-            if (inputs_.IsForceMutable(end_effector, coord, i)) {
-                inputs_.UpdateForcePoly(end_effector, coord, i, vars.segment(idx, 2));
-                idx += 2;
-            }
+        for (int i = 0; i < forces_.at(end_effector).at(coord).GetNumPolyTimes(); i++) {
+//            if (inputs_.IsForceMutable(end_effector, coord, i)) {
+//                inputs_.UpdateForcePoly(end_effector, coord, i, vars.segment(idx, 2));
+//                idx += 2;
+//            }
         }
     }
 
@@ -177,17 +173,8 @@ namespace mpc {
         file << "states: " << std::endl;
         file << states << std::endl;
 
-//        file << "node: [states], [joint vels]" << std::endl;
-//        for (int node = 0; node < states_.size(); node++) {
-//            if (node == 0) {
-//                file << states_.at(node).transpose() << std::endl;
-//            } else {
-//                file << states_.at(node).transpose() << ", " << inputs_.GetVel(node-1).transpose() << std::endl;
-//            }
-//        }
-
         file << "force spline: " << std::endl;
-        for (const auto& force : inputs_.GetForces()) {
+        for (const auto& force : forces_) {
             for (int coord = 0; coord < 3; coord++) {
                 for (int i = 0; i < force.at(coord).GetPolyVars().size(); i++) {
                     for (int j = 0; j < force.at(coord).GetPolyVars().at(i).size(); j++) {
@@ -218,16 +205,18 @@ namespace mpc {
             }
         }
 
-        matrix_t joint_vels = matrix_t::Zero(inputs_.GetAllVels().size(), inputs_.GetAllVels().at(0).size());
-        for (int i = 0; i < inputs_.GetAllVels().size(); i++) {
-            joint_vels.row(i) = inputs_.GetVel(i).transpose();
+        if (using_joints_) {
+//            matrix_t joint_vels = matrix_t::Zero(inputs_.GetAllVels().size(), inputs_.GetAllVels().at(0).size());
+//            for (int i = 0; i < inputs_.GetAllVels().size(); i++) {
+//                joint_vels.row(i) = inputs_.GetVel(i).transpose();
+//            }
         }
 
         file << "timings: " << std::endl;
         for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
             file << "end effector #" << ee << ": " << std::endl;
             const auto& pos_times = end_effector_pos_.at(ee).at(0).GetPolyTimes();
-            const auto& force_times = inputs_.GetForces().at(ee).at(0).GetPolyTimes();
+            const auto& force_times = forces_.at(ee).at(0).GetPolyTimes();
             file << "force: ";
             for (double force_time : force_times) {
                 file << force_time << ", ";
@@ -241,8 +230,10 @@ namespace mpc {
             file << std::endl;
         }
 
-        file << "input joint vels: " << std::endl;
-        file << joint_vels << std::endl;
+        if (using_joints_) {
+//            file << "input joint vels: " << std::endl;
+//            file << joint_vels << std::endl;
+        }
 
         file.close();
     }
@@ -257,17 +248,17 @@ namespace mpc {
     }
 
     double Trajectory::GetTotalTime() const {
-        return std::min(end_effector_pos_.at(0).at(0).GetEndTime(), inputs_.GetForces().at(0).at(0).GetEndTime());  // In theory this is redundant
+        return std::min(end_effector_pos_.at(0).at(0).GetEndTime(), forces_.at(0).at(0).GetEndTime());  // In theory this is redundant
     }
 
     void Trajectory::AddPolys(double final_time) {
         while (GetTotalTime() < final_time) {
-            for (auto &end_effector_pos: end_effector_pos_) {
+            for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
                 for (int coord = 0; coord < POS_VARS; coord++) {
-                    end_effector_pos.at(coord).AddPoly(0.2);
+                    end_effector_pos_.at(ee).at(coord).AddPoly(0.2);
+                    forces_.at(ee).at(coord).AddPoly(0.2);
                 }
             }
-            inputs_.AddPolys(0.2);
         }
         SetSwingPosZ();
         UpdatePosSplineVarsCount();
@@ -275,20 +266,19 @@ namespace mpc {
     }
 
     void Trajectory::RemoveUnusedPolys(double init_time) {
-        for (auto &end_effector_po: end_effector_pos_) {
+        for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
             for (int coord = 0; coord < POS_VARS; coord++) {
-                end_effector_po.at(coord).RemoveUnused(init_time);
+                end_effector_pos_.at(ee).at(coord).RemoveUnused(init_time);
+                forces_.at(ee).at(coord).RemoveUnused(init_time);
             }
         }
-
-        inputs_.RemoveUnusedPolys(init_time);
 
         UpdatePosSplineVarsCount();
         UpdateContactTimes();
     }
 
     void Trajectory::SetInitTime(double time) {
-        inputs_.SetInitTime(time);
+        init_time_ = time;
     }
 
     void Trajectory::UpdatePosSplineVarsCount() {
@@ -305,25 +295,25 @@ namespace mpc {
     void Trajectory::SetEndEffectorSplines(int ee, const Spline& force_spline, const Spline& pos_spline) {
         for (int coord = 0; coord < POS_VARS; coord++) {
             end_effector_pos_.at(ee).at(coord) = pos_spline;
-            inputs_.SetForceSpline(ee, coord, force_spline);
+            forces_.at(ee).at(coord) = force_spline;
         }
 
         SetSwingPosZ();
     }
 
     vector_t Trajectory::ConvertToQPVector() const {
-        vector_t qp_vec = vector_t::Zero(pos_spline_vars_ + inputs_.GetTotalForceSplineVars()
-                + inputs_.GetAllVels().at(0).size()*(inputs_.GetAllVels().size()-1)
-                + (states_.at(0).size()-1)*states_.size());
+        vector_t qp_vec = vector_t::Zero(GetTotalVariables());
 
         for (int i = 0; i < states_.size(); i++) {
             qp_vec.segment(i*(states_.at(0).size()-1), states_.at(i).size()-1) =
-                    CentroidalModel::ConvertManifoldStateToAlgebraState(states_.at(i), states_.at(0));
+                    Model::ConvertManifoldStateToTangentState(states_.at(i), states_.at(0));
         }
 
-        qp_vec.segment( (states_.at(0).size()-1)*states_.size(), inputs_.GetTotalForceSplineVars()
-                            + inputs_.GetAllVels().at(0).size()*inputs_.GetAllVels().size()) = inputs_.AsQPVector();
-        qp_vec.tail(pos_spline_vars_) = PositionAsQPVector();
+
+        // TODO: Redo
+//        qp_vec.segment( (states_.at(0).size()-1)*states_.size(), force_spline_vars_
+//                            + inputs_.GetAllVels().at(0).size()*inputs_.GetAllVels().size()) = inputs_.AsQPVector();
+//        qp_vec.tail(pos_spline_vars_) = PositionAsQPVector();
 
         return qp_vec;
     }
@@ -423,12 +413,13 @@ namespace mpc {
         return -(full_velocities_.at(node+1) - full_velocities_.at(node))/dt;
     }
 
-    std::vector<std::vector<Eigen::Vector3d>> Trajectory::CreateVizData(const CentroidalModel& model) {
+    std::vector<std::vector<Eigen::Vector3d>> Trajectory::CreateVizData(const Model* model) {
         for (int ee = 0; ee < 5; ee++) {
             for (int node = 0; node < states_.size(); node++) {
                 if (ee == 4) {
                     fk_traj_.at(ee).at(node) = model.GetCOMPosition(GetState(node));
                 } else {
+                    // TODO: How to deal with this
                     fk_traj_.at(ee).at(node) =
                             model.GetEndEffectorLocationCOMFrame(GetState(node),
                                                                  model.GetEndEffectorFrame(ee))
@@ -454,6 +445,62 @@ namespace mpc {
 
     std::vector<std::vector<double>> Trajectory::GetContactTimes() const {
         return contact_times_;
+    }
+
+    vector_t Trajectory::GetSplineLin(const mpc::Trajectory::SplineTypes& spline_type, int ee, int coord, double time) {
+        switch (spline_type) {
+            case SplineTypes::Force:
+                return forces_.at(ee).at(coord).GetPolyVarsLin(time);
+                break;
+            case SplineTypes::Position:
+                return end_effector_pos_.at(ee).at(coord).GetPolyVarsLin(time);
+                break;
+            default:
+                throw std::runtime_error("Spline type not implemented.");
+                break;
+        }
+    }
+
+    std::pair<int, int> Trajectory::GetForceSplineIndex(int end_effector, double time, int coord) const {
+        int num_spline_vars_before = 0;
+        for (int ee = 0; ee < end_effector; ee++) {
+            for (int j = 0; j < POS_VARS; j++) {
+                num_spline_vars_before += forces_.at(ee).at(j).GetTotalPolyVars();
+            }
+        }
+
+        int idx_into_ee_coord_spline_vars = 0;
+        for (int j = 0; j < coord; j++) {
+            idx_into_ee_coord_spline_vars += forces_.at(end_effector).at(j).GetTotalPolyVars();
+        }
+
+        int vars_idx, vars_affecting;
+        std::tie(vars_idx, vars_affecting) = forces_.at(end_effector).at(coord).GetVarsIndexEnd(time);
+
+        return std::make_pair(num_spline_vars_before + idx_into_ee_coord_spline_vars + vars_idx, vars_affecting);
+    }
+
+    int Trajectory::GetTotalPolyVars(const mpc::Trajectory::SplineTypes& spline_type, int end_effector, int coord) {
+        switch (spline_type) {
+            case SplineTypes::Force:
+                return forces_.at(end_effector).at(coord).GetTotalPolyVars();
+                break;
+            case SplineTypes::Position:
+                return end_effector_pos_.at(end_effector).at(coord).GetTotalPolyVars();
+                break;
+            default:
+                throw std::runtime_error("Spline type not impelemented.");
+                break;
+        }
+    }
+
+    Eigen::Vector3d Trajectory::GetForce(int end_effector, double time) const {
+        Eigen::Vector3d force = Eigen::Vector3d::Zero();
+        for (int coord = 0; coord < 3; coord++) {
+            force(coord) = forces_.at(end_effector).at(coord).ValueAt(time);
+        }
+
+        return force;
     }
 
 } // mpc

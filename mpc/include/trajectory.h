@@ -8,7 +8,7 @@
 #include <Eigen/Core>
 
 #include "inputs.h"
-#include "centroidal_model.h"
+#include "model.h"
 
 namespace mpc {
     using vector_t = Eigen::VectorXd;
@@ -18,7 +18,12 @@ namespace mpc {
         static int constexpr POS_VARS = 3;
 
     public:
-        Trajectory(int len, int state_size, int num_joints,
+        enum SplineTypes {
+            Position,
+            Force
+        };
+
+        Trajectory(int len, int state_size, bool using_joints,
                    const std::vector<std::vector<double>>& switching_times, double node_dt,
                    double swing_height, double foot_offset);
 
@@ -28,13 +33,7 @@ namespace mpc {
 
         std::vector<vector_t> GetStates() const;
 
-        const Inputs& GetInputs() const;
-
         const std::vector<std::array<Spline, 3>>& GetPositions() const;
-
-//        void UpdatePosition(int end_effector, int coord, const std::vector<std::array<double, Spline::POLY_ORDER>>& vars);
-
-//        void UpdateForce(int end_effector, int coord, const std::vector<std::array<double, Spline::POLY_ORDER>>& vars);
 
         /**
          * Resets all states_ and inputs to 0
@@ -42,7 +41,6 @@ namespace mpc {
         void Reset();
 
         void SetState(int idx, const vector_t& state);
-        void SetInput(const Inputs& input);
         void SetInputVels(int idx, const vector_t& joint_vels);
 
         int GetTotalPosSplineVars() const;
@@ -60,6 +58,8 @@ namespace mpc {
          * @return
          */
         std::pair<int, int> GetPositionSplineIndex(int end_effector, double time, int coord) const;
+
+        std::pair<int, int> GetForceSplineIndex(int ee, double time,  int coord) const;
 
         void SetPositionsForAllTime(int ee, const std::array<double, POS_VARS>& ee_pos);
 
@@ -101,11 +101,21 @@ namespace mpc {
 
         vector_t GetAcc(int node, double dt);
 
-        std::vector<std::vector<Eigen::Vector3d>> CreateVizData(const CentroidalModel& model);
+        std::vector<std::vector<Eigen::Vector3d>> CreateVizData(const Model* model);
 
         int GetNumContactNodes(int ee) const;
 
         std::vector<std::vector<double>> GetContactTimes() const;
+
+        int GetTotalForceSplineVars() const; // TODO: impelement
+
+        bool IsForceMutable(int ee, int coord, double time) const;
+
+        vector_t GetSplineLin(const SplineTypes& spline_type, int end_effector, int coord, double time);
+
+        int GetTotalPolyVars(const SplineTypes& spline_type, int end_effector, int coord);
+
+        Eigen::Vector3d GetForce(int end_effector, double time) const;
 
     protected:
     private:
@@ -115,13 +125,21 @@ namespace mpc {
 
         void UpdateContactTimes();
 
+        void UpdateForceSplineVarsCount();
+
+        // Should give pos_spline_vars + force_spline_vars + all vells + all states
+        int GetTotalVariables() const;    // TODO: Consider if we have joint information
+
+        const bool using_joints_;
 
         std::vector<vector_t> states_;
-        Inputs inputs_;
+//        Inputs inputs_;
         std::vector<std::array<Spline, 3>> end_effector_pos_;
+        std::vector<std::array<Spline, 3>> forces_;
         std::vector<std::array<bool, 3>> mut_flags_;
 
         int pos_spline_vars_;
+        int force_spline_vars_;
 
         double swing_height_;
         double foot_offset_;
@@ -130,6 +148,8 @@ namespace mpc {
         std::vector<std::vector<Eigen::Vector3d>> fk_traj_;
 
         std::vector<std::vector<double>> contact_times_;
+
+        double init_time_;
     };
 } // mpc
 
