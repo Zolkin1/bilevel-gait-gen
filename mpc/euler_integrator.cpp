@@ -9,8 +9,8 @@
 namespace mpc {
     EulerIntegrator::EulerIntegrator(double dt) : Integrator(dt) {}
 
-    vector_t EulerIntegrator::CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time,
-                                           double final_time, CentroidalModel& model) {
+    vector_t EulerIntegrator::CalcIntegral(const mpc::vector_t &ic, const mpc::Trajectory& traj,
+                                           double init_time, double final_time, SingleRigidBodyModel& model) {
         if (final_time < init_time) {
             throw std::runtime_error("Final time for integration less than initial time.");
         }
@@ -23,18 +23,18 @@ namespace mpc {
         vector_t val = ic;
         double time = init_time;
         for (int i = 0; i < num_iters; i++) {
-            val += model.CalcDynamics(val, input, time, ic)*dt_;
+            val += model.CalcDynamics(val, traj, time, ic)*dt_;
         }
 
         return val;
     }
 
-    vector_t EulerIntegrator::CalcIntegral(const mpc::vector_t& ic, const mpc::Inputs& input, double init_time,
-                                           int num_steps, mpc::CentroidalModel& model, const vector_t& ref_state) {
+    vector_t EulerIntegrator::CalcIntegral(const vector_t& ic, const Trajectory& traj, double init_time,
+                                           int num_steps, SingleRigidBodyModel& model, const vector_t& ref_state) {
         vector_t val = ic;
         double time = init_time;
         for (int i = 0; i < num_steps; i++) {
-            val += model.CalcDynamics(val, input, time, ref_state)*dt_;
+            val += model.CalcDynamics(val, traj, time, ref_state)*dt_;
         }
 
         return val;

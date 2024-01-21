@@ -14,7 +14,8 @@ namespace controller {
                                  double force_weight, mpc::MPCInfo info,
                                  const std::vector<vector_t>& warm_start_states,
                                  const vector_t& state_des,
-                                 int num_polys) : Controller(control_rate, robot_urdf, foot_type),
+                                 int num_polys,
+                                 const matrix_t& Q) : Controller(control_rate, robot_urdf, foot_type),
                                  qp_controller_(control_rate, robot_urdf, foot_type, nv,
                                                torque_bounds, friction_coef,
                                                base_pos_gains,
@@ -29,7 +30,7 @@ namespace controller {
                                  traj_(10, 24, 12, mpc_.CreateDefaultSwitchingTimes(2,4,1.0),
                                         0.015, 0.75, 0.0),
                                  fk_traj_(5),
-                                 gait_optimizer_(4, 10, 10, 10, 1, 0.05){  // TODO: Not hard coded
+                                 gait_optimizer_(4, 10, 10, 10, 1, 0.05) {  // TODO: Not hard coded
 
         // TODO: Get this from IC
         std::array<std::array<double, 3>, 4> ee_pos{};
@@ -41,33 +42,6 @@ namespace controller {
         mpc_.SetStateTrajectoryWarmStart(warm_start_states);
 
         mpc_.SetDefaultGaitTrajectory(mpc::Gaits::Trot, num_polys, ee_pos);
-
-        matrix_t Q = 2*matrix_t::Identity(24, 24);
-        Q.topLeftCorner<6,6>() = matrix_t::Zero(6, 6);
-        Q(0,0) = 0.0;
-        Q(1,1) = 0.0;
-        Q(2,2) = 10;
-        Q(6,6) = 300; //300;
-        Q(7,7) = 300; //300;
-        Q(8,8) = 750; //450;
-        Q(9,9) = 200;
-        Q(10,10) = 200;
-        Q(11,11) = 200;
-
-        Q(12,12) = 600;
-        Q(15,15) = 600;
-        Q(18,18) = 600;
-        Q(21,21) = 600;
-
-        Q(13,13) = 50;
-        Q(16,16) = 50;
-        Q(19,19) = 50;
-        Q(22,22) = 50;
-
-        Q(14,14) = 10;
-        Q(17,17) = 10;
-        Q(20,20) = 10;
-        Q(23,23) = 10;
 
         const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(state_des, warm_start_states.at(0));
 
@@ -212,8 +186,7 @@ namespace controller {
 
     void MPCController::UpdateTrajViz() {
         traj_viz_mut_.lock();
-        const mpc::Model* model = mpc_.GetModel();
-        fk_traj_ = traj_.CreateVizData(model);
+        fk_traj_ = mpc_.CreateVizData();
         traj_viz_mut_.unlock();
     }
 

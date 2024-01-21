@@ -7,7 +7,8 @@
 
 #include <Eigen/Core>
 
-#include "inputs.h"
+//#include "trajectory.h"
+#include "single_rigid_body_model.h"
 
 namespace mpc {
     using vector_t = Eigen::VectorXd;
@@ -20,11 +21,11 @@ namespace mpc {
         Integrator(double dt);
 
         double GetDt() const;
-        virtual vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, double final_time,
-                              CentroidalModel& model) = 0;
+        virtual vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Trajectory& traj,
+                                      double init_time, double final_time, SingleRigidBodyModel& model) = 0;
 
-        virtual vector_t CalcIntegral(const vector_t& ic, const Inputs& input, double init_time, int num_steps,
-                                      CentroidalModel& model, const vector_t& ref_state) = 0;
+        virtual vector_t CalcIntegral(const vector_t& ic, const Trajectory& traj, double init_time,
+                                      int num_steps, SingleRigidBodyModel& model, const vector_t& ref_state) = 0;
 
         virtual void CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx,
                                                  Eigen::Ref<matrix_t> A) = 0;

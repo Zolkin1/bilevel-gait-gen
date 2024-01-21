@@ -15,7 +15,8 @@ namespace mpc {
             swing_height_(swing_height),
             foot_offset_(foot_offset),
             fk_traj_(5),
-            using_joints_(using_joints) { // TODO: Make not hard coded
+            using_joints_(using_joints),
+            node_dt_(node_dt) { // TODO: Make not hard coded
         for (int i = 0; i < len; i++) {
             states_.push_back(vector_t::Zero(state_size));
             full_velocities_.push_back(vector_t::Zero(state_size));
@@ -29,19 +30,25 @@ namespace mpc {
             end_effector_pos_.emplace_back(end_effector_pos);
             const std::array<bool, 3> mut_arr = {true, true, false}; // z pos is always a constant trajectory
             mut_flags_.emplace_back(mut_arr);
+
+            std::array<Spline, 3> force =
+                    {Spline(3, switching_time, true, Spline::Force),
+                     Spline(3, switching_time, true, Spline::Force),
+                     Spline(3, switching_time, true, Spline::Force)};
+            forces_.emplace_back(force);
         }
 
         contact_times_.resize(end_effector_pos_.size());
         UpdateContactTimes();
 
-        UpdatePosSplineVarsCount();
+        UpdateSplineVarsCount();
         SetSwingPosZ();
 
         for (auto& ee_traj : fk_traj_) {
             ee_traj.resize(len);
         }
 
-        assert(forces_.size() = end_effector_pos_.size());
+        assert(forces_.size() == end_effector_pos_.size());
     }
 
     Trajectory& Trajectory::operator=(const Trajectory& traj) {
@@ -50,6 +57,7 @@ namespace mpc {
         }
 
         this->pos_spline_vars_ = traj.pos_spline_vars_;
+        this->force_spline_vars_ = traj.force_spline_vars_;
         this->swing_height_ = traj.swing_height_;
         this->foot_offset_ = traj.foot_offset_;
         this->states_ = traj.states_;
@@ -58,6 +66,7 @@ namespace mpc {
         this->full_velocities_ = traj.full_velocities_;
         this->fk_traj_ = traj.fk_traj_;
         this->forces_ = traj.forces_;
+        this->node_dt_ = traj.node_dt_;
 
         return *this;
     }
@@ -261,7 +270,7 @@ namespace mpc {
             }
         }
         SetSwingPosZ();
-        UpdatePosSplineVarsCount();
+        UpdateSplineVarsCount();
         UpdateContactTimes();
     }
 
@@ -273,7 +282,7 @@ namespace mpc {
             }
         }
 
-        UpdatePosSplineVarsCount();
+        UpdateSplineVarsCount();
         UpdateContactTimes();
     }
 
@@ -281,13 +290,16 @@ namespace mpc {
         init_time_ = time;
     }
 
-    void Trajectory::UpdatePosSplineVarsCount() {
+    void Trajectory::UpdateSplineVarsCount() {
         pos_spline_vars_ = 0;
+        force_spline_vars_ = 0;
         for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
             for (int coord = 0; coord < 3; coord++) {
                 if (mut_flags_.at(ee).at(coord)) {
                     pos_spline_vars_ += end_effector_pos_.at(ee).at(coord).GetTotalPolyVars();
                 }
+
+                force_spline_vars_ += forces_.at(ee).at(coord).GetTotalPolyVars();
             }
         }
     }
@@ -299,23 +311,6 @@ namespace mpc {
         }
 
         SetSwingPosZ();
-    }
-
-    vector_t Trajectory::ConvertToQPVector() const {
-        vector_t qp_vec = vector_t::Zero(GetTotalVariables());
-
-        for (int i = 0; i < states_.size(); i++) {
-            qp_vec.segment(i*(states_.at(0).size()-1), states_.at(i).size()-1) =
-                    Model::ConvertManifoldStateToTangentState(states_.at(i), states_.at(0));
-        }
-
-
-        // TODO: Redo
-//        qp_vec.segment( (states_.at(0).size()-1)*states_.size(), force_spline_vars_
-//                            + inputs_.GetAllVels().at(0).size()*inputs_.GetAllVels().size()) = inputs_.AsQPVector();
-//        qp_vec.tail(pos_spline_vars_) = PositionAsQPVector();
-
-        return qp_vec;
     }
 
     vector_t Trajectory::PositionAsQPVector() const {
@@ -413,24 +408,23 @@ namespace mpc {
         return -(full_velocities_.at(node+1) - full_velocities_.at(node))/dt;
     }
 
-    std::vector<std::vector<Eigen::Vector3d>> Trajectory::CreateVizData(const Model* model) {
-        for (int ee = 0; ee < 5; ee++) {
-            for (int node = 0; node < states_.size(); node++) {
-                if (ee == 4) {
-                    fk_traj_.at(ee).at(node) = model.GetCOMPosition(GetState(node));
-                } else {
-                    // TODO: How to deal with this
-                    fk_traj_.at(ee).at(node) =
-                            model.GetEndEffectorLocationCOMFrame(GetState(node),
-                                                                 model.GetEndEffectorFrame(ee))
-                            + model.GetCOMPosition(GetState(node));
-                }
-            }
-        }
-
-
-        return fk_traj_;
-    }
+//    std::vector<std::vector<Eigen::Vector3d>> Trajectory::CreateVizData(const Model* model) {
+//        for (int ee = 0; ee < 5; ee++) {
+//            for (int node = 0; node < states_.size(); node++) {
+//                if (ee == 4) {
+//                    fk_traj_.at(ee).at(node) = model->GetCOMPosition(GetState(node));
+//                } else {
+//                    // TODO: How to deal with this
+//                    fk_traj_.at(ee).at(node) = GetEndEffectorLocation(ee, GetTime(node));
+////                            model.GetEndEffectorLocationCOMFrame(GetState(node),
+////                                                                 model.GetEndEffectorFrame(ee))
+////                            + model->GetCOMPosition(GetState(node));
+//                }
+//            }
+//        }
+//
+//        return fk_traj_;
+//    }
 
     int Trajectory::GetNumContactNodes(int ee) const {
         return contact_times_.at(ee).size();
@@ -501,6 +495,34 @@ namespace mpc {
         }
 
         return force;
+    }
+
+    Eigen::Vector3d Trajectory::GetEndEffectorLocation(int end_effector, double time) const {
+        Eigen::Vector3d ee_location = Eigen::Vector3d::Zero();
+        for (int i = 0; i < 3; i++) {
+            ee_location(i) = end_effector_pos_.at(end_effector).at(i).ValueAt(time);
+        }
+
+        return ee_location;
+    }
+
+    double Trajectory::GetTime(int node) const {
+        return init_time_ + node_dt_*node;
+    }
+
+    int Trajectory::GetTotalForceSplineVars() const {
+        return force_spline_vars_;
+    }
+
+    bool Trajectory::IsForceMutable(int ee, int coord, double time) const {
+        const int idx = forces_.at(ee).at(coord).GetPolyIdx(time);
+        return forces_.at(ee).at(coord).IsMutable(idx) || forces_.at(ee).at(coord).IsMutable(idx-1);
+    }
+
+    int Trajectory::GetTotalVariables() const {
+        // TODO: Account for joint potentially
+        // TODO: Do I want states in here?
+        return force_spline_vars_ + pos_spline_vars_ + states_.size()*(states_.at(0).size()-1);
     }
 
 } // mpc

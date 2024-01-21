@@ -8,7 +8,7 @@
 #include <Eigen/Core>
 
 #include "inputs.h"
-#include "model.h"
+//#include "model.h"
 
 namespace mpc {
     using vector_t = Eigen::VectorXd;
@@ -79,7 +79,7 @@ namespace mpc {
         void SetEndEffectorSplines(int ee, const Spline& force_spline,
                                    const Spline& pos_spline);
 
-        vector_t ConvertToQPVector() const;
+//        vector_t ConvertToQPVector(const SingleRigidBodyModel& model) const;
 
         vector_t PositionAsQPVector() const;
 
@@ -101,7 +101,7 @@ namespace mpc {
 
         vector_t GetAcc(int node, double dt);
 
-        std::vector<std::vector<Eigen::Vector3d>> CreateVizData(const Model* model);
+//        std::vector<std::vector<Eigen::Vector3d>> CreateVizData(const Model* model);
 
         int GetNumContactNodes(int ee) const;
 
@@ -117,18 +117,22 @@ namespace mpc {
 
         Eigen::Vector3d GetForce(int end_effector, double time) const;
 
+        Eigen::Vector3d GetEndEffectorLocation(int end_effector, double time) const;
+
+        double GetTime(int node) const;
+
+        // Should give pos_spline_vars + force_spline_vars + all vells + all states
+        int GetTotalVariables() const;    // TODO: Consider if we have joint information
+
     protected:
     private:
-        void UpdatePosSplineVarsCount();
+        void UpdateSplineVarsCount();
 
         void SetSwingPosZ();
 
         void UpdateContactTimes();
 
         void UpdateForceSplineVarsCount();
-
-        // Should give pos_spline_vars + force_spline_vars + all vells + all states
-        int GetTotalVariables() const;    // TODO: Consider if we have joint information
 
         const bool using_joints_;
 
@@ -150,6 +154,8 @@ namespace mpc {
         std::vector<std::vector<double>> contact_times_;
 
         double init_time_;
+
+        double node_dt_;
     };
 } // mpc
 

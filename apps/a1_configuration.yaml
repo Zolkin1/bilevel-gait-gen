@@ -57,6 +57,13 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
                0., 0., 0.,
                0., 0., 0.]
 
+
+#SRBD Configs:
+srbd_init: [0, 0, 0.3541,
+            0, 0, 0,
+            0, 0, 0, 1,
+            0, 0, 0]
+
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
 control_rate: 250  # Hz
@@ -135,6 +142,12 @@ Q_diag: [1, 1, 1,          # linear momentum
          60000, 500, 10,       # FR leg
          60000, 500, 10,       # RL leg
          60000, 500, 10]       # RR leg
+
+Q_srbd_diag: [300, 300, 7500,   # COM position
+              1, 1, 1,          # linear momentum
+              200, 200, 200,    # orientation
+              1, 1, 1]          # angular momentum
+
 
 #Q_diag: [1, 1, 1,          # linear momentum
 #         1, 1, 1,           # angular momentum

@@ -6,18 +6,22 @@
 #define BILEVEL_GAIT_GEN_RK_INTEGRATOR_H
 
 #include "integrator.h"
+//#include "trajectory.h"
 //#include "centroidal_model.h"
 
 namespace mpc {
+    using vector_t = Eigen::VectorXd;
+    using matrix_t = Eigen::MatrixXd;
+
     class RKIntegrator {
     public:
         RKIntegrator(double dt);
 
-        vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, double final_time,
-                              CentroidalModel& model);
+        vector_t CalcIntegral(const mpc::vector_t &ic, const Trajectory& traj, double init_time, double final_time,
+                              SingleRigidBodyModel& model);
 
-        vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, int num_steps,
-                              CentroidalModel& model, const vector_t& ref_state);
+        vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Trajectory& traj, double init_time, int num_steps,
+                              SingleRigidBodyModel& model, const vector_t& ref_state);
 
         // Only does a single step
         void CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx,

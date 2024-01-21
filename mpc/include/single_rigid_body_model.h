@@ -28,8 +28,8 @@ namespace mpc {
         void GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Trajectory& traj,
                                        double time, matrix_t& A, matrix_t& B, vector_t& C);
 
-        vector_t GetDiscreteDynamics(const vector_t& state, const Trajectory& traj, double time,
-                                     const vector_t& ref_state);
+//        vector_t GetDiscreteDynamics(const vector_t& state, const Trajectory& traj, double time,
+//                                     const vector_t& ref_state);
 
         void ComputeLinearizationPartialWrtContactTimes(matrix_t& dA,
                                                         matrix_t& dB,
@@ -39,13 +39,18 @@ namespace mpc {
                                                         double time,
                                                         int ee, int idx);
 
+        vector_t CalcDynamics(const vector_t& state, const Trajectory& traj, double time,
+                              const vector_t& ref_state);
+
         vector_3t GetCOMPosition(const vector_t& state) const override;
 
-        vector_3t ConvertManifoldToTangentQuat(const Eigen::Vector4d& state) const;
+        static vector_3t ConvertManifoldToTangentQuat(const Eigen::Vector4d& state,
+                                               const Eigen::Vector4d& ref_state) ;
 
-        virtual int GetNumTangentStates() const override;
-
-        virtual int GetNumManifoldStates() const override;
+        int GetNumTangentStates() const override;
+        int GetNumManifoldStates() const override;
+        vector_t ConvertManifoldStateToTangentState(const vector_t& state, const vector_t& ref_state) const override;
+        vector_t ConvertTangentStateToManifoldState(const vector_t& state, const vector_t& ref_state) const override;
 
     protected:
         void ConvertMPCStateToPinocchioState(const vector_t& state, Eigen::Ref<vector_t> q_pin) const override;
@@ -55,6 +60,9 @@ namespace mpc {
 
         matrix_33t Ir_;   // Rotational inertia
         matrix_33t Ir_inv_;
+
+       static constexpr int QUAT_SIZE = 4;
+       static constexpr int QUAT_START = 6;
     private:
     };
 } // mpc

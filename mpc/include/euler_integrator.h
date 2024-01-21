@@ -12,11 +12,11 @@ namespace mpc {
     public:
         EulerIntegrator(double dt);
 
-        vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, double final_time,
-                              CentroidalModel& model) override;
+        vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Trajectory& traj,
+                              double init_time, double final_time, SingleRigidBodyModel& model) override;
 
-        vector_t CalcIntegral(const mpc::vector_t &ic, const mpc::Inputs &input, double init_time, int num_steps,
-                              CentroidalModel& model, const vector_t& ref_state) override;
+        vector_t CalcIntegral(const vector_t& ic, const Trajectory& traj, double init_time,
+                              int num_steps, SingleRigidBodyModel& model, const vector_t& ref_state) override;
 
         // Only does a single step
         void CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx,

@@ -13,13 +13,20 @@ namespace mpc {
         MPCSingleRigidBody(const MPCInfo& info, const std::string& robot_urdf);
 
         Trajectory Solve(const vector_t& state, double init_time) override;
+
+        virtual vector_t ConvertTrajToQPVec(const Trajectory& traj) const override;
+
+        virtual std::vector<std::vector<Eigen::Vector3d>> CreateVizData();
     protected:
         void AddDynamicsConstraints(const vector_t& state) override;
 
         int GetForceSplineStartIdx() const override;
         int GetPosSplineStartIdx() const override;
 
-        void SetInitQPSizes();
+        void SetInitQPSizes() override;
+
+        void InitalizeQPData();
+
     private:
     };
 } // mpc

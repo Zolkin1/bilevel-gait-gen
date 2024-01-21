@@ -17,6 +17,7 @@
 #include "timer.h"
 #include "gait_optimizer.h"
 #include "single_rigid_body_model.h"
+#include "rk_integrator.h"
 
 namespace mpc {
     /**
@@ -126,6 +127,8 @@ namespace mpc {
 
         vector_t GetQPSolution() const;
 
+        virtual std::vector<std::vector<Eigen::Vector3d>> CreateVizData() = 0;
+
     protected:
         // ---------------- Protected Member Functions ---------------- //
         // Assumes flat ground and constant coef of friction
@@ -149,6 +152,8 @@ namespace mpc {
         virtual int GetPosSplineStartIdx() const = 0;
 
         Trajectory ConvertQPSolToTrajectory(const vector_t& qp_sol, const vector_t& init_state) const;
+
+        virtual vector_t ConvertTrajToQPVec(const Trajectory& traj) const = 0;
 
         double LineSearch(const vector_t& direction, const vector_t& init_state);
 
@@ -249,6 +254,8 @@ namespace mpc {
         vector_t C_;
 
         const bool constraint_projection_;
+
+        RKIntegrator integrator_;
     private:
     };
 } // mpc

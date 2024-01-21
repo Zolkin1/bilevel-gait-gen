@@ -434,11 +434,11 @@ namespace mpc {
         return robot_mass_;
     }
 
-    vector_t CentroidalModel::GetDiscreteDynamics(const vector_t& state, const Inputs& input, double time,
-                                                  const vector_t& ref_state) {
-        vector_t xkp1 = integrator_->CalcIntegral(state, input, time, 1, *this, ref_state);
-        return xkp1;
-    }
+//    vector_t CentroidalModel::GetDiscreteDynamics(const vector_t& state, const Inputs& input, double time,
+//                                                  const vector_t& ref_state) {
+//        vector_t xkp1 = integrator_->CalcIntegral(state, input, time, 1, *this, ref_state);
+//        return xkp1;
+//    }
 
     const std::string& CentroidalModel::GetEndEffectorFrame(int ee) const {
         return frames_.at(ee);

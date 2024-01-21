@@ -34,7 +34,8 @@ namespace controller {
                   mpc::MPCInfo info,
                   const std::vector<vector_t>& warm_start_states,
                   const vector_t& state_des,
-                  int num_polys);
+                  int num_polys,
+                  const matrix_t& Q);
 
         vector_t ComputeControlAction(const vector_t& q,
                                       const vector_t& v,

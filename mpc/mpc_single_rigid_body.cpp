@@ -8,7 +8,7 @@ namespace mpc {
 
     MPCSingleRigidBody::MPCSingleRigidBody(const mpc::MPCInfo& info, const std::string& robot_urdf) :
     MPC(info, robot_urdf) {
-
+        InitalizeQPData();
     }
 
     Trajectory MPCSingleRigidBody::Solve(const mpc::vector_t& state, double init_time) {
@@ -32,7 +32,7 @@ namespace mpc {
         data_.InitQPMats();
 
         prev_traj_.SetState(0, state);
-        prev_qp_sol = prev_traj_.ConvertToQPVector();
+        prev_qp_sol = ConvertTrajToQPVec(prev_traj_);
         data_update_timer.StopTimer();
 
         assert(prev_qp_sol.size() == data_.num_decision_vars);
@@ -49,18 +49,12 @@ namespace mpc {
         constraint_idx_ = 0;
         utils::Timer dynamics_timer("dynamics constraints");
         dynamics_timer.StartTimer();
-        AddDynamicsConstraints(state);  // TODO: Speed up
+        AddDynamicsConstraints(state);
         dynamics_timer.StopTimer();
 
 //        dynamics_timer.PrintElapsedTime();
-        if (constraint_projection_) {
-            AddFKConstraintsProjection(state);
-        } else {
-            AddFKConstraints(state);
-        }
 
         AddFrictionConeConstraints();
-        AddBoxConstraints();
         AddForceBoxConstraints();
         constraint_costs_timer.StopTimer();
 
@@ -238,6 +232,45 @@ namespace mpc {
         data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
 
         data_.num_ee_location_constraints_ = (info_.num_nodes+1)*3*num_ee_;
+    }
+
+    vector_t MPCSingleRigidBody::ConvertTrajToQPVec(const Trajectory& traj) const {
+        vector_t qp_vec = vector_t::Zero(traj.GetTotalVariables());
+
+        const int num_states = traj.GetState(0).size();
+
+        for (int i = 0; i < info_.num_nodes; i++) {
+            qp_vec.segment(i*(num_states-1), num_states-1) =
+                    model_.ConvertManifoldStateToTangentState(traj.GetState(i), traj.GetState(0));
+        }
+
+
+        // TODO: Redo
+//        qp_vec.segment( (states_.at(0).size()-1)*states_.size(), force_spline_vars_
+//                            + inputs_.GetAllVels().at(0).size()*inputs_.GetAllVels().size()) = inputs_.AsQPVector();
+//        qp_vec.tail(pos_spline_vars_) = PositionAsQPVector();
+
+        return qp_vec;
+    }
+
+    std::vector<std::vector<Eigen::Vector3d>> MPCSingleRigidBody::CreateVizData() {
+        std::vector<std::vector<Eigen::Vector3d>> fk_traj;  // TODO: Dynamic memory allocation
+        for (int ee = 0; ee < 5; ee++) {
+            for (int node = 0; node < info_.num_nodes+1; node++) {
+                if (ee == 4) {
+                    fk_traj.at(ee).at(node) = model_.GetCOMPosition(prev_traj_.GetState(node));
+                } else {
+                    fk_traj.at(ee).at(node) = prev_traj_.GetEndEffectorLocation(ee, GetTime(node));
+                }
+            }
+        }
+
+        return fk_traj;
+    }
+
+    void MPCSingleRigidBody::InitalizeQPData() {
+        SetInitQPSizes();
+        data_.InitQPMats();
     }
 
 //    bool MPCSingleRigidBody::ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) {

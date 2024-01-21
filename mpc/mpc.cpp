@@ -33,20 +33,20 @@ namespace mpc {
     MPC::MPC(const MPCInfo& info, const std::string& robot_urdf) :
         info_(info),
         model_(robot_urdf, info.ee_frames, info.discretization_steps, info.integrator_dt),
+        num_states_(model_.GetNumTangentStates()),
         num_ee_(model_.GetNumEndEffectors()),
-        prev_traj_(info.num_nodes+1, num_states_+1, model_.UsesJoints(),
+        prev_traj_(info.num_nodes+1, model_.GetNumManifoldStates(), model_.UsesJoints(),
                CreateDefaultSwitchingTimes(info.num_switches, num_ee_,
                     info.integrator_dt*(info.num_nodes)),
                     info.integrator_dt, info.swing_height, info.foot_offset),
         constraint_projection_(false),
         data_(false, 25000, 2000, model_.GetApplicableConstraints()),
-        num_states_(model_.GetNumManifoldStates()){
+        integrator_(info.integrator_dt){
 
         assert(info_.ee_frames.size() == num_ee_);
 
         init_time_ = 0;
 
-        SetInitQPSizes();
         UpdateNumInputs();
 
         qp_solver = std::make_unique<OSQPInterface>(data_, false);
@@ -64,9 +64,6 @@ namespace mpc {
         constraint_idx_ = 0;
 
         in_real_time_ = false;
-
-        // Set everything to 0
-        data_.InitQPMats();
     }
 
     Trajectory MPC::CreateInitialRun(const mpc::vector_t& state) {
@@ -96,7 +93,7 @@ namespace mpc {
     void MPC::SetWarmStartTrajectory(const mpc::Trajectory &trajectory) {
         prev_traj_ = trajectory;
 
-        prev_qp_sol = prev_traj_.ConvertToQPVector();
+        prev_qp_sol = ConvertTrajToQPVec(prev_traj_);
     }
 
     void MPC::SetQuadraticCostTerm(const matrix_t& Q) {
@@ -362,7 +359,7 @@ namespace mpc {
     }
 
     double MPC::GetMeritValue(const Trajectory& traj, double mu, const mpc::vector_t& init_state) {
-        return mu*GetEqualityConstraintValues(traj, init_state).lpNorm<1>() + GetCostValue(traj.ConvertToQPVector());
+        return mu*GetEqualityConstraintValues(traj, init_state).lpNorm<1>() + GetCostValue(ConvertTrajToQPVec(traj));
     }
 
     double MPC::GetCostValue(const vector_t& x) const {
@@ -376,8 +373,9 @@ namespace mpc {
         for (int node = 0; node < info_.num_nodes; node++) {
             eq_constraints.segment(node*num_states_, num_states_) =
                     CentroidalModel::ConvertManifoldStateToAlgebraState(traj.GetState(node+1), init_state)
-                    - model_.GetDiscreteDynamics(Model::ConvertManifoldStateToTangentState(traj.GetState(node), init_state),
-                            traj, GetTime(node), init_state);
+                    - integrator_.CalcIntegral(
+                            model_.ConvertManifoldStateToTangentState(traj.GetState(node), init_state),
+                                               traj, GetTime(node), 1, model_, init_state);
 //            for (int ee = 0; ee < num_ee_; ee++) {
 //                eq_constraints.segment(info_.num_nodes*num_states_ + node*3*num_ee_ + 3*ee, 3) =
 //                        model_.GetEndEffectorLocationCOMFrame(traj.GetState(node), model_.GetEndEffectorFrame(ee))
@@ -387,6 +385,7 @@ namespace mpc {
         return eq_constraints;
     }
 
+    // TODO: Consider replacing with the trajectory GetTime function
     double MPC::GetTime(int node) const {
         return node * info_.integrator_dt + init_time_;
     }
@@ -543,6 +542,8 @@ namespace mpc {
         if (model_.UsesJoints()) {
             num_inputs_ += info_.num_nodes * model_.GetNumJoints();
         }
+
+        return num_inputs_;
     }
 
 } // mpc

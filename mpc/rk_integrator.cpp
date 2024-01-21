@@ -4,20 +4,21 @@
 
 #include "rk_integrator.h"
 #include "centroidal_model.h"
+#include "single_rigid_body_model.h"
 
 namespace mpc {
     RKIntegrator::RKIntegrator(double dt) : dt_(dt) {
 
     }
 
-    vector_t RKIntegrator::CalcIntegral(const vector_t& ic, const Inputs& input, double init_time,
+    vector_t RKIntegrator::CalcIntegral(const vector_t& ic, const Trajectory& traj, double init_time,
                                         int num_steps,
-                                        CentroidalModel& model, const vector_t& ref_state) {
+                                        SingleRigidBodyModel& model, const vector_t& ref_state) {
         vector_t state = ic;
         for (int i = 0; i < num_steps; i++) {
-            vector_t k1 = model.CalcDynamics(state, input, init_time, ref_state);
+            vector_t k1 = model.CalcDynamics(state, traj, init_time, ref_state);
             vector_t y1 = state + k1 * (dt_ / 2.0);
-            vector_t k2 = model.CalcDynamics(y1, input, init_time + dt_ / 2.0, ref_state);
+            vector_t k2 = model.CalcDynamics(y1, traj, init_time + dt_ / 2.0, ref_state);
             state = state + k2*dt_;
         }
 

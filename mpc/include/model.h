@@ -11,7 +11,7 @@
 #include "pinocchio/multibody/data.hpp"
 #include "pinocchio/parsers/urdf.hpp"
 
-#include "rk_integrator.h"
+//#include "rk_integrator.h"
 #include "qp_data.h"
 
 namespace mpc {
@@ -52,8 +52,8 @@ namespace mpc {
         virtual int GetNumTangentStates() const = 0;
         virtual int GetNumManifoldStates() const = 0;
 
-        static vector_t ConvertManifoldStateToTangentState(const vector_t& state, const vector_t& ref_state);
-        static vector_t ConvertTangentStateToManifoldState(const vector_t& state, const vector_t& ref_state);
+        virtual vector_t ConvertManifoldStateToTangentState(const vector_t& state, const vector_t& ref_state) const = 0;
+        virtual vector_t ConvertTangentStateToManifoldState(const vector_t& state, const vector_t& ref_state) const = 0;
 
     protected:
         virtual void ConvertMPCStateToPinocchioState(const vector_t& state, Eigen::Ref<vector_t> q_pin) const = 0;
@@ -77,7 +77,7 @@ namespace mpc {
         std::vector<std::string> frames_;
 
         // integrator to be used
-        std::unique_ptr<RKIntegrator> integrator_;
+//        std::unique_ptr<RKIntegrator> integrator_;
 
         const Eigen::Vector3d GRAVITY;
 

@@ -12,7 +12,7 @@ namespace mpc {
             GRAVITY(0., 0., -9.81), num_ee_(frames.size()), uses_joints_(uses_joints),
             constraints_(constraints) {
 
-        integrator_ = std::make_unique<RKIntegrator>(dt);
+//        integrator_ = std::make_unique<RKIntegrator>(dt);
 
         // create the pinocchio model - always a free flyer
         pinocchio::urdf::buildModel(robot_urdf, pinocchio::JointModelFreeFlyer(), pin_model_, false);

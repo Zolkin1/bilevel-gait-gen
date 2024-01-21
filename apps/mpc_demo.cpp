@@ -45,20 +45,20 @@ int main() {
     info.swing_height = config.ParseNumber<double>("swing_height");
     info.foot_offset = config.ParseNumber<double>("foot_offset");
 
-    mpc::MPC mpc(info, config.ParseString("robot_urdf"));
+    mpc::MPCSingleRigidBody mpc(info, config.ParseString("robot_urdf"));
 
 
     // Read in the inital config and parse it for MPC.
     vector_t standing = config.ParseEigenVector("init_config");
-    vector_t init_state = vector_t::Zero(6 + standing.size());
-    init_state.tail(standing.size()) = standing;
+    vector_t init_state = config.ParseEigenVector("srbd_init");
+//    init_state.tail(standing.size()) = standing;
 
     // Create the warm start
     std::vector<vector_t> warm_start(info.num_nodes+1, init_state);
 
     // Create the goal state
     vector_t mpc_des_state = init_state;
-    mpc_des_state.segment<2>(6) << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
+    mpc_des_state.head<2>() << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
 
     // Inital guess end effector positions
     std::array<std::array<double, 3>, 4> ee_pos{};
@@ -71,10 +71,11 @@ int main() {
     mpc.SetDefaultGaitTrajectory(mpc::Gaits::Trot, config.ParseNumber<int>("num_polys"), ee_pos);
     mpc.SetStateTrajectoryWarmStart(warm_start);
 
-    matrix_t Q(config.ParseEigenVector("Q_diag").asDiagonal());
+    matrix_t Q(config.ParseEigenVector("Q_srbd_diag").asDiagonal());
 
     // Desried state in the lie algebra
-    const vector_t des_alg = mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(mpc_des_state, init_state);
+    const vector_t des_alg = mpc.GetModel()->ConvertManifoldStateToTangentState(mpc_des_state, init_state);
+            //mpc::CentroidalModel::ConvertManifoldStateToAlgebraState(mpc_des_state, init_state);
     std::cout << des_alg << std::endl;
 
     // Add in costs
@@ -101,7 +102,8 @@ int main() {
                                                                  info,
                                                                  warm_start,
                                                                  mpc_des_state,
-                                                                 config.ParseNumber<int>("num_polys"));
+                                                                 config.ParseNumber<int>("num_polys"),
+                                                                 Q);
 
     // Make the robot for visualization
     auto robot_file = config.ParseString("robot_xml");
@@ -119,7 +121,7 @@ int main() {
     for (int i = 0; i < info.num_nodes + 200; i++) {
         vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
-        viz.GetTrajViz(mpc.GetTrajectory().CreateVizData(mpc.GetModel()));
+        viz.GetTrajViz(mpc.CreateVizData());
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
         mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
 
