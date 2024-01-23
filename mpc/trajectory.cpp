@@ -107,10 +107,19 @@ namespace mpc {
     void Trajectory::UpdateForceSpline(int end_effector, int coord, const vector_t& vars) {
         int idx = 0;
         for (int i = 0; i < forces_.at(end_effector).at(coord).GetNumPolyTimes(); i++) {
-//            if (inputs_.IsForceMutable(end_effector, coord, i)) {
-//                inputs_.UpdateForcePoly(end_effector, coord, i, vars.segment(idx, 2));
-//                idx += 2;
-//            }
+            if (IsForceMutable(end_effector, coord, i)) {
+
+                // TODO: DMA
+                std::vector<double> temp(2);
+
+                // TODO: how to convert eigen to std::vector
+                for (int j = 0; j < 2; j++) {
+                    temp.at(j) = vars(idx + j);
+                }
+
+                forces_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
+                idx += 2;
+            }
         }
     }
 
@@ -441,17 +450,14 @@ namespace mpc {
         return contact_times_;
     }
 
-    vector_t Trajectory::GetSplineLin(const mpc::Trajectory::SplineTypes& spline_type, int ee, int coord, double time) {
+    vector_t Trajectory::GetSplineLin(const mpc::Trajectory::SplineTypes& spline_type, int ee, int coord, double time) const {
         switch (spline_type) {
             case SplineTypes::Force:
                 return forces_.at(ee).at(coord).GetPolyVarsLin(time);
-                break;
             case SplineTypes::Position:
                 return end_effector_pos_.at(ee).at(coord).GetPolyVarsLin(time);
-                break;
             default:
                 throw std::runtime_error("Spline type not implemented.");
-                break;
         }
     }
 
@@ -519,10 +525,42 @@ namespace mpc {
         return forces_.at(ee).at(coord).IsMutable(idx) || forces_.at(ee).at(coord).IsMutable(idx-1);
     }
 
+    bool Trajectory::IsForceMutable(int ee, int coord, int idx) const {
+        return forces_.at(ee).at(coord).IsMutable(idx);
+    }
+
     int Trajectory::GetTotalVariables() const {
         // TODO: Account for joint potentially
         // TODO: Do I want states in here?
         return force_spline_vars_ + pos_spline_vars_ + states_.size()*(states_.at(0).size()-1);
+    }
+
+    vector_t Trajectory::SplinesAsVec() const {
+        // TODO: DMA
+        vector_t qp_vec = vector_t::Zero(GetTotalForceSplineVars() + GetTotalPosSplineVars());
+
+        // Force spline
+        int force_idx = 0;
+        for (const auto& force : forces_) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                qp_vec.segment(force_idx, force.at(coord).GetTotalPolyVars()) =
+                        force.at(coord).GetAllPolyVars();
+                force_idx += force.at(coord).GetTotalPolyVars();
+            }
+        }
+
+        int pos_idx = GetTotalForceSplineVars();
+        for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                if (mut_flags_.at(ee).at(coord)) {
+                    qp_vec.segment(pos_idx, end_effector_pos_.at(ee).at(coord).GetTotalPolyVars()) =
+                            end_effector_pos_.at(ee).at(coord).GetAllPolyVars();
+                    pos_idx += end_effector_pos_.at(ee).at(coord).GetTotalPolyVars();
+                }
+            }
+        }
+
+        return qp_vec;
     }
 
 } // mpc

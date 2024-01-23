@@ -205,9 +205,9 @@ namespace mpc {
 
         // Discretize with the integrator
         integrator_timer.StartTimer();
-        integrator_->CalcDerivWrtStateSingleStep(state, Ac_, A);
-        integrator_->CalcDerivWrtInputSingleStep(state, Bc_, Ac_, B);    // TODO: Technically this Ac should be evaluated at a different time
-        integrator_->CalcLinearTermDiscretization(Cc_, Cc2_, Ac_, C);
+//        integrator_->CalcDerivWrtStateSingleStep(state, Ac_, A);
+//        integrator_->CalcDerivWrtInputSingleStep(state, Bc_, Ac_, B);    // TODO: Technically this Ac should be evaluated at a different time
+//        integrator_->CalcLinearTermDiscretization(Cc_, Cc2_, Ac_, C);
         integrator_timer.StopTimer();
 
 //        A_timer.PrintElapsedTime();

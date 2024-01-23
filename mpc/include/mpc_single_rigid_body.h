@@ -27,6 +27,8 @@ namespace mpc {
 
         void InitalizeQPData();
 
+        int num_run_;
+
     private:
     };
 } // mpc

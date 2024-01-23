@@ -81,11 +81,6 @@ namespace mpc {
 
         const Eigen::Vector3d GRAVITY;
 
-        // Variables used in intermediate locations
-        matrix_t Ac_, Bc_;
-        vector_t Cc_, Cc2_;
-        vector_t xdot_;
-
         const std::vector<Constraints> constraints_;
     private:
         void CreateFrameMap(const std::vector<std::string>& frames);

@@ -43,6 +43,7 @@ namespace mpc {
         double force_bound;
         double swing_height;
         double foot_offset;
+        vector_t nom_state;
 
         MPCInfo();
         MPCInfo(const MPCInfo& info);
@@ -251,7 +252,7 @@ namespace mpc {
         int constraint_idx_;
 
         matrix_t A_, B_;
-        vector_t C_;
+        vector_t C_, C2_;
 
         const bool constraint_projection_;
 

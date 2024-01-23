@@ -17,6 +17,8 @@ namespace mpc {
     public:
         RKIntegrator(double dt);
 
+        void DiscretizeLinearDynamics(matrix_t& A, matrix_t& B, vector_t& C, const vector_t& C2);
+
         vector_t CalcIntegral(const mpc::vector_t &ic, const Trajectory& traj, double init_time, double final_time,
                               SingleRigidBodyModel& model);
 
@@ -24,13 +26,13 @@ namespace mpc {
                               SingleRigidBodyModel& model, const vector_t& ref_state);
 
         // Only does a single step
-        void CalcDerivWrtStateSingleStep(const vector_t& ic, const matrix_t& dfdx,
-                                             matrix_t& A);
+        void CalcDerivWrtStateSingleStep(const matrix_t& dfdx,
+                                         matrix_t& A);
 
         // Only does a single step
-        void CalcDerivWrtInputSingleStep(const vector_t& ic, const matrix_t& dfdu,
-                                             const matrix_t& dfdx,
-                                             matrix_t& B);
+        void CalcDerivWrtInputSingleStep(const matrix_t& dfdu,
+                                         const matrix_t& dfdx,
+                                         matrix_t& B);
 
         void CalcLinearTermDiscretization(const vector_t& C, const vector_t& C2, const matrix_t& A,
                                           vector_t& C_out);

@@ -6,9 +6,20 @@
 
 namespace mpc {
 
+    /*
+     * TODO items for week of 1/22/24
+     *  - Dynamics are not correct (at least COM position not updating properly based on COM linear momentum)
+     *  - Check why the spline variables don't get updated
+     *  - Check why the step norm is relatively high even after convergence (hopefully due to derivative terms)
+     *  - Verify why good steps are being rejected
+     *  - Check why the optimal cost is so high (most likely due to a dynamics error)
+     */
+
     MPCSingleRigidBody::MPCSingleRigidBody(const mpc::MPCInfo& info, const std::string& robot_urdf) :
     MPC(info, robot_urdf) {
         InitalizeQPData();
+        qp_solver = std::make_unique<OSQPInterface>(data_, false);
+        num_run_ = 0;
     }
 
     Trajectory MPCSingleRigidBody::Solve(const mpc::vector_t& state, double init_time) {
@@ -54,8 +65,9 @@ namespace mpc {
 
 //        dynamics_timer.PrintElapsedTime();
 
-        AddFrictionConeConstraints();
-        AddForceBoxConstraints();
+        // TODO: Add end effector location constraint
+//        AddForceBoxConstraints();
+//        AddFrictionConeConstraints();
         constraint_costs_timer.StopTimer();
 
         data_.ConstructSparseMats();
@@ -68,6 +80,7 @@ namespace mpc {
         qp_solver->SetupQP(data_, prev_qp_sol);
         utils::Timer qp_solve_timer("QP solve");
         qp_solve_timer.StartTimer();
+        // TODO: DMA
         const vector_t sol = qp_solver->Solve(data_);
         qp_solve_timer.StopTimer();
 
@@ -79,6 +92,7 @@ namespace mpc {
 
         std::cout << "Solve type: " << qp_solver->GetSolveQuality() << std::endl;
 
+        // TODO: DMA
         const vector_t p = sol - prev_qp_sol;
         double max = 0;
         int max_idx = 0;
@@ -94,13 +108,14 @@ namespace mpc {
 //        std::cout << "force variables: " << GetVelocityIndex(0) << std::endl;
 
         utils::Timer line_search_timer("line search");
-        double alpha = 0;
-        if (sol.size() == prev_qp_sol.size()) {
+        double alpha = 1;
+        if (num_run_ >= 0 && sol.size() == prev_qp_sol.size()) {
             line_search_timer.StartTimer();
             alpha = LineSearch(p, state);
             line_search_timer.StopTimer();
         }
 
+        num_run_++;
 //        if (run_num_ > 0){
 //            std::cout << (alpha*(qp_solver->GetDualSolution() - prev_dual_sol_) + prev_dual_sol_).lpNorm<Eigen::Infinity>() << std::endl;
 //        }
@@ -110,6 +125,17 @@ namespace mpc {
         prev_qp_sol = ((alpha * p) + prev_qp_sol).eval();
 
         prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, state);
+        // TODO: Turn into unit test
+        vector_t temp = ConvertTrajToQPVec(prev_traj_);
+        assert(temp.size() == prev_qp_sol.size());
+        for (int i = 0; i < temp.size(); i++) {
+            if (std::abs(temp(i) - prev_qp_sol(i)) > 1e-4) {
+                std::cout << "i: " << i << " error: " << std::abs(temp(i) - prev_qp_sol(i)) << std::endl;
+                std::cout << "traj->vec: " << temp(i) << std::endl;
+                std::cout << "vec: " << prev_qp_sol(i) << std::endl;
+                std::cout << "----------" << std::endl;
+            }
+        }
 
         solve_timer.StopTimer();
 
@@ -130,7 +156,7 @@ namespace mpc {
         solve_timer.PrintElapsedTime();
         std::cout << "-----------" << std::endl;
 
-//        prev_traj_.PrintTrajectoryToFile("mpc_demo_traj.txt");
+        prev_traj_.PrintTrajectoryToFile("mpc_demo_traj.txt");
 
         return prev_traj_;
     }
@@ -139,7 +165,7 @@ namespace mpc {
         // initial condition
         data_.constraint_mat_.SetDiagonalMatrix(-1, 0, 0, num_states_);
         data_.dynamics_constants.head(num_states_) =
-                -CentroidalModel::ConvertManifoldStateToAlgebraState(state, state);
+                -model_.ConvertManifoldStateToTangentState(state, state);
 
         const int force_spline_vars = prev_traj_.GetTotalForceSplineVars();
         const int position_spline_vars = prev_traj_.GetTotalPosSplineVars();
@@ -147,6 +173,7 @@ namespace mpc {
         A_.resize(num_states_, num_states_);
         B_.resize(num_states_, num_inputs_);
         C_.resize(num_states_);
+        C2_.resize(num_states_);
 
         utils::Timer get_dyn_timer("linear discrete dynamics");
 
@@ -154,8 +181,21 @@ namespace mpc {
             double time = GetTime(node);
             // A can go in normally, B needs to be split
             get_dyn_timer.StartTimer();
-            model_.GetLinearDiscreteDynamics(prev_traj_.GetStates().at(node),
-                                             state, prev_traj_, time, A_, B_, C_);
+            model_.GetLinearDynamics(prev_traj_.GetState(node),
+                                     state, prev_traj_,
+                                     info_.integrator_dt,
+                                     time, A_, B_, C_, C2_);
+
+
+            integrator_.DiscretizeLinearDynamics(A_, B_, C_, C2_);
+
+//            std::cout << "A: \n" << A_ << std::endl;
+//            std::cout << "A*state: \n" << A_ * model_.ConvertManifoldStateToTangentState(prev_traj_.GetState(node), state) << std::endl;
+//            std::cout << "B: \n" << B_ << std::endl;
+//            std::cout << "C: \n" << C_ << std::endl;
+
+//            B_.topRows(3).setZero();
+
             assert(B_.cols() == num_inputs_);
             get_dyn_timer.StopTimer();
 //            get_dyn_timer.PrintElapsedTime();
@@ -167,8 +207,10 @@ namespace mpc {
             const matrix_t B_forces = B_.leftCols(force_spline_vars);
             const matrix_t B_positions = B_.rightCols(position_spline_vars);
 
-            data_.constraint_mat_.SetMatrix(B_forces, (node + 1) * num_states_, GetPosSplineStartIdx());
-            data_.constraint_mat_.SetMatrix(B_positions, (node + 1) * num_states_, GetForceSplineStartIdx());
+            assert(B_.cols() == force_spline_vars + position_spline_vars);
+
+            data_.constraint_mat_.SetMatrix(B_forces, (node + 1) * num_states_, GetForceSplineStartIdx());
+            data_.constraint_mat_.SetMatrix(B_positions, (node + 1) * num_states_, GetPosSplineStartIdx());
             data_.dynamics_constants.segment((node + 1) * num_states_, num_states_) = -C_;
         }
         constraint_idx_ = (info_.num_nodes+1)*num_states_;
@@ -206,17 +248,20 @@ namespace mpc {
         // Set states and joint vels
         for (int node = 0; node < info_.num_nodes + 1; node++) {
             // Need to convert the state back to the manifold valued state
-            vector_t man_state = CentroidalModel::ConvertAlgebraStateToManifoldState(
+            // TODO: DMA
+            vector_t man_state = model_.ConvertTangentStateToManifoldState(
                     qp_sol.segment(node*num_states_, num_states_), init_state);
             // need to normalize quaternion returned by MPC
-            Eigen::Quaterniond quat(static_cast<Eigen::Vector4d>(man_state.segment(9, 4)));
+            Eigen::Quaterniond quat(static_cast<Eigen::Vector4d>(
+                    man_state.segment(SingleRigidBodyModel::QUAT_START, SingleRigidBodyModel::QUAT_SIZE)));
+
             // Note the warning on the pinocchio function!
             pinocchio::quaternion::firstOrderNormalize(quat);
 
-            man_state(9) = quat.x();
-            man_state(10) = quat.y();
-            man_state(11) = quat.z();
-            man_state(12) = quat.w();
+            man_state(SingleRigidBodyModel::QUAT_START) = quat.x();
+            man_state(SingleRigidBodyModel::QUAT_START + 1) = quat.y();
+            man_state(SingleRigidBodyModel::QUAT_START + 2) = quat.z();
+            man_state(SingleRigidBodyModel::QUAT_START + 3) = quat.w();
 
             traj.SetState(node, man_state);
         }
@@ -235,20 +280,17 @@ namespace mpc {
     }
 
     vector_t MPCSingleRigidBody::ConvertTrajToQPVec(const Trajectory& traj) const {
+        // TODO: DMA
         vector_t qp_vec = vector_t::Zero(traj.GetTotalVariables());
 
         const int num_states = traj.GetState(0).size();
 
-        for (int i = 0; i < info_.num_nodes; i++) {
+        for (int i = 0; i < info_.num_nodes+1; i++) {
             qp_vec.segment(i*(num_states-1), num_states-1) =
                     model_.ConvertManifoldStateToTangentState(traj.GetState(i), traj.GetState(0));
         }
 
-
-        // TODO: Redo
-//        qp_vec.segment( (states_.at(0).size()-1)*states_.size(), force_spline_vars_
-//                            + inputs_.GetAllVels().at(0).size()*inputs_.GetAllVels().size()) = inputs_.AsQPVector();
-//        qp_vec.tail(pos_spline_vars_) = PositionAsQPVector();
+        qp_vec.tail(num_inputs_) = traj.SplinesAsVec();
 
         return qp_vec;
     }

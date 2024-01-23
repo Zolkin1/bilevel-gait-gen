@@ -44,6 +44,7 @@ int main() {
     info.force_bound = config.ParseNumber<double>("force_bound");
     info.swing_height = config.ParseNumber<double>("swing_height");
     info.foot_offset = config.ParseNumber<double>("foot_offset");
+    info.nom_state = config.ParseEigenVector("init_config");
 
     mpc::MPCSingleRigidBody mpc(info, config.ParseString("robot_urdf"));
 
@@ -51,6 +52,7 @@ int main() {
     // Read in the inital config and parse it for MPC.
     vector_t standing = config.ParseEigenVector("init_config");
     vector_t init_state = config.ParseEigenVector("srbd_init");
+    init_state(2) -= 0.1;
 //    init_state.tail(standing.size()) = standing;
 
     // Create the warm start
@@ -58,6 +60,7 @@ int main() {
 
     // Create the goal state
     vector_t mpc_des_state = init_state;
+    mpc_des_state(2) += 0.1;
     mpc_des_state.head<2>() << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
 
     // Inital guess end effector positions

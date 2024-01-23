@@ -110,8 +110,9 @@ namespace mpc {
         int GetTotalForceSplineVars() const; // TODO: impelement
 
         bool IsForceMutable(int ee, int coord, double time) const;
+        bool IsForceMutable(int ee, int coord, int idx) const;
 
-        vector_t GetSplineLin(const SplineTypes& spline_type, int end_effector, int coord, double time);
+        vector_t GetSplineLin(const SplineTypes& spline_type, int end_effector, int coord, double time) const;
 
         int GetTotalPolyVars(const SplineTypes& spline_type, int end_effector, int coord);
 
@@ -123,6 +124,8 @@ namespace mpc {
 
         // Should give pos_spline_vars + force_spline_vars + all vells + all states
         int GetTotalVariables() const;    // TODO: Consider if we have joint information
+
+        vector_t SplinesAsVec() const;
 
     protected:
     private:

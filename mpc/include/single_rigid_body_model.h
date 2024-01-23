@@ -14,6 +14,8 @@
 namespace mpc {
     using vector_t = Eigen::VectorXd;
     using vector_3t = Eigen::Vector3d;
+    using tan_state_t = Eigen::Vector<double, 12>;
+    using man_state_t = Eigen::Vector<double, 13>;
     using matrix_t =  Eigen::MatrixXd;
     using vector6_t = Eigen::Vector<double, 6>;
     using matrix_3t = Eigen::Matrix3Xd;
@@ -23,10 +25,14 @@ namespace mpc {
     class SingleRigidBodyModel : public Model {
     public:
         SingleRigidBodyModel(const std::string& robot_urdf, const std::vector<std::string>& frames,
-                             int discretization_steps, double dt);
+                             int discretization_steps, double dt, const vector_t& nom_state);
 
-        void GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Trajectory& traj,
-                                       double time, matrix_t& A, matrix_t& B, vector_t& C);
+        void GetLinearDynamics(const vector_t& state,
+                               const vector_t& ref_state,
+                               const Trajectory& traj,
+                               double dt,
+                               double time,
+                               matrix_t& A, matrix_t& B, vector_t& C, vector_t& C2);
 
 //        vector_t GetDiscreteDynamics(const vector_t& state, const Trajectory& traj, double time,
 //                                     const vector_t& ref_state);
@@ -39,7 +45,7 @@ namespace mpc {
                                                         double time,
                                                         int ee, int idx);
 
-        vector_t CalcDynamics(const vector_t& state, const Trajectory& traj, double time,
+        tan_state_t CalcDynamics(const vector_t& state, const Trajectory& traj, double time,
                               const vector_t& ref_state);
 
         vector_3t GetCOMPosition(const vector_t& state) const override;
@@ -52,6 +58,12 @@ namespace mpc {
         vector_t ConvertManifoldStateToTangentState(const vector_t& state, const vector_t& ref_state) const override;
         vector_t ConvertTangentStateToManifoldState(const vector_t& state, const vector_t& ref_state) const override;
 
+        static constexpr int QUAT_SIZE = 4;
+        static constexpr int QUAT_START = 6;
+        static constexpr int ORIENTATION_START = 6;
+        static constexpr int ANG_VEL_START = 9;
+        static constexpr int LIN_MOM_START = 3;
+        static constexpr int POS_START = 0;
     protected:
         void ConvertMPCStateToPinocchioState(const vector_t& state, Eigen::Ref<vector_t> q_pin) const override;
 
@@ -60,9 +72,6 @@ namespace mpc {
 
         matrix_33t Ir_;   // Rotational inertia
         matrix_33t Ir_inv_;
-
-       static constexpr int QUAT_SIZE = 4;
-       static constexpr int QUAT_START = 6;
     private:
     };
 } // mpc

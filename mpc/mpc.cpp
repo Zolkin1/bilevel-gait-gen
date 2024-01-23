@@ -28,11 +28,12 @@ namespace mpc {
         force_bound = info.force_bound;
         swing_height = info.swing_height;
         foot_offset = info.foot_offset;
+        nom_state = info.nom_state;
     }
 
     MPC::MPC(const MPCInfo& info, const std::string& robot_urdf) :
         info_(info),
-        model_(robot_urdf, info.ee_frames, info.discretization_steps, info.integrator_dt),
+        model_(robot_urdf, info.ee_frames, info.discretization_steps, info.integrator_dt, info.nom_state),
         num_states_(model_.GetNumTangentStates()),
         num_ee_(model_.GetNumEndEffectors()),
         prev_traj_(info.num_nodes+1, model_.GetNumManifoldStates(), model_.UsesJoints(),
@@ -48,8 +49,6 @@ namespace mpc {
         init_time_ = 0;
 
         UpdateNumInputs();
-
-        qp_solver = std::make_unique<OSQPInterface>(data_, false);
 
         SetFrictionPyramid();
 
@@ -368,19 +367,15 @@ namespace mpc {
 
     // TODO: Optimize this and make it so it is called less
     vector_t MPC::GetEqualityConstraintValues(const Trajectory& traj, const vector_t& init_state) {
+        // TODO: DMA
         vector_t eq_constraints = vector_t::Zero(data_.num_dynamics_constraints - num_states_); // data_.num_fk_constraints_
 
         for (int node = 0; node < info_.num_nodes; node++) {
             eq_constraints.segment(node*num_states_, num_states_) =
-                    CentroidalModel::ConvertManifoldStateToAlgebraState(traj.GetState(node+1), init_state)
+                    model_.ConvertManifoldStateToTangentState(traj.GetState(node+1), init_state)
                     - integrator_.CalcIntegral(
                             model_.ConvertManifoldStateToTangentState(traj.GetState(node), init_state),
                                                traj, GetTime(node), 1, model_, init_state);
-//            for (int ee = 0; ee < num_ee_; ee++) {
-//                eq_constraints.segment(info_.num_nodes*num_states_ + node*3*num_ee_ + 3*ee, 3) =
-//                        model_.GetEndEffectorLocationCOMFrame(traj.GetState(node), model_.GetEndEffectorFrame(ee))
-//                        - traj.GetPosition(ee,GetTime(node));
-//            }
         }
         return eq_constraints;
     }
