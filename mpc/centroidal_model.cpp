@@ -60,181 +60,181 @@ namespace mpc {
 //        ref_state_ = vector_t::Zero(num_total_states_+1);
     }
 
-    void CentroidalModel::GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Inputs& input,
-                                                             double time, matrix_t& A, matrix_t& B,
-                                                             vector_t& C) {
-
-        utils::Timer A_timer("A creation");
-        utils::Timer B_timer("B creation");
-        utils::Timer C_timer("C creation");
-        utils::Timer integrator_timer("integration");
-
-        // Get the pinocchio configuration
-        ConvertMPCStateToPinocchioState(state, q_pin_);
-
-        // ------------------------------------------- //
-        // --------------- Calculate A --------------- //
-        // ------------------------------------------- //
-        pinocchio::computeJointJacobians(pin_model_, *pin_data_, q_pin_);
-        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin_);
-
-        A_timer.StartTimer();
-        Ac_ = matrix_t::Zero(num_total_states_, num_total_states_); // TODO: resize then set 0 instead?
-
-        matrix_3t J = matrix_t::Zero(3, pin_model_.nv);
-        for (int i = 0; i < num_ee_; i++) {
-            // Get the jacobian of the FK
-            J = GetFKJacobianForEndEffector(q_pin_, frames_.at(i), false);
-            Eigen::Vector3d force = input.GetForce(i, time);
-            for (int j = 0; j < pin_model_.nv; j++) {
-                // Cross product with the corresponding input force, add these for all the end effectors
-                Ac_.block<3,1>(POS_VARS, MOMENTUM_OFFSET + j) +=
-                        static_cast<Eigen::Vector3d>(J.col(j)).cross(force);
-            }
-        }
-
-        // TODO: Investigate the angle representations. Might be part of the reason it doesn't work with the CMM
-        // Deal with centroidal dynamics
-//        matrix6x_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q_pin_);
+//    void CentroidalModel::GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Inputs& input,
+//                                                             double time, matrix_t& A, matrix_t& B,
+//                                                             vector_t& C) {
 //
-//        matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
-//        matrix_t CMMj = CMM.rightCols(num_joints_);
-//        matrix_t CMMbinv = CMMb.inverse();  // TODO: maybe calc better, see below
-
-        // OCS2 Version
-//        const double mass = CMMb(0, 0);
-//        Eigen::Matrix<double, 3, 3> Ab_22_inv = CMMb.template block<3, 3>(3, 3).inverse();
-//        Eigen::Matrix<double, 6, 6> Ab_inv = Eigen::Matrix<double, 6, 6>::Zero();
-//        Ab_inv << 1.0 / mass * Eigen::Matrix<double, 3, 3>::Identity(), -1.0 / mass * CMMb.template block<3, 3>(0, 3) * Ab_22_inv,
-//                Eigen::Matrix<double, 3, 3>::Zero(), Ab_22_inv;
+//        utils::Timer A_timer("A creation");
+//        utils::Timer B_timer("B creation");
+//        utils::Timer C_timer("C creation");
+//        utils::Timer integrator_timer("integration");
 //
-//        vector_t v_pin = ComputePinocchioVelocities(state, input.GetVels(time), CMMbinv, CMMj);
-
-//        std::cout << "pinocchio velocities: \n" << v_pin << std::endl;
-
-//        vector_t a_pin = vector_t::Zero(pin_model_.nv);
+//        // Get the pinocchio configuration
+//        ConvertMPCStateToPinocchioState(state, q_pin_);
 //
-//        matrix6x_t dhdq_m = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
-//        matrix6x_t dhdotdq = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
-//        matrix6x_t dhdotdv = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
+//        // ------------------------------------------- //
+//        // --------------- Calculate A --------------- //
+//        // ------------------------------------------- //
+//        pinocchio::computeJointJacobians(pin_model_, *pin_data_, q_pin_);
+//        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin_);
 //
-//        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
-        // Get dhdq
-        // TODO: I only need this for dhdq so I can just steal that one line for efficiency, see below
-//        pinocchio::computeCentroidalDynamicsDerivatives(pin_model_, *pin_data_, q_pin_, v_pin, a_pin,
-//                                                        dhdq_m, dhdotdq, dhdotdv, CMM);
-
-        // OCS2 version
-//        matrix6x_t dhdq(6, pin_model_.nv);
-//        pinocchio::translateForceSet(pin_data_->dHdq, pin_data_->com[0], dhdq.const_cast_derived());
-//        for (size_t k = 0; k < pin_model_.nv; ++k) {
-//            dhdq.template block<3, 1>(pinocchio::Force::ANGULAR, k) +=
-//                    pin_data_->hg.linear().cross(pin_data_->dFda.template block<3, 1>(pinocchio::Force::LINEAR, k))
-//                    / pin_data_->Ig.mass();
+//        A_timer.StartTimer();
+//        Ac_ = matrix_t::Zero(num_total_states_, num_total_states_); // TODO: resize then set 0 instead?
+//
+//        matrix_3t J = matrix_t::Zero(3, pin_model_.nv);
+//        for (int i = 0; i < num_ee_; i++) {
+//            // Get the jacobian of the FK
+//            J = GetFKJacobianForEndEffector(q_pin_, frames_.at(i), false);
+//            Eigen::Vector3d force = input.GetForce(i, time);
+//            for (int j = 0; j < pin_model_.nv; j++) {
+//                // Cross product with the corresponding input force, add these for all the end effectors
+//                Ac_.block<3,1>(POS_VARS, MOMENTUM_OFFSET + j) +=
+//                        static_cast<Eigen::Vector3d>(J.col(j)).cross(force);
+//            }
 //        }
+//
+//        // TODO: Investigate the angle representations. Might be part of the reason it doesn't work with the CMM
+//        // Deal with centroidal dynamics
+////        matrix6x_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q_pin_);
+////
+////        matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
+////        matrix_t CMMj = CMM.rightCols(num_joints_);
+////        matrix_t CMMbinv = CMMb.inverse();  // TODO: maybe calc better, see below
+//
+//        // OCS2 Version
+////        const double mass = CMMb(0, 0);
+////        Eigen::Matrix<double, 3, 3> Ab_22_inv = CMMb.template block<3, 3>(3, 3).inverse();
+////        Eigen::Matrix<double, 6, 6> Ab_inv = Eigen::Matrix<double, 6, 6>::Zero();
+////        Ab_inv << 1.0 / mass * Eigen::Matrix<double, 3, 3>::Identity(), -1.0 / mass * CMMb.template block<3, 3>(0, 3) * Ab_22_inv,
+////                Eigen::Matrix<double, 3, 3>::Zero(), Ab_22_inv;
+////
+////        vector_t v_pin = ComputePinocchioVelocities(state, input.GetVels(time), CMMbinv, CMMj);
+//
+////        std::cout << "pinocchio velocities: \n" << v_pin << std::endl;
+//
+////        vector_t a_pin = vector_t::Zero(pin_model_.nv);
+////
+////        matrix6x_t dhdq_m = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
+////        matrix6x_t dhdotdq = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
+////        matrix6x_t dhdotdv = matrix6x_t::Zero(MOMENTUM_OFFSET, pin_model_.nv);
+////
+////        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
+//        // Get dhdq
+//        // TODO: I only need this for dhdq so I can just steal that one line for efficiency, see below
+////        pinocchio::computeCentroidalDynamicsDerivatives(pin_model_, *pin_data_, q_pin_, v_pin, a_pin,
+////                                                        dhdq_m, dhdotdq, dhdotdv, CMM);
+//
+//        // OCS2 version
+////        matrix6x_t dhdq(6, pin_model_.nv);
+////        pinocchio::translateForceSet(pin_data_->dHdq, pin_data_->com[0], dhdq.const_cast_derived());
+////        for (size_t k = 0; k < pin_model_.nv; ++k) {
+////            dhdq.template block<3, 1>(pinocchio::Force::ANGULAR, k) +=
+////                    pin_data_->hg.linear().cross(pin_data_->dFda.template block<3, 1>(pinocchio::Force::LINEAR, k))
+////                    / pin_data_->Ig.mass();
+////        }
+//
+////        std::cout << "dhdq me: \n" << dhdq_m << std::endl;
+////        std::cout << "dhdq ocs2: \n" << dhdq << std::endl;
+//
+////        Ac_.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << CMMbinv, CMMbinv * dhdq_m;
+//
+//        // TODO: Note CMM has been removed
+//        Ac_.block(MOMENTUM_OFFSET, 0, POS_VARS, POS_VARS) = matrix_t::Identity(POS_VARS, POS_VARS)/robot_mass_;
+//        Ac_.block(MOMENTUM_OFFSET + 3, 3, POS_VARS, POS_VARS) = matrix_t::Identity(POS_VARS, POS_VARS)/robot_mass_;
+//        A_timer.StopTimer();
+//
+//        // TODO: For now I'm just assuming the CMM has no partial wrt q. Will need to come back and change this.
+//        // I need the partial w.r.t to each configuration variable
+//        // Note: (A^-1)' = (A^-1)*A'*(A^-1)
+//
+//        // ------------------------------------------- //
+//        // --------------- Calculate B --------------- //
+//        // ------------------------------------------- //
+//        B_timer.StartTimer();
+//        int num_inputs = input.GetNumInputs();
+//
+//        // Inputs: [f_{c1,p1}^{x}(1), ... , f_{c1, p1}^{x}(4), f_{c1,p2}^{x}(1), ... , f_{c1, p2}^{x}(4), ... ]
+//        //          = [f_{c1,p1}^{x}, f_{c1,p2}^{x}, f_{c1,p3}^{x}, ... ]
+//        //          = [f_{c1}^{x}, f_{c1}^{y}, f_{c1}^{z}, f_{c2}^{x}, f_{c2}^{y}, f_{c2}^{z}, ... ]
+//        //     Given a specific time, we only need to look at one pj (polynomial j) and thus
+//        //     one set of columns for each spline.
+//
+//        Bc_ = matrix_t::Zero(num_total_states_, num_inputs);
+//        const Eigen::Matrix3d Id = Eigen::Matrix3d::Identity();
+//        for (int ee = 0; ee < num_ee_; ee++) {
+//            const Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
+//            for (int coord = 0; coord < 3; coord++) {
+//                if (input.IsForceMutable(ee, coord, time)) {
+//                    vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
+//
+//                    int vars_idx, vars_affecting;
+//                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
+//
+//                    // linear momentum
+//                    Bc_.block(coord, vars_idx - vars_affecting, 1, vars_affecting) = vars_lin.transpose();
+//
+//                    // Angular momentum
+//                    for (int poly = 0; poly < vars_lin.size(); poly++) {
+//                        Bc_.block(3, vars_idx - vars_affecting + poly, 3, 1).noalias() =
+//                                ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
+//                    }
+//                }
+//            }
+//        }
+//
+//        // --- Base velocity --- //
+////        Bc_.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) <<
+////                matrix_t::Zero(FLOATING_VEL_OFFSET, num_inputs - num_joints_),
+////                -CMMbinv*CMMj;
+//
+//        // --- Joint velocity --- //
+//        Bc_.block(POS_VARS + MOMENTUM_OFFSET + POS_VARS, num_inputs - num_joints_, num_joints_, num_joints_) =
+//                matrix_t::Identity(num_joints_, num_joints_);
+//        B_timer.StopTimer();
+//
+//        // ------------------------------------------- //
+//        // ---------------- Calculate C -------------- //
+//        // ------------------------------------------- //
+//        C_timer.StartTimer();
+//        const vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
+//        Cc_.noalias() = -Ac_*state_alg;
+//        Cc2_ = Cc_;
+//        Cc_.noalias() += CalcDynamics(state_alg, input, time, ref_state) - Bc_*input.AsQPVector(time);
+//        Cc2_.noalias() += CalcDynamics(state_alg, input, time + integrator_->GetDt()/2, ref_state) - Bc_*input.AsQPVector(time+ integrator_->GetDt()/2);
+//        C_timer.StopTimer();
+//
+//        // Discretize with the integrator
+//        integrator_timer.StartTimer();
+////        integrator_->CalcDerivWrtStateSingleStep(state, Ac_, A);
+////        integrator_->CalcDerivWrtInputSingleStep(state, Bc_, Ac_, B);    // TODO: Technically this Ac should be evaluated at a different time
+////        integrator_->CalcLinearTermDiscretization(Cc_, Cc2_, Ac_, C);
+//        integrator_timer.StopTimer();
+//
+////        A_timer.PrintElapsedTime();
+////        B_timer.PrintElapsedTime();
+////        C_timer.PrintElapsedTime();
+////        integrator_timer.PrintElapsedTime();
+//    }
 
-//        std::cout << "dhdq me: \n" << dhdq_m << std::endl;
-//        std::cout << "dhdq ocs2: \n" << dhdq << std::endl;
-
-//        Ac_.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) << CMMbinv, CMMbinv * dhdq_m;
-
-        // TODO: Note CMM has been removed
-        Ac_.block(MOMENTUM_OFFSET, 0, POS_VARS, POS_VARS) = matrix_t::Identity(POS_VARS, POS_VARS)/robot_mass_;
-        Ac_.block(MOMENTUM_OFFSET + 3, 3, POS_VARS, POS_VARS) = matrix_t::Identity(POS_VARS, POS_VARS)/robot_mass_;
-        A_timer.StopTimer();
-
-        // TODO: For now I'm just assuming the CMM has no partial wrt q. Will need to come back and change this.
-        // I need the partial w.r.t to each configuration variable
-        // Note: (A^-1)' = (A^-1)*A'*(A^-1)
-
-        // ------------------------------------------- //
-        // --------------- Calculate B --------------- //
-        // ------------------------------------------- //
-        B_timer.StartTimer();
-        int num_inputs = input.GetNumInputs();
-
-        // Inputs: [f_{c1,p1}^{x}(1), ... , f_{c1, p1}^{x}(4), f_{c1,p2}^{x}(1), ... , f_{c1, p2}^{x}(4), ... ]
-        //          = [f_{c1,p1}^{x}, f_{c1,p2}^{x}, f_{c1,p3}^{x}, ... ]
-        //          = [f_{c1}^{x}, f_{c1}^{y}, f_{c1}^{z}, f_{c2}^{x}, f_{c2}^{y}, f_{c2}^{z}, ... ]
-        //     Given a specific time, we only need to look at one pj (polynomial j) and thus
-        //     one set of columns for each spline.
-
-        Bc_ = matrix_t::Zero(num_total_states_, num_inputs);
-        const Eigen::Matrix3d Id = Eigen::Matrix3d::Identity();
-        for (int ee = 0; ee < num_ee_; ee++) {
-            const Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
-            for (int coord = 0; coord < 3; coord++) {
-                if (input.IsForceMutable(ee, coord, time)) {
-                    vector_t vars_lin = input.GetForces().at(ee).at(coord).GetPolyVarsLin(time);
-
-                    int vars_idx, vars_affecting;
-                    std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
-
-                    // linear momentum
-                    Bc_.block(coord, vars_idx - vars_affecting, 1, vars_affecting) = vars_lin.transpose();
-
-                    // Angular momentum
-                    for (int poly = 0; poly < vars_lin.size(); poly++) {
-                        Bc_.block(3, vars_idx - vars_affecting + poly, 3, 1).noalias() =
-                                ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
-                    }
-                }
-            }
-        }
-
-        // --- Base velocity --- //
-//        Bc_.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) <<
-//                matrix_t::Zero(FLOATING_VEL_OFFSET, num_inputs - num_joints_),
-//                -CMMbinv*CMMj;
-
-        // --- Joint velocity --- //
-        Bc_.block(POS_VARS + MOMENTUM_OFFSET + POS_VARS, num_inputs - num_joints_, num_joints_, num_joints_) =
-                matrix_t::Identity(num_joints_, num_joints_);
-        B_timer.StopTimer();
-
-        // ------------------------------------------- //
-        // ---------------- Calculate C -------------- //
-        // ------------------------------------------- //
-        C_timer.StartTimer();
-        const vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
-        Cc_.noalias() = -Ac_*state_alg;
-        Cc2_ = Cc_;
-        Cc_.noalias() += CalcDynamics(state_alg, input, time, ref_state) - Bc_*input.AsQPVector(time);
-        Cc2_.noalias() += CalcDynamics(state_alg, input, time + integrator_->GetDt()/2, ref_state) - Bc_*input.AsQPVector(time+ integrator_->GetDt()/2);
-        C_timer.StopTimer();
-
-        // Discretize with the integrator
-        integrator_timer.StartTimer();
-//        integrator_->CalcDerivWrtStateSingleStep(state, Ac_, A);
-//        integrator_->CalcDerivWrtInputSingleStep(state, Bc_, Ac_, B);    // TODO: Technically this Ac should be evaluated at a different time
-//        integrator_->CalcLinearTermDiscretization(Cc_, Cc2_, Ac_, C);
-        integrator_timer.StopTimer();
-
-//        A_timer.PrintElapsedTime();
-//        B_timer.PrintElapsedTime();
-//        C_timer.PrintElapsedTime();
-//        integrator_timer.PrintElapsedTime();
-    }
-
-    void CentroidalModel::GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
-                                                 matrix_t& A, vector_t& C) {
-        ConvertMPCStateToPinocchioState(state, q_pin_);
-        A = matrix_t::Zero(3, pin_model_.nv);
-        C = vector_t::Zero(3);
-
-        pinocchio::computeJointJacobians(pin_model_, *pin_data_, q_pin_);
-        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin_);
-
-        matrix6x_t J = matrix6x_t::Zero(6, pin_model_.nv);
-        pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_map_.at(frames_.at(end_effector)),
-                                    pinocchio::LOCAL_WORLD_ALIGNED, J);
-
-        A = J.topRows<3>();
-
-        const vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
-        C = GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector)) + GetCOMPosition(state)
-                - A*state_alg.tail(pin_model_.nv);
-    }
+//    void CentroidalModel::GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
+//                                                 matrix_t& A, vector_t& C) {
+//        ConvertMPCStateToPinocchioState(state, q_pin_);
+//        A = matrix_t::Zero(3, pin_model_.nv);
+//        C = vector_t::Zero(3);
+//
+//        pinocchio::computeJointJacobians(pin_model_, *pin_data_, q_pin_);
+//        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin_);
+//
+//        matrix6x_t J = matrix6x_t::Zero(6, pin_model_.nv);
+//        pinocchio::getFrameJacobian(pin_model_, *pin_data_, frame_map_.at(frames_.at(end_effector)),
+//                                    pinocchio::LOCAL_WORLD_ALIGNED, J);
+//
+//        A = J.topRows<3>();
+//
+//        const vector_t state_alg = ConvertManifoldStateToAlgebraState(state, ref_state);
+//        C = GetEndEffectorLocationCOMFrame(state, frames_.at(end_effector)) + GetCOMPosition(state)
+//                - A*state_alg.tail(pin_model_.nv);
+//    }
 
     matrix_3t CentroidalModel::GetFKJacobianForEndEffector(const vector_t& q, const std::string& frame, bool compute_jac) {
         if (compute_jac) {
@@ -390,45 +390,45 @@ namespace mpc {
         }
     }
 
-    vector_t CentroidalModel::CalcDynamics(const vector_t& state, const Inputs& input, double time,
-                                           const vector_t& ref_state) {
-        assert(state.size() == pin_model_.nv + 6);
-
-        const vector_t state_man = ConvertAlgebraStateToManifoldState(state, ref_state);
-
-        xdot_.topRows<3>().noalias() = robot_mass_*GRAVITY;
-        xdot_.segment<3>(3) = vector_t::Zero(3);
-
-        // Pinocchio calls
-        ConvertMPCStateToPinocchioState(state_man, q_pin_);
-        pinocchio::forwardKinematics(pin_model_, *pin_data_, q_pin_);
-        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin_);
-
-        const Eigen::Vector3d com_pos = GetCOMPosition(state_man);
-
-        for (int i = 0; i < num_ee_; i++) {
-            const Eigen::Vector3d force = input.GetForce(i, time);
-            xdot_.topRows<3>() += force;
-
-            // Note that the input ee position can deviate from the state ee position.
-            // So I use the state ee position.
-            xdot_.middleRows<3>(3) += (pin_data_->oMf.at(frame_map_.at(frames_.at(i))).translation()
-                    - com_pos).cross(force);
-        }
-
-        // NOTE: This CMM call is expensive
-//        matrix_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q_pin_);
-//        matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
-//        matrix_t CMMj = CMM.rightCols(num_joints_);
-//        xdot_.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) =
-//                CMMb.householderQr().solve(state.head<MOMENTUM_OFFSET>() - CMMj*input.GetVels(time));
-        xdot_.segment<POS_VARS>(MOMENTUM_OFFSET) = state.segment<POS_VARS>(0)/robot_mass_;
-        xdot_.segment<POS_VARS>(MOMENTUM_OFFSET + POS_VARS) = state.segment<POS_VARS>(POS_VARS)/robot_mass_;
-
-        xdot_.bottomRows(num_joints_) = input.GetVels(time);
-
-        return xdot_;
-    }
+//    vector_t CentroidalModel::CalcDynamics(const vector_t& state, const Inputs& input, double time,
+//                                           const vector_t& ref_state) {
+//        assert(state.size() == pin_model_.nv + 6);
+//
+//        const vector_t state_man = ConvertAlgebraStateToManifoldState(state, ref_state);
+//
+//        xdot_.topRows<3>().noalias() = robot_mass_*GRAVITY;
+//        xdot_.segment<3>(3) = vector_t::Zero(3);
+//
+//        // Pinocchio calls
+//        ConvertMPCStateToPinocchioState(state_man, q_pin_);
+//        pinocchio::forwardKinematics(pin_model_, *pin_data_, q_pin_);
+//        pinocchio::framesForwardKinematics(pin_model_, *pin_data_, q_pin_);
+//
+//        const Eigen::Vector3d com_pos = GetCOMPosition(state_man);
+//
+//        for (int i = 0; i < num_ee_; i++) {
+//            const Eigen::Vector3d force = input.GetForce(i, time);
+//            xdot_.topRows<3>() += force;
+//
+//            // Note that the input ee position can deviate from the state ee position.
+//            // So I use the state ee position.
+//            xdot_.middleRows<3>(3) += (pin_data_->oMf.at(frame_map_.at(frames_.at(i))).translation()
+//                    - com_pos).cross(force);
+//        }
+//
+//        // NOTE: This CMM call is expensive
+////        matrix_t CMM = pinocchio::computeCentroidalMap(pin_model_, *pin_data_, q_pin_);
+////        matrix_t CMMb = CMM.leftCols<FLOATING_VEL_OFFSET>();
+////        matrix_t CMMj = CMM.rightCols(num_joints_);
+////        xdot_.middleRows<FLOATING_VEL_OFFSET>(MOMENTUM_OFFSET) =
+////                CMMb.householderQr().solve(state.head<MOMENTUM_OFFSET>() - CMMj*input.GetVels(time));
+//        xdot_.segment<POS_VARS>(MOMENTUM_OFFSET) = state.segment<POS_VARS>(0)/robot_mass_;
+//        xdot_.segment<POS_VARS>(MOMENTUM_OFFSET + POS_VARS) = state.segment<POS_VARS>(POS_VARS)/robot_mass_;
+//
+//        xdot_.bottomRows(num_joints_) = input.GetVels(time);
+//
+//        return xdot_;
+//    }
 
     double CentroidalModel::GetMass() const {
         return robot_mass_;
@@ -453,67 +453,67 @@ namespace mpc {
         return frames;
     }
 
-    void CentroidalModel::ComputeLinearizationPartialWrtContactTimes(matrix_t& dA, matrix_t& dB,
-                                                                     vector_t& dC, const vector_t& state,
-                                                                     const Inputs& input, double time,
-                                                                     int ee, int idx) {
-        // TODO: Can do this quicker by using the stuff computed for the original linearization
-        const int num_inputs = input.GetNumInputs();
-
-        dA.resize(num_total_states_, num_total_states_);
-        dB.resize(num_total_states_, num_inputs);
-        dC.resize(num_total_states_);
-
-        dA.setZero();
-        dB.setZero();
-        dC.setZero();
-
-        // dA
-        ConvertMPCStateToPinocchioState(state, q_pin_);
-        for (int i = 0; i < num_ee_; i++) {
-            // Get the jacobian of the FK
-            matrix_3t J = matrix_t::Zero(3, pin_model_.nv);
-            J = GetFKJacobianForEndEffector(q_pin_, frames_.at(i), false);
-            Eigen::Vector3d force_partial = input.GetForcePartialWrtContact(i, time, idx);
-            for (int j = 0; j < pin_model_.nv; j++) {
-                // Cross product with the corresponding input force, add these for all the end effectors
-                dA.block<3,1>(POS_VARS, MOMENTUM_OFFSET + j) +=
-                        static_cast<Eigen::Vector3d>(J.col(j)).cross(force_partial);
-            }
-        }
-
-        // dB
-        const Eigen::Matrix3d Id = Eigen::Matrix3d::Identity();
-        const Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
-        for (int coord = 0; coord < 3; coord++) {
-            if (input.IsForceMutable(ee, coord, time)) {
-                vector_t coef_partials = input.GetForces().at(ee).at(coord).ComputeCoefPartialWrtTime(time, idx);
-
-                int vars_idx, vars_affecting;
-                std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
-
-                // linear momentum
-                dB.block(coord, vars_idx - vars_affecting, 1, vars_affecting) =
-                        coef_partials.transpose();
-
-                // Angular momentum
-                for (int poly = 0; poly < coef_partials.size(); poly++) {
-                    dB.block(3, vars_idx - vars_affecting + poly, 3, 1).noalias() =
-                            ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * coef_partials(poly);
-                }
-            }
-        }
-
-        // dC
-        Eigen::Vector3d force_partial = input.GetForcePartialWrtContact(ee, time, idx);
-        dC.segment<POS_VARS>(0) = force_partial;
-        for (int coord = 0; coord < POS_VARS; coord++) {
-            for (int poly = 0; poly < force_partial.size(); poly++) {
-                dC.segment<POS_VARS>(POS_VARS).noalias() =
-                        ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * force_partial(poly);
-            }
-        }
-
-    }
+//    void CentroidalModel::ComputeLinearizationPartialWrtContactTimes(matrix_t& dA, matrix_t& dB,
+//                                                                     vector_t& dC, const vector_t& state,
+//                                                                     const Inputs& input, double time,
+//                                                                     int ee, int idx) {
+//        // TODO: Can do this quicker by using the stuff computed for the original linearization
+//        const int num_inputs = input.GetNumInputs();
+//
+//        dA.resize(num_total_states_, num_total_states_);
+//        dB.resize(num_total_states_, num_inputs);
+//        dC.resize(num_total_states_);
+//
+//        dA.setZero();
+//        dB.setZero();
+//        dC.setZero();
+//
+//        // dA
+//        ConvertMPCStateToPinocchioState(state, q_pin_);
+//        for (int i = 0; i < num_ee_; i++) {
+//            // Get the jacobian of the FK
+//            matrix_3t J = matrix_t::Zero(3, pin_model_.nv);
+//            J = GetFKJacobianForEndEffector(q_pin_, frames_.at(i), false);
+//            Eigen::Vector3d force_partial = input.GetForcePartialWrtContact(i, time, idx);
+//            for (int j = 0; j < pin_model_.nv; j++) {
+//                // Cross product with the corresponding input force, add these for all the end effectors
+//                dA.block<3,1>(POS_VARS, MOMENTUM_OFFSET + j) +=
+//                        static_cast<Eigen::Vector3d>(J.col(j)).cross(force_partial);
+//            }
+//        }
+//
+//        // dB
+//        const Eigen::Matrix3d Id = Eigen::Matrix3d::Identity();
+//        const Eigen::Vector3d ee_pos_wrt_com = GetEndEffectorLocationCOMFrame(state, frames_.at(ee));
+//        for (int coord = 0; coord < 3; coord++) {
+//            if (input.IsForceMutable(ee, coord, time)) {
+//                vector_t coef_partials = input.GetForces().at(ee).at(coord).ComputeCoefPartialWrtTime(time, idx);
+//
+//                int vars_idx, vars_affecting;
+//                std::tie(vars_idx, vars_affecting) = input.GetForceSplineIndex(ee, time, coord);
+//
+//                // linear momentum
+//                dB.block(coord, vars_idx - vars_affecting, 1, vars_affecting) =
+//                        coef_partials.transpose();
+//
+//                // Angular momentum
+//                for (int poly = 0; poly < coef_partials.size(); poly++) {
+//                    dB.block(3, vars_idx - vars_affecting + poly, 3, 1).noalias() =
+//                            ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * coef_partials(poly);
+//                }
+//            }
+//        }
+//
+//        // dC
+//        Eigen::Vector3d force_partial = input.GetForcePartialWrtContact(ee, time, idx);
+//        dC.segment<POS_VARS>(0) = force_partial;
+//        for (int coord = 0; coord < POS_VARS; coord++) {
+//            for (int poly = 0; poly < force_partial.size(); poly++) {
+//                dC.segment<POS_VARS>(POS_VARS).noalias() =
+//                        ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * force_partial(poly);
+//            }
+//        }
+//
+//    }
 
 } // mpc

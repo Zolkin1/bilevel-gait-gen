@@ -5,7 +5,6 @@ set(MPC_HEADER_LIST "include/mpc.h"
         "include/integrator.h"
         "include/trajectory.h"
         "include/spline.h"
-        "include/inputs.h"
         "include/euler_integrator.h"
         "include/qp_data.h"
         "include/osqp_interface.h"
@@ -22,7 +21,6 @@ add_library(mpc mpc.cpp
         integrator.cpp
         trajectory.cpp
         spline.cpp
-        inputs.cpp
         euler_integrator.cpp
         osqp_interface.cpp
         rk_integrator.cpp

@@ -12,7 +12,6 @@
 #include "pinocchio/parsers/urdf.hpp"
 
 //#include "integrator.h"
-#include "inputs.h"
 #include "rk_integrator.h"
 #include "timer.h"
 
@@ -41,13 +40,13 @@ namespace mpc {
          * @param time
          * @return
          */
-        void GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Inputs& input, double time,
-                                           matrix_t& A, matrix_t& B, vector_t& C);
+//        void GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Inputs& input, double time,
+//                                           matrix_t& A, matrix_t& B, vector_t& C);
 
         // See computeForwardKinematicsDerivatives
         // Needs to return with the frame transition built in
-        void GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
-                                    matrix_t& A, vector_t& C);
+//        void GetFKLinearization(const vector_t& state, const vector_t& ref_state, const Inputs& input, int end_effector,
+//                                    matrix_t& A, vector_t& C);
 
         matrix_3t GetFKJacobianForEndEffector(const vector_t& state, const std::string& frame, bool compute_jac);
 
@@ -62,8 +61,8 @@ namespace mpc {
 
 //        void SetDynamicsRefState(const vector_t& state);
 
-        vector_t CalcDynamics(const vector_t& state, const Inputs& input, double time,
-                              const vector_t& ref_state);
+//        vector_t CalcDynamics(const vector_t& state, const Inputs& input, double time,
+//                              const vector_t& ref_state);
 
         static Eigen::Vector4d ConvertZYXRotToQuaternion(const Eigen::Vector3d& zyx_rot);
         static Eigen::Vector3d ConvertQuaternionToZYXRot(const Eigen::Vector4d& quat);
@@ -79,8 +78,8 @@ namespace mpc {
 
         double GetMass() const;
 
-        vector_t GetDiscreteDynamics(const vector_t& state, const Inputs& input, double time,
-                                     const vector_t& ref_state);
+//        vector_t GetDiscreteDynamics(const vector_t& state, const Inputs& input, double time,
+//                                     const vector_t& ref_state);
 
         const std::string& GetEndEffectorFrame(int ee) const;
 
@@ -98,13 +97,13 @@ namespace mpc {
          * @param ee
          * @param idx
          */
-        void ComputeLinearizationPartialWrtContactTimes(matrix_t& dA,
-                                                        matrix_t& dB,
-                                                        vector_t& dC,
-                                                        const vector_t& state,
-                                                        const Inputs& inputs,
-                                                        double time,
-                                                        int ee, int idx);
+//        void ComputeLinearizationPartialWrtContactTimes(matrix_t& dA,
+//                                                        matrix_t& dB,
+//                                                        vector_t& dC,
+//                                                        const vector_t& state,
+//                                                        const Inputs& inputs,
+//                                                        double time,
+//                                                        int ee, int idx);
 
     protected:
     private:

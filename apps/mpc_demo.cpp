@@ -4,7 +4,6 @@
 
 #include "config_parser.h"
 #include "mpc.h"
-#include "inputs.h"
 #include "spline.h"
 #include "mpc_controller.h"
 #include "visualization.h"

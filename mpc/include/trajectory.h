@@ -7,7 +7,7 @@
 
 #include <Eigen/Core>
 
-#include "inputs.h"
+#include "spline.h"
 //#include "model.h"
 
 namespace mpc {

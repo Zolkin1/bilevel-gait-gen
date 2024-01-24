@@ -327,7 +327,8 @@ namespace mpc {
     }
 
     std::vector<std::vector<Eigen::Vector3d>> MPCSingleRigidBody::CreateVizData() {
-        std::vector<std::vector<Eigen::Vector3d>> fk_traj;  // TODO: Dynamic memory allocation
+        // TODO: DMA
+        std::vector<std::vector<Eigen::Vector3d>> fk_traj;
         for (int ee = 0; ee < 5; ee++) {
             for (int node = 0; node < info_.num_nodes+1; node++) {
                 if (ee == 4) {
@@ -366,7 +367,7 @@ namespace mpc {
 
                 for (int coord = 0; coord < 2; coord++) {
                     A(idx, node*num_states_ + coord) =
-                            -1;//model_.GetCOMPosition(prev_traj_.GetState(node))(coord);
+                            -1;
 
                     int vars_idx, vars_affecting;
                     std::tie(vars_idx, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
@@ -385,8 +386,6 @@ namespace mpc {
 
         data_.constraint_mat_.SetMatrix(A, constraint_idx_, 0);
         constraint_idx_ += idx;
-
-//        std::cout << "ee location mat: \n" << A << std::endl;
 
         assert(idx == data_.num_ee_location_constraints_);
     }
