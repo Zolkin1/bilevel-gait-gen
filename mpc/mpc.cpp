@@ -166,6 +166,12 @@ namespace mpc {
                 idx += 4;
             }
         }
+        Eigen::SparseMatrix<double> temp;
+        assert(idx == data_.num_cone_constraints_);
+        temp.resize(data_.GetTotalNumConstraints(), data_.num_decision_vars);
+        temp.setFromTriplets(data_.constraint_mat_.GetTriplet().begin(), data_.constraint_mat_.GetTriplet().end());
+//        std::cout << temp.toDense().middleRows(constraint_idx_, data_.num_cone_constraints_) << std::endl;
+
         constraint_idx_ += idx;
     }
 
@@ -185,15 +191,28 @@ namespace mpc {
                                                     constraint_idx_ + row_idx,
                                                     force_idx + vars_index - vars_affecting);
                     if (coord == 2) {
-                        data_.force_box_lb_(row_idx) = 0;
+                        data_.force_box_lb_(row_idx) = 0.0;
+//                        if (row_idx < 10) {
+//                            data_.force_box_lb_(row_idx) = 0.0;
+//                        } else {
+//                            data_.force_box_lb_(row_idx) = -1000.0;
+//                        }
                     } else {
                         data_.force_box_lb_(row_idx) = -info_.force_bound;
                     }
+
+//                    data_.force_box_ub_(row_idx) = qp_solver->GetInfinity(1)(0);
                     data_.force_box_ub_(row_idx) = info_.force_bound;
+
                     row_idx++;
                 }
             }
         }
+        Eigen::SparseMatrix<double> temp;
+        assert(row_idx == data_.num_force_box_constraints_);
+        temp.resize(data_.GetTotalNumConstraints(), data_.num_decision_vars);
+        temp.setFromTriplets(data_.constraint_mat_.GetTriplet().begin(), data_.constraint_mat_.GetTriplet().end());
+//        std::cout << temp.toDense().middleRows(constraint_idx_, data_.num_force_box_constraints_) << std::endl;
         constraint_idx_ += row_idx;
     }
 
@@ -211,7 +230,7 @@ namespace mpc {
             data_.cost_mat_.SetMatrix(Q_, node*num_states_, node*num_states_);
         }
         if (Q_forces_.size() > 0) {
-            data_.cost_mat_.SetMatrix(Q_forces_, GetForceSplineStartIdx(), GetForceSplineStartIdx());
+//            data_.cost_mat_.SetMatrix(Q_forces_, GetForceSplineStartIdx(), GetForceSplineStartIdx());
         }
     }
 
@@ -268,6 +287,23 @@ namespace mpc {
 
                 Spline force1(num_polys, times, false, Spline::Force);
                 Spline force2(num_polys, times, true, Spline::Force);
+//                for (int j = 0; j < force1.GetNumPolyTimes(); j++) {
+//                    if (force1.IsMutable(j)) {
+//                        std::vector<double> vars(2);
+//                        vars.at(0) = 100;
+//                        vars.at(1) = 0;
+//                        force1.SetPolyVars(j, vars);
+//                    }
+//                }
+//                for (int j = 0; j < force2.GetNumPolyTimes(); j++) {
+//                    if (force2.IsMutable(j)) {
+//                        std::vector<double> vars(2);
+//                        vars.at(0) = 100;
+//                        vars.at(1) = 0;
+//                        force2.SetPolyVars(j, vars);
+//                    }
+//                }
+
 
                 for (int ee = 0; ee < num_ee_; ee++) {
                     if (ee == 0 || ee == 3) {

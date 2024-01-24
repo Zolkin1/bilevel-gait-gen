@@ -7,10 +7,10 @@
 
 #include <Eigen/Core>
 
-#include "mpc.h"
 #include "config_parser.h"
 #include "spline.h"
 #include "centroidal_model.h"
+#include "mpc_single_rigid_body.h"
 
 TEST_CASE("Basic MPC", "[mpc]") {
 
@@ -31,8 +31,9 @@ TEST_CASE("Basic MPC", "[mpc]") {
     info.num_contacts = info.ee_frames.size();
     info.force_bound = config.ParseNumber<double>("force_bound");
     info.swing_height = config.ParseNumber<double>("swing_height");
+    info.nom_state = config.ParseEigenVector("init_config");
 
-    mpc::MPC mpc(info, config.ParseString("robot_urdf"));
+    mpc::MPCSingleRigidBody mpc(info, config.ParseString("robot_urdf"));
 
 }
 

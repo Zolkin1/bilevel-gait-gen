@@ -121,22 +121,27 @@ namespace mpc {
 
         prev_dual_sol_ = qp_solver_.getDualSolution();
 
-        if (verbose_) {
-//            vector_t temp = data.sparse_constraint_ * qp_sol - data.ub_;
-//
-//            std::cout << "--- Solve Stats ---" << std::endl;
-//            std::cout << "max diff: " << temp.maxCoeff() << std::endl;
-//            int ind = 0;
-//            for (int i = 0; i < temp.size(); i++) {
-//                if (temp(i) == temp.maxCoeff()) {
-//                    ind = i;
-//                }
-//            }
-//
-//            std::cout << "index of max: " << ind << std::endl;
-//            std::cout << "num dynamics constraints: " << data.num_dynamics_constraints << std::endl;
-//            std::cout << "num decision variables: " << data.num_decision_vars << std::endl;
-//            std::cout << std::endl;
+        if (false) {
+            vector_t temp = -data.sparse_constraint_ * qp_sol + data.ub_;
+
+            std::cout << "--- Solve Stats ---" << std::endl;
+            std::cout << "max diff: " << temp.maxCoeff() << std::endl;
+            int ind = 0;
+            for (int i = 0; i < temp.size(); i++) {
+                if (temp(i) == temp.maxCoeff()) {
+                    ind = i;
+                }
+            }
+
+            std::cout << "index of max: " << ind << std::endl;
+            std::cout << "num dynamics constraints: " << data.num_dynamics_constraints << std::endl;
+            std::cout << "num decision variables: " << data.num_decision_vars << std::endl;
+            std::cout << "num constraints: " << data.GetTotalNumConstraints() << std::endl;
+            std::cout << std::endl;
+
+//            std::cout << "force box constraints: \n" <<
+//            data.sparse_constraint_.bottomRows(data.num_force_box_constraints_)*qp_sol << std::endl;
+//            std::cout << "upper bound: \n" << data.ub_.bottomRows(data.num_force_box_constraints_) << std::endl;
         }
 
         run++;

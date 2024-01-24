@@ -58,6 +58,8 @@ namespace mpc {
         vector_t ConvertManifoldStateToTangentState(const vector_t& state, const vector_t& ref_state) const override;
         vector_t ConvertTangentStateToManifoldState(const vector_t& state, const vector_t& ref_state) const override;
 
+        vector_3t GetCOMToHip(int end_effector) const;
+
         static constexpr int QUAT_SIZE = 4;
         static constexpr int QUAT_START = 6;
         static constexpr int ORIENTATION_START = 6;

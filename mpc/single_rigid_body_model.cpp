@@ -14,7 +14,8 @@ namespace mpc {
     SingleRigidBodyModel::SingleRigidBodyModel(const std::string& robot_urdf, const std::vector<std::string>& frames,
                                                int discretization_steps, double dt, const vector_t& nom_state) :
             Model(robot_urdf, frames, discretization_steps, dt, false,
-                  {Constraints::Dynamics}),//, Constraints::ForceBox, Constraints::FrictionCone}), //, Constraints::EndEffectorLocation}),
+                  {Constraints::Dynamics, Constraints::ForceBox,
+                   Constraints::FrictionCone, Constraints::EndEffectorLocation}),
             num_tangent_states_(MOMENTUM_OFFSET + FLOATING_VEL_OFFSET),
             num_manifold_states_(MOMENTUM_OFFSET + FLOATING_BASE_OFFSET) {
         // Populate Ir
@@ -211,7 +212,7 @@ namespace mpc {
         xdot.head<POS_VARS>() = state.segment<POS_VARS>(LIN_MOM_START)/robot_mass_;
 
         // COM linear momentum
-        xdot.segment<POS_VARS>(LIN_MOM_START).noalias() = robot_mass_*GRAVITY; //vector_3t::Zero()
+        xdot.segment<POS_VARS>(LIN_MOM_START).noalias() = robot_mass_*GRAVITY; //vector_3t::Zero();
 
         // Orientation
         xdot.segment<3>(ORIENTATION_START) = Ir_inv_ * omega;
@@ -232,6 +233,38 @@ namespace mpc {
         }
 
         return xdot;
+    }
+
+    vector_3t SingleRigidBodyModel::GetCOMToHip(int end_effector) const {
+        // TODO: Make not hard coded
+
+//        for (int i = 0; i < pin_model_.njoints; i++) {
+//            std::cout << pin_model_.names.at(i) << std::endl;
+//        }
+
+        int com_joint_id = pin_model_.getJointId("root_joint");
+
+        int hip_joint_id = 0;
+        switch (end_effector) {
+            case 0:
+                hip_joint_id = pin_model_.getJointId("FL_hip_joint");
+                break;
+            case 1:
+                hip_joint_id = pin_model_.getJointId("FR_hip_joint");
+                break;
+            case 2:
+                hip_joint_id = pin_model_.getJointId("RL_hip_joint");
+                break;
+            case 3:
+                hip_joint_id = pin_model_.getJointId("RR_hip_joint");
+                break;
+            default:
+                throw std::runtime_error("Not a valid end effector number");
+        }
+
+//        std::cout << "hip (wrt com): \n " << pin_data_->oMi[com_joint_id].translation()
+//                                            - pin_data_->oMi[hip_joint_id].translation();
+        return -pin_data_->oMi[com_joint_id].translation() + pin_data_->oMi[hip_joint_id].translation();
     }
 
 } // mpc

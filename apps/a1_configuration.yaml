@@ -143,7 +143,7 @@ Q_diag: [1, 1, 1,          # linear momentum
          60000, 500, 10,       # RL leg
          60000, 500, 10]       # RR leg
 
-Q_srbd_diag: [0, 0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+Q_srbd_diag: [10, 10, 1000, 0, 0, 0, 10, 10, 10, 0, 0, 0]
 #  [300, 300, 7500,   # COM position
 #              1, 1, 1,          # linear momentum
 #              200, 200, 200,    # orientation

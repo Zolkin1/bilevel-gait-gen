@@ -9,10 +9,14 @@ namespace mpc {
     /*
      * TODO items for week of 1/22/24
      *  - Dynamics are not correct (at least COM position not updating properly based on COM linear momentum)
+     *  --- Dynamics look better now (1/22/24)
      *  - Check why the spline variables don't get updated
      *  - Check why the step norm is relatively high even after convergence (hopefully due to derivative terms)
      *  - Verify why good steps are being rejected
      *  - Check why the optimal cost is so high (most likely due to a dynamics error)
+     *
+     *  1/22/24:
+     *  - Force box constraint doesn't seem to work, friction cone constraints look ok
      */
 
     MPCSingleRigidBody::MPCSingleRigidBody(const mpc::MPCInfo& info, const std::string& robot_urdf) :
@@ -59,15 +63,26 @@ namespace mpc {
         // TODO: Go through the constraint enum
         constraint_idx_ = 0;
         utils::Timer dynamics_timer("dynamics constraints");
-        dynamics_timer.StartTimer();
-        AddDynamicsConstraints(state);
-        dynamics_timer.StopTimer();
-
-//        dynamics_timer.PrintElapsedTime();
-
-        // TODO: Add end effector location constraint
-//        AddForceBoxConstraints();
-//        AddFrictionConeConstraints();
+        for (const auto& constraint : data_.constraints_) {
+            switch (constraint) {
+                case Constraints::Dynamics:
+                    dynamics_timer.StartTimer();
+                    AddDynamicsConstraints(state);
+                    dynamics_timer.StopTimer();
+                    break;
+                case Constraints::ForceBox:
+                    AddForceBoxConstraints();
+                    break;
+                case Constraints::FrictionCone:
+                    AddFrictionConeConstraints();
+                    break;
+                case Constraints::EndEffectorLocation:
+                    AddEELocationConstraints();
+                    break;
+                default:
+                    throw std::runtime_error("No such constraint exists.");
+            }
+        }
         constraint_costs_timer.StopTimer();
 
         data_.ConstructSparseMats();
@@ -156,6 +171,16 @@ namespace mpc {
         solve_timer.PrintElapsedTime();
         std::cout << "-----------" << std::endl;
 
+//        for (int i = 0; i < info_.num_nodes; i++) {
+//            vector_3t net_force;
+//            net_force << 0, 0, -9.81* model_.GetMass();
+//            for (int ee = 0; ee < num_ee_; ee++) {
+//                net_force += prev_traj_.GetForce(ee, GetTime(i));
+//            }
+//
+//            std::cout << "Node: " << i << ", net force: " << net_force.transpose() << std::endl;
+//        }
+
         prev_traj_.PrintTrajectoryToFile("mpc_demo_traj.txt");
 
         return prev_traj_;
@@ -187,7 +212,11 @@ namespace mpc {
                                      time, A_, B_, C_, C2_);
 
 
-            integrator_.DiscretizeLinearDynamics(A_, B_, C_, C2_);
+//            integrator_.DiscretizeLinearDynamics(A_, B_, C_, C2_);
+
+            A_ = matrix_t::Identity(num_states_, num_states_) + integrator_.GetDt()*A_;
+            B_ = integrator_.GetDt()*B_;
+            C_ = integrator_.GetDt()*C_;
 
 //            std::cout << "A: \n" << A_ << std::endl;
 //            std::cout << "A*state: \n" << A_ * model_.ConvertManifoldStateToTangentState(prev_traj_.GetState(node), state) << std::endl;
@@ -199,19 +228,21 @@ namespace mpc {
             assert(B_.cols() == num_inputs_);
             get_dyn_timer.StopTimer();
 //            get_dyn_timer.PrintElapsedTime();
-            data_.constraint_mat_.SetMatrix(A_, (node + 1) * num_states_, node * num_states_);
+            data_.constraint_mat_.SetMatrix(A_, constraint_idx_ + (node + 1) * num_states_, node * num_states_);
 
-            data_.constraint_mat_.SetDiagonalMatrix(-1, (node + 1) * num_states_,
+            data_.constraint_mat_.SetDiagonalMatrix(-1, constraint_idx_ +(node + 1) * num_states_,
                                                     (node + 1) * num_states_, num_states_);
 
-            const matrix_t B_forces = B_.leftCols(force_spline_vars);
-            const matrix_t B_positions = B_.rightCols(position_spline_vars);
+//            const matrix_t B_forces = B_.leftCols(force_spline_vars);
+//            const matrix_t B_positions = B_.rightCols(position_spline_vars);
 
             assert(B_.cols() == force_spline_vars + position_spline_vars);
+            data_.constraint_mat_.SetMatrix(B_, constraint_idx_ + (node+1)*num_states_,
+                                            GetForceSplineStartIdx());
 
-            data_.constraint_mat_.SetMatrix(B_forces, (node + 1) * num_states_, GetForceSplineStartIdx());
-            data_.constraint_mat_.SetMatrix(B_positions, (node + 1) * num_states_, GetPosSplineStartIdx());
-            data_.dynamics_constants.segment((node + 1) * num_states_, num_states_) = -C_;
+//            data_.constraint_mat_.SetMatrix(B_forces, constraint_idx_ + (node + 1) * num_states_, GetForceSplineStartIdx());
+//            data_.constraint_mat_.SetMatrix(B_positions, constraint_idx_ + (node + 1) * num_states_, GetPosSplineStartIdx());
+            data_.dynamics_constants.segment(constraint_idx_ + (node + 1) * num_states_, num_states_) = -C_;
         }
         constraint_idx_ = (info_.num_nodes+1)*num_states_;
     }
@@ -276,7 +307,7 @@ namespace mpc {
         data_.num_cone_constraints_ = (info_.num_nodes+1)*4*num_ee_;
         data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
 
-        data_.num_ee_location_constraints_ = (info_.num_nodes+1)*3*num_ee_;
+        data_.num_ee_location_constraints_ = (info_.num_nodes+1)*2*num_ee_;
     }
 
     vector_t MPCSingleRigidBody::ConvertTrajToQPVec(const Trajectory& traj) const {
@@ -314,6 +345,52 @@ namespace mpc {
         SetInitQPSizes();
         data_.InitQPMats();
     }
+
+    void MPCSingleRigidBody::AddEELocationConstraints() {
+        // TODO: Do I need a rotation matrix?
+        int idx = 0;
+
+        const int pos_start_idx = GetPosSplineStartIdx();
+
+        // Note: Bounds are given for the 2D space centered under the hip
+        const Eigen::Vector2d bounds = {0.5, 0.5};
+
+        // TODO: DMA
+        matrix_t A(data_.num_ee_location_constraints_, data_.num_decision_vars);
+        A.setZero();
+
+        for (int node = 0; node < info_.num_nodes+1; node++) {
+            for (int ee = 0; ee < num_ee_; ee++) {
+                data_.ee_location_ub_.segment<2>(idx) = bounds + model_.GetCOMToHip(ee).head<2>();
+                data_.ee_location_lb_.segment<2>(idx) = -bounds + model_.GetCOMToHip(ee).head<2>();
+
+                for (int coord = 0; coord < 2; coord++) {
+                    A(idx, node*num_states_ + coord) =
+                            -1;//model_.GetCOMPosition(prev_traj_.GetState(node))(coord);
+
+                    int vars_idx, vars_affecting;
+                    std::tie(vars_idx, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
+
+                    // TODO: DMA
+                    vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position, ee, coord, GetTime(node));
+
+                    A.block(idx,
+                            pos_start_idx + vars_idx - vars_affecting,
+                            1, vars_affecting) = vars_lin.transpose();
+                    idx++;
+                }
+
+            }
+        }
+
+        data_.constraint_mat_.SetMatrix(A, constraint_idx_, 0);
+        constraint_idx_ += idx;
+
+//        std::cout << "ee location mat: \n" << A << std::endl;
+
+        assert(idx == data_.num_ee_location_constraints_);
+    }
+
 
 //    bool MPCSingleRigidBody::ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) {
 //        if (solve_type_.at(solve_type_.size()-1) == "Solved") {

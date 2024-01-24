@@ -20,6 +20,8 @@ namespace mpc {
     protected:
         void AddDynamicsConstraints(const vector_t& state) override;
 
+        void AddEELocationConstraints();
+
         int GetForceSplineStartIdx() const override;
         int GetPosSplineStartIdx() const override;
 

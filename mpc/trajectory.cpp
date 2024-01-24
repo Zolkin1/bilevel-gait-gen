@@ -253,6 +253,8 @@ namespace mpc {
 //            file << joint_vels << std::endl;
         }
 
+        file << "spline vec: \n" << SplinesAsVec() << std::endl;
+
         file.close();
     }
 
@@ -320,6 +322,7 @@ namespace mpc {
         }
 
         SetSwingPosZ();
+        UpdateSplineVarsCount();
     }
 
     vector_t Trajectory::PositionAsQPVector() const {
@@ -469,15 +472,15 @@ namespace mpc {
             }
         }
 
-        int idx_into_ee_coord_spline_vars = 0;
+        int idx_into_force_coord_spline_vars = 0;
         for (int j = 0; j < coord; j++) {
-            idx_into_ee_coord_spline_vars += forces_.at(end_effector).at(j).GetTotalPolyVars();
+            idx_into_force_coord_spline_vars += forces_.at(end_effector).at(j).GetTotalPolyVars();
         }
 
         int vars_idx, vars_affecting;
         std::tie(vars_idx, vars_affecting) = forces_.at(end_effector).at(coord).GetVarsIndexEnd(time);
 
-        return std::make_pair(num_spline_vars_before + idx_into_ee_coord_spline_vars + vars_idx, vars_affecting);
+        return std::make_pair(num_spline_vars_before + idx_into_force_coord_spline_vars + vars_idx, vars_affecting);
     }
 
     int Trajectory::GetTotalPolyVars(const mpc::Trajectory::SplineTypes& spline_type, int end_effector, int coord) {

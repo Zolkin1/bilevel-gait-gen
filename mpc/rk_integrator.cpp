@@ -18,10 +18,12 @@ namespace mpc {
         vector_t state = ic;
         for (int i = 0; i < num_steps; i++) {
             // TODO: DMA
-            vector_t k1 = model.CalcDynamics(state, traj, init_time, ref_state);
-            vector_t y1 = state + k1 * (dt_ / 2.0);
-            vector_t k2 = model.CalcDynamics(y1, traj, init_time + dt_ / 2.0, ref_state);
-            state = state + k2*dt_;
+//            vector_t k1 = model.CalcDynamics(state, traj, init_time, ref_state);
+//            vector_t y1 = state + k1 * (dt_ / 2.0);
+//            vector_t k2 = model.CalcDynamics(y1, traj, init_time + dt_ / 2.0, ref_state);
+//            state = state + k2*dt_;
+            // TODO: put back
+            state = state + dt_*model.CalcDynamics(state, traj, init_time, ref_state);
         }
 
         return state;
