@@ -22,6 +22,8 @@ namespace mpc {
 
         poly_vars_.push_back(ZERO_CONSTANT);
         poly_times_.push_back(0);
+        start_pair_ = start_on_constant_;
+        end_pair_ = true;
 
         if (type == SplineType::Constants) {
             for (int idx = 0; idx < times.size(); idx++) {
@@ -33,15 +35,16 @@ namespace mpc {
                     num_all_poly_vars++;
                 }
             }
-            if (!(times.size()&2)){
+            if (!(times.size()&2) && start_on_constant_){
                 num_all_poly_vars++;
                 end_pair_ = false;
-            } else {
-                end_pair_ = true;
             }
             num_constant_++;
             total_poly_++;
-            start_pair_ = true;
+            if (!start_on_constant_) {
+                num_all_poly_vars++;
+                num_all_poly_vars++;
+            }
         } else {
 
             num_all_poly_vars++;
@@ -149,6 +152,8 @@ namespace mpc {
         num_polys_ = spline.num_polys_;
         num_all_poly_vars = spline.num_all_poly_vars;
         type_ = spline.type_;
+        end_pair_ = spline.end_pair_;
+        start_pair_ = spline.start_pair_;
 
         return *this;
     }
@@ -529,7 +534,7 @@ namespace mpc {
                 poly_vars_.push_back(ZERO_CONSTANT);
                 poly_times_.push_back(poly_times_.at(poly_times_.size() - 1) + time);
 
-                if (type_ == Normal || type_ == Constants) {
+                if (type_ == Normal) {
                     mut_flags_.emplace_back(true);
                 } else {
                     mut_flags_.emplace_back(false);
@@ -543,7 +548,7 @@ namespace mpc {
             if (poly_times_.at(i+1) < time && poly_times_.at(i) < time) {
                 if (IsConstantPoly(i+1)) {
                     // Then we are getting rid of the first part of a constant, which is just an internal change
-                    if (poly_vars_.at(i) != poly_vars_.at(i+1) && type_ == Constants) {
+                    if (!start_pair_ && type_ == Constants) {
                         num_all_poly_vars--;
                         start_pair_ = true;
                     } else {

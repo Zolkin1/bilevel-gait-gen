@@ -39,6 +39,7 @@ namespace mpc {
         prev_traj_.AddPolys(info_.integrator_dt*info_.num_nodes + init_time);
         prev_traj_.RemoveUnusedPolys(init_time);
         poly_update_timer.StopTimer();
+        UpdateNumInputs();
 
         utils::Timer data_update_timer("data update");
         data_update_timer.StartTimer();
@@ -354,7 +355,7 @@ namespace mpc {
         const int pos_start_idx = GetPosSplineStartIdx();
 
         // Note: Bounds are given for the 2D space centered under the hip
-        const Eigen::Vector2d bounds = {0.1, 0.1}; // TODO: 0.5 has better convergence
+        const Eigen::Vector2d bounds = {0.0, 0.0}; // TODO: 0.5 has better convergence
 
         // TODO: DMA
         matrix_t A(data_.num_ee_location_constraints_, data_.num_decision_vars);
@@ -366,7 +367,7 @@ namespace mpc {
                 data_.ee_location_lb_.segment<2>(idx) = -bounds + model_.GetCOMToHip(ee).head<2>();
 
                 for (int coord = 0; coord < 2; coord++) {
-                    A(idx, node*num_states_ + coord) = -1;
+//                    A(idx, node*num_states_ + coord) = -1;
 
                     int vars_idx, vars_affecting;
                     std::tie(vars_idx, vars_affecting) =

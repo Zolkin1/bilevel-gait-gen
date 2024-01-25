@@ -302,10 +302,14 @@ namespace mpc {
     void Trajectory::AddPolys(double final_time) {
         while (GetTotalTime() < final_time) {
             for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
+                assert(end_effector_pos_.at(ee).at(0).IsStartPairConstant() == end_effector_pos_.at(ee).at(1).IsStartPairConstant());
+                assert(end_effector_pos_.at(ee).at(0).IsEndPairConstant() == end_effector_pos_.at(ee).at(1).IsEndPairConstant());
                 for (int coord = 0; coord < POS_VARS; coord++) {
                     end_effector_pos_.at(ee).at(coord).AddPoly(0.2);
                     forces_.at(ee).at(coord).AddPoly(0.2);
                 }
+                assert(end_effector_pos_.at(ee).at(0).IsStartPairConstant() == end_effector_pos_.at(ee).at(1).IsStartPairConstant());
+                assert(end_effector_pos_.at(ee).at(0).IsEndPairConstant() == end_effector_pos_.at(ee).at(1).IsEndPairConstant());
             }
         }
         SetSwingPosZ();
@@ -315,10 +319,15 @@ namespace mpc {
 
     void Trajectory::RemoveUnusedPolys(double init_time) {
         for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
+            assert(end_effector_pos_.at(ee).at(0).IsStartPairConstant() == end_effector_pos_.at(ee).at(1).IsStartPairConstant());
+            assert(end_effector_pos_.at(ee).at(0).IsEndPairConstant() == end_effector_pos_.at(ee).at(1).IsEndPairConstant());
+
             for (int coord = 0; coord < POS_VARS; coord++) {
                 end_effector_pos_.at(ee).at(coord).RemoveUnused(init_time);
                 forces_.at(ee).at(coord).RemoveUnused(init_time);
             }
+            assert(end_effector_pos_.at(ee).at(0).IsStartPairConstant() == end_effector_pos_.at(ee).at(1).IsStartPairConstant());
+            assert(end_effector_pos_.at(ee).at(0).IsEndPairConstant() == end_effector_pos_.at(ee).at(1).IsEndPairConstant());
         }
 
         UpdateSplineVarsCount();
@@ -350,7 +359,7 @@ namespace mpc {
                 for (int i = 0; i < times.size(); i++) {
                     times.at(i) = pos_spline.GetPolyTimes().at(i+1);
                 }
-                Spline position1(2, times, true, Spline::Normal);
+                Spline position1(2, times, !pos_spline.IsStartPairConstant(), Spline::Normal);
                 end_effector_pos_.at(ee).at(coord) = position1;
             } else {
                 end_effector_pos_.at(ee).at(coord) = pos_spline;
