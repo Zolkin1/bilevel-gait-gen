@@ -4,6 +4,11 @@
 
 #include "pinocchio/algorithm/center-of-mass.hpp"
 #include "pinocchio/algorithm/centroidal.hpp"
+#include "pinocchio/spatial/explog.hpp"
+#include "pinocchio/algorithm/kinematics.hpp"
+#include "pinocchio/algorithm/jacobian.hpp"
+#include "pinocchio/algorithm/joint-configuration.hpp"
+#include "pinocchio/algorithm/frames.hpp"
 
 #include "single_rigid_body_model.h"
 #include "timer.h"
@@ -71,10 +76,10 @@ namespace mpc {
         A.block<3,3>(ORIENTATION_START, ANG_VEL_START) = Ir_inv_;
 
         // Angular momentum
-        for (int i = 0; i < 3; i++) {
-            A.block<3,1>(ANG_VEL_START, ANG_VEL_START + i).noalias() =
-                    -Id.col(i).cross(Ir_*omega) - omega.cross(Ir_.col(i));
-        }
+//        for (int i = 0; i < 3; i++) {
+//            A.block<3,1>(ANG_VEL_START, ANG_VEL_START + i).noalias() =
+//                    -Id.col(i).cross(Ir_*omega) - omega.cross(Ir_.col(i));
+//        }
 
 //        std::cout << A << std::endl;
         A_timer.StopTimer();
@@ -106,23 +111,23 @@ namespace mpc {
                             vars_lin.transpose();
 
                     // Angular momentum - force
-                    for (int poly = 0; poly < vars_lin.size(); poly++) {
-                        B.block(ANG_VEL_START, vars_idx - vars_affecting + poly, 3, 1).noalias() =
-                                ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
-                    }
+//                    for (int poly = 0; poly < vars_lin.size(); poly++) {
+//                        B.block(ANG_VEL_START, vars_idx - vars_affecting + poly, 3, 1).noalias() =
+//                                ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
+//                    }
                 }
 
                 // Angular momentum - position
-                if (coord != 2) {
-                    // TODO: DMA
-                    vector_t vars_lin = traj.GetSplineLin(Trajectory::SplineTypes::Position, ee, coord, time);
-                    int vars_idx, vars_affecting;
-                    std::tie(vars_idx, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
-                    for (int poly = 0; poly < vars_lin.size(); poly++) {
-                        B.block(ANG_VEL_START, pos_spline_start + vars_idx - vars_affecting + poly, 3, 1).noalias() =
-                                Id.col(coord).cross(force) * vars_lin(poly);
-                    }
-                }
+//                if (coord != 2) {
+//                    // TODO: DMA
+//                    vector_t vars_lin = traj.GetSplineLin(Trajectory::SplineTypes::Position, ee, coord, time);
+//                    int vars_idx, vars_affecting;
+//                    std::tie(vars_idx, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
+//                    for (int poly = 0; poly < vars_lin.size(); poly++) {
+//                        B.block(ANG_VEL_START, pos_spline_start + vars_idx - vars_affecting + poly, 3, 1).noalias() =
+//                                Id.col(coord).cross(force) * vars_lin(poly);
+//                    }
+//                }
             }
         }
         B_timer.StopTimer();
@@ -228,8 +233,8 @@ namespace mpc {
             xdot.segment<POS_VARS>(LIN_MOM_START) += force;
 
             // Angular momentum
-            xdot.segment<3>(ANG_VEL_START) += -omega.cross(Ir_*omega) +
-                    (traj.GetEndEffectorLocation(i, time) - com_pos).cross(force);
+//            xdot.segment<3>(ANG_VEL_START) += -omega.cross(Ir_*omega) +
+//                    (traj.GetEndEffectorLocation(i, time) - com_pos).cross(force);
         }
 
         return xdot;
@@ -265,6 +270,121 @@ namespace mpc {
 //        std::cout << "hip (wrt com): \n " << pin_data_->oMi[com_joint_id].translation()
 //                                            - pin_data_->oMi[hip_joint_id].translation();
         return -pin_data_->oMi[com_joint_id].translation() + pin_data_->oMi[hip_joint_id].translation();
+    }
+
+    vector_t SingleRigidBodyModel::InverseKinematics(const mpc::man_state_t& state,
+                                                     mpc::vector_3t end_effector_location, int end_effector,
+                                                     const vector_t& state_guess) {
+
+        const int frame_id = frame_map_.at(frames_.at(end_effector));
+        const int base_joint_id = pin_model_.getJointId("root_joint");
+
+        // TODO: Check the rotation part
+        const pinocchio::SE3 ee_des(Eigen::Matrix3d::Identity(), end_effector_location);
+        const pinocchio::SE3 body_des(static_cast<Eigen::Quaterniond>(state.segment<QUAT_SIZE>(QUAT_START)).matrix(),
+                                      state.segment<POS_VARS>(POS_START));
+
+        Eigen::VectorXd q = pinocchio::neutral(pin_model_);
+        q.head<POS_VARS>() = state.head<POS_VARS>();
+        q.segment<QUAT_SIZE>(POS_VARS) = state.segment<QUAT_SIZE>(QUAT_START);
+        q.tail(pin_model_.njoints-2) = state_guess.tail(pin_model_.njoints-2);
+
+//        q(8) += 0.1;
+//        q(7) -= 0.2;
+//        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+//        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
+//        const pinocchio::SE3 ee_loc = pin_data_->oMf[frame_id];
+//        q(7) += 0.2;
+//        q(8) -= 0.1;
+
+//        q.segment<3>(7) << -0.0139083, 0.47, -0.709954;
+
+        const double eps  = 1e-4;
+        const int IT_MAX  = 1000;
+        const double DT   = 1e-1;
+        const double damp = 1e-6;
+
+        pinocchio::Data::Matrix6x Jee(6,pin_model_.nv);
+        Jee.setZero();
+
+        Eigen::Matrix<double, 6, Eigen::Dynamic> Jb(6, pin_model_.nv);
+        Jb.setZero();
+
+        Eigen::Matrix<double, 9, Eigen::Dynamic> J(9, pin_model_.nv);
+        J.setZero();
+
+        bool success = false;
+        typedef Eigen::Matrix<double, 6, 1> Vector6d;
+        Eigen::Vector<double, 9> err;
+
+        Eigen::VectorXd v(pin_model_.nv);
+        for (int i = 0; i<IT_MAX; i++) {
+
+            Eigen::Quaterniond quat(q.segment<4>(3));
+            pinocchio::quaternion::firstOrderNormalize(quat);
+            q(3) = quat.x();
+            q(3 + 1) = quat.y();
+            q(3 + 2) = quat.z();
+            q(3 + 3) = quat.w();
+
+            pinocchio::forwardKinematics(pin_model_,*pin_data_,q);
+            pinocchio::updateFramePlacements(pin_model_, *pin_data_);
+
+            const pinocchio::SE3 ee_err = pin_data_->oMf[frame_id].actInv(ee_des); //GetSE3Error(frame_id, ee_des);
+            const pinocchio::SE3 body_err = pin_data_->oMi[base_joint_id].actInv(body_des); //GetSE3Error(base_joint_id, body_des);
+
+            // TODO: Maybe try just matching the position and not the orientation on the frame
+            err.head<3>() = ee_err.translation(); //pinocchio::log6(ee_err).toVector();
+            err.tail<6>() = pinocchio::log6(body_err).toVector();
+
+            if(err.norm() < eps) {
+                success = true;
+                break;
+            }
+
+            ComputeJacobianForIK(q, ee_err, frame_id, Jee, true);
+            J.block(0, 0, 3, pin_model_.nv) = -Jee.topRows<3>();
+
+            ComputeJacobianForIK(q, body_err, base_joint_id, Jb, false);
+            J.block(3, 0, 6, pin_model_.nv) = Jb;
+
+            Eigen::Matrix<double, 9, 9> JJt;
+            JJt.noalias() = J * J.transpose();
+            JJt.diagonal().array() += damp;
+            v.noalias() = -(J.transpose() * JJt.ldlt().solve(err));
+            q = pinocchio::integrate(pin_model_,q,v*DT);
+
+//            if(!(i%10)) {
+//                std::cout << i << ": error = " << err.transpose() << std::endl;
+//            }
+        }
+
+//        std::cout << "q: \n" << q << std::endl;
+
+        if(success) {
+            std::cout << "Convergence achieved!" << std::endl;
+        } else {
+            std::cout << "\nWarning: the iterative algorithm has not reached convergence to the desired precision" << std::endl;
+        }
+
+        return q.segment<3>(7 + end_effector*3);    // TODO: make thise not hard coded
+    }
+
+    pinocchio::SE3 SingleRigidBodyModel::GetSE3Error(int joint_id, const pinocchio::SE3& des_state) {
+        return pin_data_->oMi[joint_id].actInv(des_state);
+    }
+
+    void SingleRigidBodyModel::ComputeJacobianForIK(const mpc::vector_t& q, const pinocchio::SE3& error,
+                                                    int id, Eigen::Matrix<double, 6, Eigen::Dynamic>& J,
+                                                    bool is_frame) {
+        if (is_frame) {
+            pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, id, J);
+        } else {
+            pinocchio::computeJointJacobian(pin_model_, *pin_data_, q, id, J);
+            pinocchio::Data::Matrix6 Jlog;
+            pinocchio::Jlog6(error.inverse(), Jlog);
+            J = -Jlog * J;
+        }
     }
 
 } // mpc

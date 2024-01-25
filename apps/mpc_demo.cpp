@@ -51,7 +51,6 @@ int main() {
     // Read in the inital config and parse it for MPC.
     vector_t standing = config.ParseEigenVector("init_config");
     vector_t init_state = config.ParseEigenVector("srbd_init");
-    init_state(2) -= 0.1;
 //    init_state.tail(standing.size()) = standing;
 
     // Create the warm start
@@ -59,7 +58,6 @@ int main() {
 
     // Create the goal state
     vector_t mpc_des_state = init_state;
-    mpc_des_state(2) += 0.1;
     mpc_des_state.head<2>() << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
 
     // Inital guess end effector positions
@@ -120,12 +118,15 @@ int main() {
     // Visualize results
     simulation::Visualizer viz(config.ParseString("robot_xml"));
     robot->SetSimModel(viz.GetModel());
+    vector_t state = standing;
     for (int i = 0; i < info.num_nodes + 200; i++) {
-        vector_t temp_state = mpc.GetFullTargetState(i*info.integrator_dt);
-        viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(mpc.GetTargetConfig(i*info.integrator_dt)));
+        // Only grabbing the COM states for now (for debugging)
+        state.head<7>() = mpc.GetFullTargetState(i*info.integrator_dt, state).head<7>();
+
+        viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(state)); //mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.GetTrajViz(mpc.CreateVizData());
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
-        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
+        prev_traj = mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), prev_traj.GetState(1), i*info.integrator_dt);
 
         // Gait optimization
 //        if (i == 0) {
@@ -153,7 +154,7 @@ int main() {
 //        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
 //        }
 
-        prev_traj = mpc.GetTrajectory();
+//        prev_traj = mpc.GetTrajectory();
     }
 
     // Print the final trajectory to a file for viewing

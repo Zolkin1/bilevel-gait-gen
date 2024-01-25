@@ -55,6 +55,8 @@ namespace mpc {
         virtual vector_t ConvertManifoldStateToTangentState(const vector_t& state, const vector_t& ref_state) const = 0;
         virtual vector_t ConvertTangentStateToManifoldState(const vector_t& state, const vector_t& ref_state) const = 0;
 
+        int GetFullModelConfigSpace() const;
+
     protected:
         virtual void ConvertMPCStateToPinocchioState(const vector_t& state, Eigen::Ref<vector_t> q_pin) const = 0;
 

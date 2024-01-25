@@ -100,7 +100,7 @@ namespace mpc {
         // TODO: Do I really need this?
         controller::Contact GetDesiredContacts(double time) const;
 
-        vector_t GetFullTargetState(double time) const;
+//        virtual vector_t GetFullTargetState(double time) = 0;
 
         Trajectory GetTrajectory() const;
 

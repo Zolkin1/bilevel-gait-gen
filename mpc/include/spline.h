@@ -48,7 +48,8 @@ namespace mpc {
         enum SplineType {
             Normal = 0,
             PositionZ = 1,
-            Force = 2
+            Constants = 2,
+            Force = 3
         };
 
         /**
@@ -161,6 +162,10 @@ namespace mpc {
 
         vector_t ComputeCoefPartialWrtTime(double time, int time_idx) const;
 
+        bool IsStartPairConstant() const;
+
+        bool IsEndPairConstant() const;
+
     protected:
     private:
         double Getx0Coef(double time, double DeltaT) const;
@@ -201,6 +206,9 @@ namespace mpc {
         int num_all_poly_vars;
 
         SplineType type_;
+
+        bool start_pair_;
+        bool end_pair_;
     };
 } // mpc
 

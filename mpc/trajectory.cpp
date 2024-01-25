@@ -126,21 +126,49 @@ namespace mpc {
     void Trajectory::UpdatePositionSpline(int end_effector, int coord, const vector_t& vars) {
         int idx = 0;
         for (int i = 0; i < end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes(); i++) {
-            int num_vars = end_effector_pos_.at(end_effector).at(coord).GetNumPolyVars(i);
+            // TODO: The below only works with constant splines (see commented code for otherwise)
+            std::vector<double> temp(1);
+            temp.at(0) = vars.segment(idx, 1)(0);
 
-            std::vector<double> temp(num_vars);
-            for (int j = 0; j < num_vars; j++) {
-                temp.at(j) = vars.segment(idx, num_vars)(j);
+            if (i == 0) {
+                end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
+                if (end_effector_pos_.at(end_effector).at(coord).IsStartPairConstant()) {
+                    end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i + 1, temp);
+                    i++;
+                }
+            } else if (i == end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes()-2) {
+                end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
+                if (end_effector_pos_.at(end_effector).at(coord).IsEndPairConstant()) {
+                    end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i + 1, temp);
+                    i++;
+                }
+            } else {
+                end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
+                if (i != end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes()-1) {
+                    end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i + 1, temp);
+                    i++;
+                }
             }
-            end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
 
-            if (num_vars == 1 && i+1 < end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes() &&
-            end_effector_pos_.at(end_effector).at(coord).GetNumPolyVars(i+1) == 1) {
-                // Set then skip the additional constant term
-                end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i+1, temp);
-                i++;
-            }
-            idx += num_vars;
+            idx++;
+
+
+//            int num_vars = end_effector_pos_.at(end_effector).at(coord).GetNumPolyVars(i);
+//
+//            std::vector<double> temp(num_vars);
+//            for (int j = 0; j < num_vars; j++) {
+//                temp.at(j) = vars.segment(idx, num_vars)(j);
+//            }
+//            end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
+
+//            if (num_vars == 1 && i+1 < end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes() &&
+//            end_effector_pos_.at(end_effector).at(coord).GetNumPolyVars(i+1) == 1) {
+//                // Set then skip the additional constant term
+//                end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i+1, temp);
+//                i++;
+//            }
+//            idx += num_vars;
+
         }
     }
 
@@ -317,7 +345,16 @@ namespace mpc {
 
     void Trajectory::SetEndEffectorSplines(int ee, const Spline& force_spline, const Spline& pos_spline) {
         for (int coord = 0; coord < POS_VARS; coord++) {
-            end_effector_pos_.at(ee).at(coord) = pos_spline;
+            if (coord == 2) {
+                std::vector<double> times(pos_spline.GetNumPolyTimes()-1);
+                for (int i = 0; i < times.size(); i++) {
+                    times.at(i) = pos_spline.GetPolyTimes().at(i+1);
+                }
+                Spline position1(2, times, true, Spline::Normal);
+                end_effector_pos_.at(ee).at(coord) = position1;
+            } else {
+                end_effector_pos_.at(ee).at(coord) = pos_spline;
+            }
             forces_.at(ee).at(coord) = force_spline;
         }
 

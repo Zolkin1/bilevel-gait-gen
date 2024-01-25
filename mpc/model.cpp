@@ -71,4 +71,8 @@ namespace mpc {
         return 0;
     }
 
+    int Model::GetFullModelConfigSpace() const {
+        return pin_model_.nq;
+    }
+
 } // mpc

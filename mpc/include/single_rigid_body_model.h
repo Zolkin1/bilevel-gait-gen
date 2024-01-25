@@ -14,8 +14,11 @@
 namespace mpc {
     using vector_t = Eigen::VectorXd;
     using vector_3t = Eigen::Vector3d;
+
+    // TODO: Make in the Model namespace
     using tan_state_t = Eigen::Vector<double, 12>;
     using man_state_t = Eigen::Vector<double, 13>;
+
     using matrix_t =  Eigen::MatrixXd;
     using vector6_t = Eigen::Vector<double, 6>;
     using matrix_3t = Eigen::Matrix3Xd;
@@ -60,6 +63,9 @@ namespace mpc {
 
         vector_3t GetCOMToHip(int end_effector) const;
 
+        vector_t InverseKinematics(const man_state_t& state, vector_3t end_effector_location, int end_effector,
+                                   const vector_t& state_guess);
+
         static constexpr int QUAT_SIZE = 4;
         static constexpr int QUAT_START = 6;
         static constexpr int ORIENTATION_START = 6;
@@ -68,6 +74,12 @@ namespace mpc {
         static constexpr int POS_START = 0;
     protected:
         void ConvertMPCStateToPinocchioState(const vector_t& state, Eigen::Ref<vector_t> q_pin) const override;
+
+        pinocchio::SE3 GetSE3Error(int joint_id, const pinocchio::SE3& des_state);
+
+        void ComputeJacobianForIK(const vector_t& q, const pinocchio::SE3& error,
+                                  int id, Eigen::Matrix<double, 6, Eigen::Dynamic>& J,
+                                  bool is_frame);
 
         const int num_tangent_states_;
         const int num_manifold_states_;

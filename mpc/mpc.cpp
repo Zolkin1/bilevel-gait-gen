@@ -230,7 +230,7 @@ namespace mpc {
             data_.cost_mat_.SetMatrix(Q_, node*num_states_, node*num_states_);
         }
         if (Q_forces_.size() > 0) {
-//            data_.cost_mat_.SetMatrix(Q_forces_, GetForceSplineStartIdx(), GetForceSplineStartIdx());
+            data_.cost_mat_.SetMatrix(Q_forces_, GetForceSplineStartIdx(), GetForceSplineStartIdx());
         }
     }
 
@@ -282,8 +282,8 @@ namespace mpc {
                 times.push_back(0.6);
                 times.push_back(0.8);
 
-                Spline position1(2, times, true, Spline::Normal);
-                Spline position2(2, times, false, Spline::Normal);
+                Spline position1(1, times, true, Spline::Constants);
+                Spline position2(1, times, false, Spline::Constants);
 
                 Spline force1(num_polys, times, false, Spline::Force);
                 Spline force2(num_polys, times, true, Spline::Force);
@@ -344,11 +344,6 @@ namespace mpc {
     vector_t MPC::GetTargetConfig(double time) const {
         int node = floor((time - init_time_)/info_.integrator_dt);
         return prev_traj_.GetStates().at(node).tail(num_states_ - 5);
-    }
-
-    vector_t MPC::GetFullTargetState(double time) const {
-        int node = floor((time - init_time_)/info_.integrator_dt);
-        return prev_traj_.GetStates().at(node);
     }
 
     vector_t MPC::GetForceTarget(double time) const {

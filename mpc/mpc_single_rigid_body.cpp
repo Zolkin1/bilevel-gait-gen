@@ -10,13 +10,12 @@ namespace mpc {
      * TODO items for week of 1/22/24
      *  - Dynamics are not correct (at least COM position not updating properly based on COM linear momentum)
      *  --- Dynamics look better now (1/22/24)
-     *  - Check why the spline variables don't get updated
-     *  - Check why the step norm is relatively high even after convergence (hopefully due to derivative terms)
-     *  - Verify why good steps are being rejected
-     *  - Check why the optimal cost is so high (most likely due to a dynamics error)
      *
      *  1/22/24:
      *  - Force box constraint doesn't seem to work, friction cone constraints look ok
+     *
+     *  I think I need to constrain or penalize the force (and probably specifically its derivative)
+     *  I think this is contributing to some of the extreme motions.
      */
 
     MPCSingleRigidBody::MPCSingleRigidBody(const mpc::MPCInfo& info, const std::string& robot_urdf) :
@@ -230,7 +229,7 @@ namespace mpc {
 //            get_dyn_timer.PrintElapsedTime();
             data_.constraint_mat_.SetMatrix(A_, constraint_idx_ + (node + 1) * num_states_, node * num_states_);
 
-            data_.constraint_mat_.SetDiagonalMatrix(-1, constraint_idx_ +(node + 1) * num_states_,
+            data_.constraint_mat_.SetDiagonalMatrix(-1, constraint_idx_ + (node + 1) * num_states_,
                                                     (node + 1) * num_states_, num_states_);
 
 //            const matrix_t B_forces = B_.leftCols(force_spline_vars);
@@ -328,13 +327,13 @@ namespace mpc {
 
     std::vector<std::vector<Eigen::Vector3d>> MPCSingleRigidBody::CreateVizData() {
         // TODO: DMA
-        std::vector<std::vector<Eigen::Vector3d>> fk_traj;
+        std::vector<std::vector<Eigen::Vector3d>> fk_traj(num_ee_+1);
         for (int ee = 0; ee < 5; ee++) {
             for (int node = 0; node < info_.num_nodes+1; node++) {
                 if (ee == 4) {
-                    fk_traj.at(ee).at(node) = model_.GetCOMPosition(prev_traj_.GetState(node));
+                    fk_traj.at(ee).push_back(model_.GetCOMPosition(prev_traj_.GetState(node)));
                 } else {
-                    fk_traj.at(ee).at(node) = prev_traj_.GetEndEffectorLocation(ee, GetTime(node));
+                    fk_traj.at(ee).push_back(prev_traj_.GetEndEffectorLocation(ee, GetTime(node)));
                 }
             }
         }
@@ -347,6 +346,7 @@ namespace mpc {
         data_.InitQPMats();
     }
 
+    // TODO: Make this also constrain the z axis
     void MPCSingleRigidBody::AddEELocationConstraints() {
         // TODO: Do I need a rotation matrix?
         int idx = 0;
@@ -354,7 +354,7 @@ namespace mpc {
         const int pos_start_idx = GetPosSplineStartIdx();
 
         // Note: Bounds are given for the 2D space centered under the hip
-        const Eigen::Vector2d bounds = {0.5, 0.5};
+        const Eigen::Vector2d bounds = {0.1, 0.1}; // TODO: 0.5 has better convergence
 
         // TODO: DMA
         matrix_t A(data_.num_ee_location_constraints_, data_.num_decision_vars);
@@ -366,11 +366,11 @@ namespace mpc {
                 data_.ee_location_lb_.segment<2>(idx) = -bounds + model_.GetCOMToHip(ee).head<2>();
 
                 for (int coord = 0; coord < 2; coord++) {
-                    A(idx, node*num_states_ + coord) =
-                            -1;
+                    A(idx, node*num_states_ + coord) = -1;
 
                     int vars_idx, vars_affecting;
-                    std::tie(vars_idx, vars_affecting) = prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
+                    std::tie(vars_idx, vars_affecting) =
+                            prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
 
                     // TODO: DMA
                     vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position, ee, coord, GetTime(node));
@@ -380,7 +380,6 @@ namespace mpc {
                             1, vars_affecting) = vars_lin.transpose();
                     idx++;
                 }
-
             }
         }
 
@@ -390,6 +389,32 @@ namespace mpc {
         assert(idx == data_.num_ee_location_constraints_);
     }
 
+    vector_t MPCSingleRigidBody::GetFullTargetState(double time, const vector_t& prev_state) {
+        int node = GetNode(time);
+
+        vector_t state(model_.GetFullModelConfigSpace());
+
+        // Craft the vector and return
+        man_state_t mpc_state = prev_traj_.GetState(node);
+        state.head<7>() << mpc_state.head<POS_VARS>(), mpc_state.segment<4>(6);
+
+        int idx = 7;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            // Grab state and end effector locations at that time
+            vector_3t ee_location = prev_traj_.GetEndEffectorLocation(ee, time);
+
+            // Compute IK to get the joint angles
+            // TODO: put this back in after debugging
+//            vector_t ik_joints = model_.InverseKinematics(prev_traj_.GetState(node),
+//                                                             ee_location, ee, prev_state);
+            vector_t ik_joints = vector_t::Zero(3);
+
+            state.segment(idx, ik_joints.size()) = ik_joints;
+            idx += ik_joints.size();
+        }
+
+        return state;
+    }
 
 //    bool MPCSingleRigidBody::ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) {
 //        if (solve_type_.at(solve_type_.size()-1) == "Solved") {

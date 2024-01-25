@@ -14,9 +14,12 @@ namespace mpc {
 
         Trajectory Solve(const vector_t& state, double init_time) override;
 
-        virtual vector_t ConvertTrajToQPVec(const Trajectory& traj) const override;
+        vector_t ConvertTrajToQPVec(const Trajectory& traj) const override;
 
-        virtual std::vector<std::vector<Eigen::Vector3d>> CreateVizData();
+        std::vector<std::vector<Eigen::Vector3d>> CreateVizData() override;
+
+        vector_t GetFullTargetState(double time, const vector_t& state_guess);
+
     protected:
         void AddDynamicsConstraints(const vector_t& state) override;
 

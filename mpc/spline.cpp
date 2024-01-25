@@ -23,73 +23,95 @@ namespace mpc {
         poly_vars_.push_back(ZERO_CONSTANT);
         poly_times_.push_back(0);
 
-        num_all_poly_vars++;
-        num_constant_++;
-
-        int mut_idx = 0;
-        for (int time_idx = 0; time_idx < times.size(); time_idx++) {
-            if (start_on_constant_) {
-                if ((time_idx) % 2 == 0) {      // On a constant
-                    poly_vars_.push_back(ZERO_CONSTANT);
-                    num_constant_++;
-                    total_poly_++;
+        if (type == SplineType::Constants) {
+            for (int idx = 0; idx < times.size(); idx++) {
+                poly_vars_.push_back(ZERO_CONSTANT);
+                num_constant_++;
+                total_poly_++;
+                poly_times_.push_back(times.at(idx));
+                if (!(idx%2)){
                     num_all_poly_vars++;
-
-                    if (time_idx != 0) {
-                        poly_times_.push_back(times.at(time_idx-1));
-                        poly_vars_.push_back(ZERO_CONSTANT);
-                    }
-                    poly_times_.push_back(times.at(time_idx));
-                } else {        // On a polynomial
-                    total_poly_ += num_polys_;
-                    for (int i = 0; i < num_polys_ - 1; i++) {
-                        poly_vars_.push_back(ZERO_POLY);
-                        poly_times_.push_back((times.at(time_idx) - times.at(time_idx - 1))/num_polys
-                        + poly_times_.at(poly_times_.size()-1));
-
-                        num_all_poly_vars += 2;
-                    }
-
-//                    poly_times_.push_back(times.at(time_idx));
                 }
+            }
+            if (!(times.size()&2)){
+                num_all_poly_vars++;
+                end_pair_ = false;
             } else {
-                if ((time_idx + 1) % 2 == 0) {      // On a constant
-                    poly_vars_.push_back(ZERO_CONSTANT);
-                    poly_vars_.push_back(ZERO_CONSTANT);
-                    num_constant_++;
-                    total_poly_++;
-                    total_poly_++;
+                end_pair_ = true;
+            }
+            num_constant_++;
+            total_poly_++;
+            start_pair_ = true;
+        } else {
 
-                    num_all_poly_vars++;
+            num_all_poly_vars++;
+            num_constant_++;
 
-                    poly_times_.push_back(times.at(time_idx-1));
-                    poly_times_.push_back(times.at(time_idx));
-                } else {        // On a polynomial
-                    total_poly_ += num_polys_;
+            int mut_idx = 0;
+            for (int time_idx = 0; time_idx < times.size(); time_idx++) {
+                if (start_on_constant_) {
+                    if ((time_idx) % 2 == 0) {      // On a constant
+                        poly_vars_.push_back(ZERO_CONSTANT);
+                        num_constant_++;
+                        total_poly_++;
+                        num_all_poly_vars++;
 
-                    for (int i = 0; i < num_polys_ - 1; i++) {
-                        if (time_idx == 0) {
-                            poly_times_.push_back(times.at(time_idx)/num_polys + poly_times_.at(poly_times_.size()-1));
-                        } else {
+                        if (time_idx != 0) {
+                            poly_times_.push_back(times.at(time_idx - 1));
+                            poly_vars_.push_back(ZERO_CONSTANT);
+                        }
+                        poly_times_.push_back(times.at(time_idx));
+                    } else {        // On a polynomial
+                        total_poly_ += num_polys_;
+                        for (int i = 0; i < num_polys_ - 1; i++) {
+                            poly_vars_.push_back(ZERO_POLY);
                             poly_times_.push_back((times.at(time_idx) - times.at(time_idx - 1)) / num_polys
-                                                  + poly_times_.at(poly_times_.size()-1));
+                                                  + poly_times_.at(poly_times_.size() - 1));
+
+                            num_all_poly_vars += 2;
                         }
 
-                        poly_vars_.push_back(ZERO_POLY);
+//                    poly_times_.push_back(times.at(time_idx));
+                    }
+                } else {
+                    if ((time_idx + 1) % 2 == 0) {      // On a constant
+                        poly_vars_.push_back(ZERO_CONSTANT);
+                        poly_vars_.push_back(ZERO_CONSTANT);
+                        num_constant_++;
+                        total_poly_++;
+                        total_poly_++;
 
-                        num_all_poly_vars+=2;
+                        num_all_poly_vars++;
 
+                        poly_times_.push_back(times.at(time_idx - 1));
+                        poly_times_.push_back(times.at(time_idx));
+                    } else {        // On a polynomial
+                        total_poly_ += num_polys_;
+
+                        for (int i = 0; i < num_polys_ - 1; i++) {
+                            if (time_idx == 0) {
+                                poly_times_.push_back(
+                                        times.at(time_idx) / num_polys + poly_times_.at(poly_times_.size() - 1));
+                            } else {
+                                poly_times_.push_back((times.at(time_idx) - times.at(time_idx - 1)) / num_polys
+                                                      + poly_times_.at(poly_times_.size() - 1));
+                            }
+
+                            poly_vars_.push_back(ZERO_POLY);
+
+                            num_all_poly_vars += 2;
+
+                        }
                     }
                 }
             }
-        }
-
-        // Add final elements
-        if ((start_on_constant_ && (times.size()) % 2 == 0) || (!start_on_constant_ && (times.size()-1) % 2 == 0)) {
-            poly_vars_.push_back(ZERO_CONSTANT);
-            poly_times_.push_back(times.at(times.size()-1));
-            num_constant_++;
-            num_all_poly_vars++;
+            // Add final elements
+            if ((start_on_constant_ && (times.size()) % 2 == 0) || (!start_on_constant_ && (times.size()-1) % 2 == 0)) {
+                poly_vars_.push_back(ZERO_CONSTANT);
+                poly_times_.push_back(times.at(times.size()-1));
+                num_constant_++;
+                num_all_poly_vars++;
+            }
         }
 
         switch (type) {
@@ -107,6 +129,7 @@ namespace mpc {
                 }
                 break;
             case Normal:
+            case Constants:
             default:
                 for (const auto& poly_var : poly_vars_) {
                     mut_flags_.emplace_back(true);
@@ -253,8 +276,15 @@ namespace mpc {
                 }
             }
             // Constants are always followed by redundant constants
-            if (poly_vars_.at(poly).size() == 1 && poly < poly_vars_.size()-1 && poly_vars_.at(poly+1).size() == 1) {
-                poly++;
+            if (type_ == Constants) {
+                if (!(poly%2)) {
+                    poly++;
+                }
+            } else {
+                if (poly_vars_.at(poly).size() == 1 && poly < poly_vars_.size() - 1 &&
+                    poly_vars_.at(poly + 1).size() == 1) {
+                    poly++;
+                }
             }
         }
 
@@ -359,6 +389,7 @@ namespace mpc {
 
     bool Spline::IsConstantPoly(int idx) const {
         return (poly_vars_.at(idx).size() == 1 && poly_vars_.at(idx-1).size() == 1);
+        //&& poly_vars_.at(idx).at(0) == poly_vars_.at(idx-1).at(0));
     }
 
     std::pair<int, int> Spline::GetVarsIndexEnd(double time) const {
@@ -458,37 +489,51 @@ namespace mpc {
         std::vector<double> const ZERO_POLY = {0, 0};
         bool added_constant = false;
 
-        if (poly_vars_.at(end_idx).size() == 1 && poly_vars_.at(end_idx-1).size() == 1) {
-            // External and internal change
-            for (int i = 0; i < num_polys_-1; i++) {
-                poly_vars_.push_back(ZERO_POLY);
-                total_poly_++;
-                num_all_poly_vars+=2;
-                poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time/num_polys_);
-                mut_flags_.emplace_back(true);
-            }
-
-            // Internal and external change
+        if (type_ == Constants) {
             poly_vars_.push_back(ZERO_CONSTANT);
-            poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time/num_polys_);
-            num_constant_++;
             total_poly_++;
-
-            if (type_ == Normal) {
-                mut_flags_.emplace_back(true);
+            num_constant_++;
+            if (start_pair_ && !(poly_times_.size()%2) || !start_pair_ && (poly_times_.size()%2)) {
                 num_all_poly_vars++;
+                end_pair_ = false;
             } else {
-                mut_flags_.emplace_back(false);
+                end_pair_ = true;
             }
-        } else {
-            // Internal and external change
-            poly_vars_.push_back(ZERO_CONSTANT);
             poly_times_.push_back(poly_times_.at(poly_times_.size()-1) + time);
+            mut_flags_.push_back(true);
+        } else {
+            if (poly_vars_.at(end_idx).size() == 1 && poly_vars_.at(end_idx - 1).size() == 1) {
+                // External and internal change
+                for (int i = 0; i < num_polys_ - 1; i++) {
+                    poly_vars_.push_back(ZERO_POLY);
+                    total_poly_++;
+                    num_all_poly_vars += 2;
+                    poly_times_.push_back(poly_times_.at(poly_times_.size() - 1) + time / num_polys_);
+                    mut_flags_.emplace_back(true);
+                }
 
-            if (type_ == Normal) {
-                mut_flags_.emplace_back(true);
+                // Internal and external change
+                poly_vars_.push_back(ZERO_CONSTANT);
+                poly_times_.push_back(poly_times_.at(poly_times_.size() - 1) + time / num_polys_);
+                num_constant_++;
+                total_poly_++;
+
+                if (type_ == Normal) {
+                    mut_flags_.emplace_back(true);
+                    num_all_poly_vars++;
+                } else {
+                    mut_flags_.emplace_back(false);
+                }
             } else {
-                mut_flags_.emplace_back(false);
+                // Internal and external change
+                poly_vars_.push_back(ZERO_CONSTANT);
+                poly_times_.push_back(poly_times_.at(poly_times_.size() - 1) + time);
+
+                if (type_ == Normal || type_ == Constants) {
+                    mut_flags_.emplace_back(true);
+                } else {
+                    mut_flags_.emplace_back(false);
+                }
             }
         }
     }
@@ -498,12 +543,17 @@ namespace mpc {
             if (poly_times_.at(i+1) < time && poly_times_.at(i) < time) {
                 if (IsConstantPoly(i+1)) {
                     // Then we are getting rid of the first part of a constant, which is just an internal change
-
+                    if (poly_vars_.at(i) != poly_vars_.at(i+1) && type_ == Constants) {
+                        num_all_poly_vars--;
+                        start_pair_ = true;
+                    } else {
+                        start_pair_ = false;
+                    }
                 } else if (poly_vars_.at(i).size() == 1) {
                     // Then we are removing the last part of a constant segment
                     total_poly_--;
                     num_constant_--;
-                    if (type_ == Normal) {
+                    if (type_ == Normal || type_ == Constants) {
                         num_all_poly_vars--;
                     }
                 } else {
@@ -667,6 +717,14 @@ namespace mpc {
         } else {
             return -pow(DeltaT, -2)* pow(time, 2) - 2*pow(DeltaT, -3)*pow(time, 3);
         }
+    }
+
+    bool Spline::IsStartPairConstant() const {
+        return start_pair_;
+    }
+
+    bool Spline::IsEndPairConstant() const {
+        return end_pair_;
     }
 
 } // mpc
