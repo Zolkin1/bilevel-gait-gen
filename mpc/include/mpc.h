@@ -59,11 +59,14 @@ namespace mpc {
     public:
         MPC(const MPCInfo& info, const std::string& robot_urdf);
 
-        Trajectory CreateInitialRun(const vector_t& state);
+        // TODO: Figure out how to not explicitly pass the ee location
+        Trajectory CreateInitialRun(const vector_t& state, const std::vector<vector_3t>& ee_start_locations);
 
-        Trajectory GetRealTimeUpdate(double run_time_iters, const vector_t& state, double init_time);
+        Trajectory GetRealTimeUpdate(double run_time_iters, const vector_t& state, double init_time,
+                                     const std::vector<vector_3t>& ee_start_locations);
 
-        virtual Trajectory Solve(const vector_t& state, double init_time) = 0;
+        virtual Trajectory Solve(const vector_t& state, double init_time,
+                                 const std::vector<vector_3t>& ee_start_locations) = 0;
 
         void SetWarmStartTrajectory(const Trajectory& trajectory);
 

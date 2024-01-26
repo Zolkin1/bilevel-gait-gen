@@ -35,14 +35,13 @@ namespace mpc {
                     num_all_poly_vars++;
                 }
             }
-            if (!(times.size()&2) && start_on_constant_){
+            if (!(times.size()%2) && start_on_constant_){
                 num_all_poly_vars++;
                 end_pair_ = false;
             }
             num_constant_++;
             total_poly_++;
             if (!start_on_constant_) {
-                num_all_poly_vars++;
                 num_all_poly_vars++;
             }
         } else {
@@ -282,7 +281,9 @@ namespace mpc {
             }
             // Constants are always followed by redundant constants
             if (type_ == Constants) {
-                if (!(poly%2)) {
+                if ((start_pair_ && poly == 0) || (end_pair_ && poly == poly_vars_.size()-2)) {
+                    poly++;
+                } else if (poly != 0 && poly != poly_vars_.size()-2) {
                     poly++;
                 }
             } else {
@@ -314,82 +315,145 @@ namespace mpc {
 
     vector_t Spline::GetPolyVarsLin(double time) const {
         int i = GetPolyIdx(time);
+        if (type_ == Constants) {
+            int idx = i;
+            if (start_pair_ && idx == 1) {
+                vector_t vars(1);
+                vars << 1;
+                return vars;
+            }
 
-        if (IsConstantPoly(i)) {
-            vector_t vars(1);
-            vars << 1;
-            return vars;
+            if (end_pair_ && idx == poly_times_.size()-1) {
+                vector_t vars(1);
+                vars << 1;
+                return vars;
+            }
+
+            if (start_pair_ && idx%2) {
+                vector_t vars(1);
+                vars << 1;
+                return vars;
+            }
+
+            if (end_pair_ && !(idx%2)) {  // !start_pair
+                vector_t vars(1);
+                vars << 1;
+                return vars;
+            }
+
+            if (start_pair_) {
+                assert(!(idx%2));
+                const double DeltaT = poly_times_.at(i) - poly_times_.at(i - 1);
+                time = time - poly_times_.at(i - 1);
+
+                vector_t vars(2);
+                vars(0) = Getx0Coef(time, DeltaT);
+                vars(1) = Getx1Coef(time, DeltaT);
+
+                return vars;
+            }
+
+            if (end_pair_) {
+                assert(idx%2);
+                const double DeltaT = poly_times_.at(i) - poly_times_.at(i - 1);
+                time = time - poly_times_.at(i - 1);
+
+                vector_t vars(2);
+                vars(0) = Getx0Coef(time, DeltaT);
+                vars(1) = Getx1Coef(time, DeltaT);
+
+                return vars;
+            }
+
+            if (idx%2) {
+                const double DeltaT = poly_times_.at(i) - poly_times_.at(i - 1);
+                time = time - poly_times_.at(i - 1);
+
+                vector_t vars(2);
+                vars(0) = Getx0Coef(time, DeltaT);
+                vars(1) = Getx1Coef(time, DeltaT);
+
+                return vars;
+            } else {
+                vector_t vars(1);
+                vars << 1;
+                return vars;
+            }
+        } else {
+            if (IsConstantPoly(i)) {
+                vector_t vars(1);
+                vars << 1;
+                return vars;
+            }
+
+            // Polynomial
+            const double DeltaT = poly_times_.at(i) - poly_times_.at(i - 1);
+            time = time - poly_times_.at(i - 1);
+
+            if (mut_flags_.at(i) && mut_flags_.at(i - 1)) {
+                if (poly_vars_.at(i).size() == 1) {
+                    // Final time derivative is fixed at 0
+                    vector_t vars = vector_t::Zero(3);
+                    vars(0) = Getx0Coef(time, DeltaT);          // x0 coef
+                    vars(2) = Getx1Coef(time, DeltaT);         // x1 coef
+                    vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
+                    return vars;
+                } else if (poly_vars_.at(i - 1).size() == 1) {
+                    // Initial time derivative is fixed at 0
+                    vector_t vars = vector_t::Zero(3);
+                    vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
+                    vars(1) = Getx1Coef(time, DeltaT);         // x1 coef
+                    vars(2) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
+
+                    return vars;
+                } else {
+                    vector_t vars = vector_t::Zero(4);
+                    vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
+                    vars(2) = Getx1Coef(time, DeltaT);         // x1 coef
+
+                    vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
+                    vars(3) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
+                    return vars;
+                }
+            } else if (mut_flags_.at(i)) {
+                if (poly_vars_.at(i).size() == 1) {
+                    // Final time derivative is fixed at 0
+                    vector_t vars = vector_t::Zero(1);
+                    vars(0) = Getx1Coef(time, DeltaT);         // x1 coef
+                    return vars;
+                } else if (poly_vars_.at(i - 1).size() == 1) {
+                    // Initial time derivative is fixed at 0
+                    vector_t vars = vector_t::Zero(2);
+                    vars(0) = Getx1Coef(time, DeltaT);         // x1 coef
+                    vars(1) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
+                    return vars;
+                } else {
+                    vector_t vars = vector_t::Zero(2);
+                    vars(0) = Getx1Coef(time, DeltaT);         // x1 coef
+                    vars(1) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
+                    return vars;
+                }
+            } else if (mut_flags_.at(i - 1)) {
+                if (poly_vars_.at(i).size() == 1) {
+                    // Final time derivative is fixed at 0
+                    vector_t vars = vector_t::Zero(2);
+                    vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
+                    vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
+                    return vars;
+                } else if (poly_vars_.at(i - 1).size() == 1) {
+                    // Initial time derivative is fixed at 0
+                    vector_t vars = vector_t::Zero(1);
+                    vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
+                    return vars;
+                } else {
+                    vector_t vars = vector_t::Zero(2);
+                    vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
+                    vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
+                    return vars;
+                }
+            }
+            throw std::runtime_error("Reached bad spot. PolyVarsLin");
         }
-
-        // Polynomial
-        double DeltaT = poly_times_.at(i) - poly_times_.at(i-1);
-        time = time - poly_times_.at(i-1);
-
-        if (mut_flags_.at(i) && mut_flags_.at(i-1)) {
-            if (poly_vars_.at(i).size() == 1) {
-                // Final time derivative is fixed at 0
-                vector_t vars = vector_t::Zero(3);
-                vars(0) = Getx0Coef(time, DeltaT);          // x0 coef
-                vars(2) = Getx1Coef(time, DeltaT);         // x1 coef
-                vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
-                return vars;
-            } else if (poly_vars_.at(i - 1).size() == 1) {
-                // Initial time derivative is fixed at 0
-                vector_t vars = vector_t::Zero(3);
-                vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
-                vars(1) = Getx1Coef(time, DeltaT);         // x1 coef
-                vars(2) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
-
-                return vars;
-            } else {
-                vector_t vars = vector_t::Zero(4);
-                vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
-                vars(2) = Getx1Coef(time, DeltaT);         // x1 coef
-
-                vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
-                vars(3) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
-                return vars;
-            }
-        } else if (mut_flags_.at(i)) {
-            if (poly_vars_.at(i).size() == 1) {
-                // Final time derivative is fixed at 0
-                vector_t vars = vector_t::Zero(1);
-                vars(0) = Getx1Coef(time, DeltaT);         // x1 coef
-                return vars;
-            } else if (poly_vars_.at(i-1).size() == 1) {
-                // Initial time derivative is fixed at 0
-                vector_t vars = vector_t::Zero(2);
-                vars(0) = Getx1Coef(time, DeltaT);         // x1 coef
-                vars(1) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
-                return vars;
-            } else {
-                vector_t vars = vector_t::Zero(2);
-                vars(0) = Getx1Coef(time, DeltaT);         // x1 coef
-                vars(1) = Getx1dotCoef(time, DeltaT);                   // x1dot coef
-                return vars;
-            }
-        } else if (mut_flags_.at(i-1)) {
-            if (poly_vars_.at(i).size() == 1) {
-                // Final time derivative is fixed at 0
-                vector_t vars = vector_t::Zero(2);
-                vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
-                vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
-                return vars;
-            } else if (poly_vars_.at(i - 1).size() == 1) {
-                // Initial time derivative is fixed at 0
-                vector_t vars = vector_t::Zero(1);
-                vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
-                return vars;
-            } else {
-                vector_t vars = vector_t::Zero(2);
-                vars(0) = Getx0Coef(time, DeltaT);     // x0 coef
-                vars(1) = Getx0dotCoef(time, DeltaT);           // x0dot coef
-                return vars;
-            }
-        }
-
-        throw std::runtime_error("Reached bad spot. PolyVarsLin");
-
     }
 
     bool Spline::IsConstantPoly(int idx) const {
@@ -401,18 +465,44 @@ namespace mpc {
         // Given the index of the switching time, determine the start index of the (minimal) vars vector that
         // describes this polynomial
 
-//        if (time == poly_times_.at(0) && mut_flags_.at(0)) {
-//            int num_vars_affecting = 1;
-//            int vars_idx = 1;
-//            return std::pair<double, double>(vars_idx, num_vars_affecting);
-//        } else if (time == poly_times_.at(0)) {
-//            throw std::runtime_error("The polynomial is not mutable at the provided time.");
-//        }
-
         int idx = GetPolyIdx(time);
 
         if (!mut_flags_.at(idx) && !mut_flags_.at(idx-1)) {
             throw std::runtime_error("The polynomial is not mutable at the provided time.");
+        }
+
+        if (type_ == Constants) {
+            if (start_pair_ && idx == 1) {
+                return std::make_pair(1,1);
+            }
+
+            if (end_pair_ && idx == poly_times_.size()-1) {
+                return std::make_pair(std::floor(idx/2)+1, 1);
+            }
+
+            if (start_pair_ && idx%2) {
+                return std::make_pair(std::floor(idx/2)+1, 1);
+            }
+
+            if (end_pair_ && !(idx%2)) { // !start_pair_
+                return std::make_pair(idx/2, 1);
+            }
+
+            if (start_pair_) {
+                assert(!(idx%2));
+                return std::make_pair(((idx-2)/2)+2, 2);
+            }
+
+            if (end_pair_) {
+                assert(idx%2);
+                return std::make_pair((idx-1)/2+2, 2);
+            }
+
+            if (idx%2) {
+                return std::make_pair(2 + (idx-1)/2, 2);
+            } else {
+                return std::make_pair(2 + (idx-2)/2, 1);
+            }
         }
 
         int vars_idx = 0;
@@ -550,6 +640,8 @@ namespace mpc {
                     // Then we are getting rid of the first part of a constant, which is just an internal change
                     if (!start_pair_ && type_ == Constants) {
                         num_all_poly_vars--;
+                        num_constant_--;
+                        total_poly_--;
                         start_pair_ = true;
                     } else {
                         start_pair_ = false;

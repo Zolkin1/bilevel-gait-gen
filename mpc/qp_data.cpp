@@ -72,7 +72,7 @@ namespace mpc {
                     }
                     break;
                 case Constraints::EndEffectorLocation:
-                    num_constraints += num_ee_location_constraints_;
+                    num_constraints += num_ee_location_constraints_ + num_start_ee_constraints_;
                     break;
                 case Constraints::ForceBox:
                     num_constraints += num_force_box_constraints_;
@@ -116,6 +116,7 @@ namespace mpc {
                 case Constraints::EndEffectorLocation:
                     ee_location_lb_ = vector_t::Zero(num_ee_location_constraints_);
                     ee_location_ub_ = vector_t::Zero(num_ee_location_constraints_);
+                    start_ee_constants_ = vector_t::Zero(num_start_ee_constraints_);
                     break;
                 case Constraints::ForceBox:
                     force_box_lb_ = vector_t::Zero(num_force_box_constraints_);
@@ -197,6 +198,9 @@ namespace mpc {
                     lb_.segment(idx, num_ee_location_constraints_) = ee_location_lb_;
                     ub_.segment(idx, num_ee_location_constraints_) = ee_location_ub_;
                     idx += num_ee_location_constraints_;
+                    lb_.segment(idx, num_start_ee_constraints_) = start_ee_constants_;
+                    ub_.segment(idx, num_start_ee_constraints_) = start_ee_constants_;
+                    idx += num_start_ee_constraints_;
                     break;
                 case Constraints::ForceBox:
                     lb_.segment(idx, num_force_box_constraints_) = force_box_lb_;

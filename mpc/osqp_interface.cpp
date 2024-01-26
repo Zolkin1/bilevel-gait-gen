@@ -20,12 +20,13 @@ namespace mpc {
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setAbsoluteTolerance(1e-4);
         qp_solver_.settings()->setRelativeTolerance(1e-4);
-        qp_solver_.settings()->setScaledTerimination(false);
+        qp_solver_.settings()->setScaledTerimination(true);
         qp_solver_.settings()->setMaxIteration(1000);
-        qp_solver_.settings()->setRho(.01);
-//        qp_solver_.settings()->setAlpha(1.6);
+        qp_solver_.settings()->setRho(.0001);   // @Note: This makes a HUGE difference
+        qp_solver_.settings()->setAlpha(1.6);
+        qp_solver_.settings()->setSigma(1e-6);
         qp_solver_.settings()->setWarmStart(true);
-        qp_solver_.settings()->setScaling(10); // TODO: This has a pretty big effect on the timing and the solution quality
+        qp_solver_.settings()->setScaling(10);  // @Note: This has a pretty big effect on the timing and the solution quality
         qp_solver_.settings()->setLinearSystemSolver(1);
 
         prev_dual_sol_ = vector_t::Zero(data.GetTotalNumConstraints());
@@ -240,8 +241,8 @@ namespace mpc {
 
     void OSQPInterface::ConfigureForRealTime(double run_time_iters) const {
         qp_solver_.settings()->setPolish(false);
-        qp_solver_.settings()->setAbsoluteTolerance(1e-5);
-        qp_solver_.settings()->setRelativeTolerance(1e-6);
+        qp_solver_.settings()->setAbsoluteTolerance(1e-4);
+        qp_solver_.settings()->setRelativeTolerance(1e-4);
         qp_solver_.settings()->setMaxIteration(run_time_iters);
     }
 

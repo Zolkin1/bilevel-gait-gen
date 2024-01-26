@@ -79,6 +79,8 @@ namespace mpc {
         vector_t ee_location_lb_;
         vector_t ee_location_ub_;
 
+        vector_t start_ee_constants_;
+
         int num_dynamics_constraints;
         int num_decision_vars;
 
@@ -88,6 +90,7 @@ namespace mpc {
         int num_force_box_constraints_;
         int num_fk_ineq_constraints_;
         int num_ee_location_constraints_;
+        int num_start_ee_constraints_;
 
         QPData();
         QPData(bool constraint_projection, int constraint_mat_nnz, int cost_mat_nnz,

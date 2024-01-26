@@ -12,7 +12,8 @@ namespace mpc {
     public:
         MPCSingleRigidBody(const MPCInfo& info, const std::string& robot_urdf);
 
-        Trajectory Solve(const vector_t& state, double init_time) override;
+        Trajectory Solve(const vector_t& state, double init_time,
+                         const std::vector<vector_3t>& ee_start_locations) override;
 
         vector_t ConvertTrajToQPVec(const Trajectory& traj) const override;
 
@@ -23,7 +24,7 @@ namespace mpc {
     protected:
         void AddDynamicsConstraints(const vector_t& state) override;
 
-        void AddEELocationConstraints();
+        void AddEELocationConstraints(const std::vector<vector_3t>& ee_start_locations);
 
         int GetForceSplineStartIdx() const override;
         int GetPosSplineStartIdx() const override;

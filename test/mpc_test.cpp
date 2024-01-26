@@ -527,3 +527,97 @@ TEST_CASE("Force Spline", "[mpc][spline]") {
         REQUIRE_THAT(spline2.ValueAt(0.916), WithinAbs(2.0, MARGIN));
     }
 }
+
+TEST_CASE("Constant Splines", "[mpc][spline]") {
+    using namespace mpc;
+    using Catch::Matchers::WithinAbs;
+
+    std::vector<double> times;
+    times.push_back(0.35);
+    times.push_back(0.75);
+
+    constexpr double MARGIN = 5e-3;
+
+    // ----------- Basic Creation ----------- //
+    const int num_polys1 = 2;
+    Spline spline1 = Spline(num_polys1, times, true, Spline::Constants);
+
+    Spline spline2 = Spline(num_polys1, times, false, Spline::Constants);
+
+    REQUIRE(spline1.GetPolyTimes().size() == 3);
+    REQUIRE(spline1.GetEndTime() == 0.75);
+    REQUIRE(spline1.GetNumConstant() == 3);
+    REQUIRE(spline1.GetTotalPolyVars() == 2);
+    REQUIRE(spline1.GetNumPolyTimes() == 3);
+
+    for (int i = 0; i < spline1.GetPolyTimes().size(); i++) {
+        REQUIRE(spline1.GetPolyVars().at(i).size() == 1);
+    }
+
+
+    SECTION("Assigning values") {
+        const double position = 1;
+        spline1.SetAllPositions(position);
+        for (int i = 0; i < spline1.GetPolyVars().size(); i++) {
+            REQUIRE(spline1.GetPolyVars().at(i).at(0) == 1);
+        }
+
+        std::vector<double> vars = {3};
+        spline1.SetPolyVars(1, vars);
+        REQUIRE(spline1.GetPolyVars().at(1).at(0) == vars.at(0));
+    }
+
+    SECTION("Checking values") {
+        std::vector<double> end1 = {4};
+        spline1.UpdatePolyVar(1, end1);
+
+        REQUIRE(spline1.ValueAt(0) == 0);
+        REQUIRE_THAT(spline1.ValueAt(0.0965517), WithinAbs(0.745254, MARGIN));
+        REQUIRE_THAT(spline1.ValueAt(0.217241), WithinAbs(2.71007, MARGIN));
+        REQUIRE_THAT(spline1.ValueAt(0.35), WithinAbs(4, MARGIN));
+        REQUIRE_THAT(spline1.ValueAt(0.75), WithinAbs(0.0, MARGIN));
+    }
+
+    SECTION("Linearization/Coefficients") {
+        std::vector<double> end1 = {1};
+        std::vector<double> end2 = {2};
+        spline1.UpdatePolyVar(0, end1);
+        spline1.UpdatePolyVar(1, end2);
+        spline1.UpdatePolyVar(2, end2);
+
+        vector_t vars(2);
+        vars << 1, 2;
+
+        double time = 0;
+        while (time <= spline1.GetEndTime()) {
+            vector_t vars_coef = spline1.GetPolyVarsLin(time);
+
+            int vars_index, vars_affecting;
+            std::tie(vars_index, vars_affecting) = spline1.GetVarsIndexEnd(time);
+            REQUIRE(vars_affecting == vars_coef.size());
+
+            double lin_val = vars_coef.dot(vars.segment(vars_index-vars_affecting,vars_affecting));
+            REQUIRE_THAT(spline1.ValueAt(time), WithinAbs(lin_val, MARGIN));
+
+            time += 0.015;
+        }
+
+        spline2.UpdatePolyVar(0, end1);
+        spline2.UpdatePolyVar(1, end1);
+        spline2.UpdatePolyVar(2, end2);
+        time = 0;
+        while (time <= spline2.GetEndTime()) {
+            vector_t vars_coef = spline2.GetPolyVarsLin(time);
+
+            int vars_index, vars_affecting;
+            std::tie(vars_index, vars_affecting) = spline2.GetVarsIndexEnd(time);
+            REQUIRE(vars_affecting == vars_coef.size());
+
+            double lin_val = vars_coef.dot(vars.segment(vars_index-vars_affecting,vars_affecting));
+            REQUIRE_THAT(spline2.ValueAt(time), WithinAbs(lin_val, MARGIN));
+
+            time += 0.015;
+        }
+    }
+
+}

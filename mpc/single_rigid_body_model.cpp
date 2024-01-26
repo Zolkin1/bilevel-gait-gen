@@ -76,10 +76,16 @@ namespace mpc {
         A.block<3,3>(ORIENTATION_START, ANG_VEL_START) = Ir_inv_;
 
         // Angular momentum
-//        for (int i = 0; i < 3; i++) {
-//            A.block<3,1>(ANG_VEL_START, ANG_VEL_START + i).noalias() =
-//                    -Id.col(i).cross(Ir_*omega) - omega.cross(Ir_.col(i));
-//        }
+        for (int i = 0; i < 3; i++) {
+            // Omega dependence
+            A.block<3,1>(ANG_VEL_START, ANG_VEL_START + i).noalias() =
+                    -Id.col(i).cross(Ir_*omega) - omega.cross(Ir_.col(i));
+
+            // COM dependence
+            for (int ee = 0; ee < num_ee_; ee++) {
+                A.block<3, 1>(ANG_VEL_START, POS_START + i) += -Id.col(i).cross(traj.GetForce(ee, time));
+            }
+        }
 
 //        std::cout << A << std::endl;
         A_timer.StopTimer();
@@ -111,23 +117,23 @@ namespace mpc {
                             vars_lin.transpose();
 
                     // Angular momentum - force
-//                    for (int poly = 0; poly < vars_lin.size(); poly++) {
-//                        B.block(ANG_VEL_START, vars_idx - vars_affecting + poly, 3, 1).noalias() =
-//                                ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
-//                    }
+                    for (int poly = 0; poly < vars_lin.size(); poly++) {
+                        B.block(ANG_VEL_START, vars_idx - vars_affecting + poly, 3, 1).noalias() =
+                                ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
+                    }
                 }
 
                 // Angular momentum - position
-//                if (coord != 2) {
-//                    // TODO: DMA
-//                    vector_t vars_lin = traj.GetSplineLin(Trajectory::SplineTypes::Position, ee, coord, time);
-//                    int vars_idx, vars_affecting;
-//                    std::tie(vars_idx, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
-//                    for (int poly = 0; poly < vars_lin.size(); poly++) {
-//                        B.block(ANG_VEL_START, pos_spline_start + vars_idx - vars_affecting + poly, 3, 1).noalias() =
-//                                Id.col(coord).cross(force) * vars_lin(poly);
-//                    }
-//                }
+                if (coord != 2) {
+                    // TODO: DMA
+                    vector_t vars_lin = traj.GetSplineLin(Trajectory::SplineTypes::Position, ee, coord, time);
+                    int vars_idx, vars_affecting;
+                    std::tie(vars_idx, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
+                    for (int poly = 0; poly < vars_lin.size(); poly++) {
+                        B.block(ANG_VEL_START, pos_spline_start + vars_idx - vars_affecting + poly, 3, 1).noalias() =
+                                Id.col(coord).cross(force) * vars_lin(poly);
+                    }
+                }
             }
         }
         B_timer.StopTimer();
@@ -220,10 +226,10 @@ namespace mpc {
         xdot.segment<POS_VARS>(LIN_MOM_START).noalias() = robot_mass_*GRAVITY; //vector_3t::Zero();
 
         // Orientation
-        xdot.segment<3>(ORIENTATION_START) = Ir_inv_ * omega;
+        xdot.segment<3>(ORIENTATION_START).noalias() = Ir_inv_ * omega;
 
         // Angular momentum
-        xdot.segment<3>(ANG_VEL_START) = vector_t::Zero(3);
+        xdot.segment<3>(ANG_VEL_START).noalias() = -omega.cross(Ir_*omega);
 
 
         const vector_3t com_pos = GetCOMPosition(state_man);
@@ -233,8 +239,7 @@ namespace mpc {
             xdot.segment<POS_VARS>(LIN_MOM_START) += force;
 
             // Angular momentum
-//            xdot.segment<3>(ANG_VEL_START) += -omega.cross(Ir_*omega) +
-//                    (traj.GetEndEffectorLocation(i, time) - com_pos).cross(force);
+            xdot.segment<3>(ANG_VEL_START) += (traj.GetEndEffectorLocation(i, time) - com_pos).cross(force);
         }
 
         return xdot;
@@ -249,7 +254,8 @@ namespace mpc {
 
         int com_joint_id = pin_model_.getJointId("root_joint");
 
-        int hip_joint_id = 0;
+        // TODO: Consider getting a different frame/joint
+        int hip_joint_id;
         switch (end_effector) {
             case 0:
                 hip_joint_id = pin_model_.getJointId("FL_hip_joint");
@@ -269,6 +275,7 @@ namespace mpc {
 
 //        std::cout << "hip (wrt com): \n " << pin_data_->oMi[com_joint_id].translation()
 //                                            - pin_data_->oMi[hip_joint_id].translation();
+
         return -pin_data_->oMi[com_joint_id].translation() + pin_data_->oMi[hip_joint_id].translation();
     }
 

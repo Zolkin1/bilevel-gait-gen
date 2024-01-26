@@ -63,7 +63,7 @@ namespace controller {
     void MPCController::InitSolver(const vector_t& state) {
         state_ = state;
 
-        mpc_.CreateInitialRun(state_);
+//        mpc_.CreateInitialRun(state_);
         mpc_.PrintStats();
 
         time_ = 0;
@@ -152,7 +152,7 @@ namespace controller {
                 time = time_;
                 state_time_mut_.unlock();
 
-                mpc_.GetRealTimeUpdate(200, state, time);
+//                mpc_.GetRealTimeUpdate(200, state, time);
 
 //                std::this_thread::sleep_for(std::chrono::milliseconds(40));
 

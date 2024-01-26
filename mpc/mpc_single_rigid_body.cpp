@@ -7,15 +7,9 @@
 namespace mpc {
 
     /*
-     * TODO items for week of 1/22/24
-     *  - Dynamics are not correct (at least COM position not updating properly based on COM linear momentum)
-     *  --- Dynamics look better now (1/22/24)
-     *
-     *  1/22/24:
-     *  - Force box constraint doesn't seem to work, friction cone constraints look ok
-     *
-     *  I think I need to constrain or penalize the force (and probably specifically its derivative)
-     *  I think this is contributing to some of the extreme motions.
+     * TODO:
+     * - Debug orientation
+     * - Determine why the end effector constraint causes the QP to be much harder to solve (bug?)
      */
 
     MPCSingleRigidBody::MPCSingleRigidBody(const mpc::MPCInfo& info, const std::string& robot_urdf) :
@@ -25,7 +19,8 @@ namespace mpc {
         num_run_ = 0;
     }
 
-    Trajectory MPCSingleRigidBody::Solve(const mpc::vector_t& state, double init_time) {
+    Trajectory MPCSingleRigidBody::Solve(const mpc::vector_t& state, double init_time,
+                                         const std::vector<vector_3t>& ee_start_locations) {
         utils::Timer solve_timer("mpc solve");
         solve_timer.StartTimer();
 
@@ -77,7 +72,7 @@ namespace mpc {
                     AddFrictionConeConstraints();
                     break;
                 case Constraints::EndEffectorLocation:
-                    AddEELocationConstraints();
+                    AddEELocationConstraints(ee_start_locations);
                     break;
                 default:
                     throw std::runtime_error("No such constraint exists.");
@@ -308,6 +303,7 @@ namespace mpc {
         data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
 
         data_.num_ee_location_constraints_ = (info_.num_nodes+1)*2*num_ee_;
+        data_.num_start_ee_constraints_ = 2*num_ee_;
     }
 
     vector_t MPCSingleRigidBody::ConvertTrajToQPVec(const Trajectory& traj) const {
@@ -347,38 +343,64 @@ namespace mpc {
         data_.InitQPMats();
     }
 
-    // TODO: Make this also constrain the z axis
-    void MPCSingleRigidBody::AddEELocationConstraints() {
+    // TODO: Make this also constrain the z axis - maybe
+    void MPCSingleRigidBody::AddEELocationConstraints(const std::vector<vector_3t>& ee_start_locations) {
         // TODO: Do I need a rotation matrix?
         int idx = 0;
-
         const int pos_start_idx = GetPosSplineStartIdx();
 
+        // -------------- End Effector Box Constraints -------------- //
         // Note: Bounds are given for the 2D space centered under the hip
-        const Eigen::Vector2d bounds = {0.0, 0.0}; // TODO: 0.5 has better convergence
+        constexpr int CONSTRAINT_COORDS = 2;
+        const Eigen::Vector<double, CONSTRAINT_COORDS> bounds = {0.1, 0.2};//, 0.2};
 
         // TODO: DMA
         matrix_t A(data_.num_ee_location_constraints_, data_.num_decision_vars);
         A.setZero();
 
+
         for (int node = 0; node < info_.num_nodes+1; node++) {
             for (int ee = 0; ee < num_ee_; ee++) {
-                data_.ee_location_ub_.segment<2>(idx) = bounds + model_.GetCOMToHip(ee).head<2>();
-                data_.ee_location_lb_.segment<2>(idx) = -bounds + model_.GetCOMToHip(ee).head<2>();
+                switch (ee) {
+                    case 0:
+                        data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) << 0.15, 0.15;
+                        data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) << 0.05, 0.05;
+                        break;
+                    case 1:
+                        data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) << 0.15, -0.05;
+                        data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) << 0.05, -0.15;
+                        break;
+                    case 2:
+                        data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) << -0.1, 0.15;
+                        data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) << -0.25, 0.05;
+                        break;
+                    case 3:
+                        data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) << -0.1, -0.05;
+                        data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) << -0.25, -0.15;
+                        break;
+                }
+//                data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) = bounds + model_.GetCOMToHip(ee).head<CONSTRAINT_COORDS>();
+//                data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) = -bounds + model_.GetCOMToHip(ee).head<CONSTRAINT_COORDS>();
 
-                for (int coord = 0; coord < 2; coord++) {
-//                    A(idx, node*num_states_ + coord) = -1;
+                for (int coord = 0; coord < CONSTRAINT_COORDS; coord++) {
+                    A(idx, node*num_states_ + coord) = -1;
 
-                    int vars_idx, vars_affecting;
-                    std::tie(vars_idx, vars_affecting) =
-                            prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
+                    if (coord < 2) {
+                        int vars_idx, vars_affecting;
+                        std::tie(vars_idx, vars_affecting) =
+                                prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
 
-                    // TODO: DMA
-                    vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position, ee, coord, GetTime(node));
+                        // TODO: DMA
+                        vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position,
+                                                                    ee, coord, GetTime(node));
 
-                    A.block(idx,
-                            pos_start_idx + vars_idx - vars_affecting,
-                            1, vars_affecting) = vars_lin.transpose();
+                        A.block(idx,
+                                pos_start_idx + vars_idx - vars_affecting,
+                                1, vars_affecting) = vars_lin.transpose();
+                    } else {
+                        data_.ee_location_ub_(idx) += prev_traj_.GetEndEffectorLocation(ee, GetTime(node))(2) - 0.45;
+                        data_.ee_location_lb_(idx) += prev_traj_.GetEndEffectorLocation(ee, GetTime(node))(2) - 0.45 + 0.0;
+                    }
                     idx++;
                 }
             }
@@ -386,8 +408,37 @@ namespace mpc {
 
         data_.constraint_mat_.SetMatrix(A, constraint_idx_, 0);
         constraint_idx_ += idx;
-
         assert(idx == data_.num_ee_location_constraints_);
+
+        // -------------- End Effector Start Constraints -------------- //
+        idx = 0;
+        // TODO: DMA
+        matrix_t M(data_.num_start_ee_constraints_, prev_traj_.GetTotalPosSplineVars());
+        M.setZero();
+        for (int ee = 0; ee < num_ee_; ee++) {
+            data_.start_ee_constants_.segment<2>(idx) = ee_start_locations.at(ee).head<2>();
+
+            for (int coord = 0; coord < 2; coord++) {
+                int vars_idx, vars_affecting;
+                std::tie(vars_idx, vars_affecting) =
+                        prev_traj_.GetPositionSplineIndex(ee, GetTime(0), coord);
+
+                // TODO: DMA
+                vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position,
+                                                            ee, coord, GetTime(0));
+
+                assert(vars_lin.size() == vars_affecting);
+
+//                vars_idx = (ee*2*3) + coord*3 + vars_affecting;
+                M.block(idx, vars_idx - vars_affecting, 1, vars_affecting) =
+                        vars_lin.transpose();
+                idx++;
+            }
+        }
+
+        data_.constraint_mat_.SetMatrix(M, constraint_idx_, GetPosSplineStartIdx());
+
+        assert(idx == data_.start_ee_constants_.size());
     }
 
     vector_t MPCSingleRigidBody::GetFullTargetState(double time, const vector_t& prev_state) {
@@ -405,10 +456,10 @@ namespace mpc {
             vector_3t ee_location = prev_traj_.GetEndEffectorLocation(ee, time);
 
             // Compute IK to get the joint angles
-            // TODO: put this back in after debugging
-//            vector_t ik_joints = model_.InverseKinematics(prev_traj_.GetState(node),
-//                                                             ee_location, ee, prev_state);
-            vector_t ik_joints = vector_t::Zero(3);
+            // TODO: Merge this into one IK call for all the joints
+            vector_t ik_joints = model_.InverseKinematics(prev_traj_.GetState(node),
+                                                             ee_location, ee, prev_state);
+//            vector_t ik_joints = vector_t::Zero(3);
 
             state.segment(idx, ik_joints.size()) = ik_joints;
             idx += ik_joints.size();

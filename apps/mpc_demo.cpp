@@ -81,8 +81,8 @@ int main() {
     // Add in costs
     mpc.AddQuadraticTrackingCost(des_alg, Q);
     mpc.AddForceCost(config.ParseNumber<double>("force_cost"));  // Note: NEED to adjust this based on the number of nodes otherwise it is out-weighed
-    mpc.SetQuadraticFinalCost(5000*Q);
-    mpc.SetLinearFinalCost(-5000*Q*des_alg);
+    mpc.SetQuadraticFinalCost(1*Q);
+    mpc.SetLinearFinalCost(-1*Q*des_alg);
 
     // Create the MPC controller (only used here for the visualizer)
     std::unique_ptr<controller::Controller> mpc_controller;
@@ -109,7 +109,14 @@ int main() {
     auto robot_file = config.ParseString("robot_xml");
     std::unique_ptr<simulator::SimulationRobot> robot = std::make_unique<simulator::SimulationRobot>(robot_file, mpc_controller);
 
-    mpc.CreateInitialRun(init_state);
+    std::vector<Eigen::Vector3d> ee_locations(4);
+    for (int i = 0; i < ee_locations.size(); i++) {
+        for (int j = 0; j < 3; j++) {
+            ee_locations.at(i)(j) = ee_pos.at(i).at(j);
+        }
+    }
+
+    mpc.CreateInitialRun(init_state, ee_locations);
     mpc.PrintStats();
     mpc::Trajectory prev_traj = mpc.GetTrajectory();
 
@@ -121,12 +128,17 @@ int main() {
     vector_t state = standing;
     for (int i = 0; i < info.num_nodes + 200; i++) {
         // Only grabbing the COM states for now (for debugging)
-        state.head<7>() = mpc.GetFullTargetState(i*info.integrator_dt, state).head<7>();
+//        state.head<7>() = mpc.GetFullTargetState(i*info.integrator_dt, state).head<7>();
+        state = mpc.GetFullTargetState(i*info.integrator_dt, state);
+        for (int j = 0; j < ee_locations.size(); j++) {
+            ee_locations.at(j) = prev_traj.GetEndEffectorLocation(j, (i+1)*info.integrator_dt);
+        }
 
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(state)); //mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.GetTrajViz(mpc.CreateVizData());
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
-        prev_traj = mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), prev_traj.GetState(1), i*info.integrator_dt);
+        prev_traj = mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"),
+                prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
 
         // Gait optimization
 //        if (i == 0) {

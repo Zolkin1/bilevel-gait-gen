@@ -65,7 +65,7 @@ namespace mpc {
         in_real_time_ = false;
     }
 
-    Trajectory MPC::CreateInitialRun(const mpc::vector_t& state) {
+    Trajectory MPC::CreateInitialRun(const mpc::vector_t& state, const std::vector<vector_3t>& ee_start_locations) {
         bool converged = false;
         int num_iter = 0;
         in_real_time_ = false;
@@ -73,19 +73,20 @@ namespace mpc {
         qp_solver->ConfigureForInitialRun();
 
         while (!converged && num_iter < 10) {
-            Solve(state, 0);
+            Solve(state, 0, ee_start_locations);
             num_iter++;
         }
         return prev_traj_;
     }
 
-    Trajectory MPC::GetRealTimeUpdate(double run_time_iters, const vector_t& state, double init_time) {
+    Trajectory MPC::GetRealTimeUpdate(double run_time_iters, const vector_t& state, double init_time,
+                                      const std::vector<vector_3t>& ee_start_locations) {
         if (in_real_time_) {
-            return Solve(state, init_time);
+            return Solve(state, init_time, ee_start_locations);
         } else {
             qp_solver->ConfigureForRealTime(run_time_iters);
             in_real_time_ = true;
-            return Solve(state, init_time);
+            return Solve(state, init_time, ee_start_locations);
         }
     }
 
