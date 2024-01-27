@@ -44,6 +44,7 @@ namespace mpc {
         double swing_height;
         double foot_offset;
         vector_t nom_state;
+        Eigen::Vector2d ee_box_size;
 
         MPCInfo();
         MPCInfo(const MPCInfo& info);

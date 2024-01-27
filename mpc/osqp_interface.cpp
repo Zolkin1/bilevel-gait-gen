@@ -16,16 +16,17 @@ namespace mpc {
         // Set solver settings
         qp_solver_.settings()->setVerbosity(true);
         qp_solver_.settings()->setPolish(true);
-        qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
-        qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
+        qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-4); // 1e-6
+        qp_solver_.settings()->setDualInfeasibilityTolerance(1e-4); // 1e-6
         qp_solver_.settings()->setAbsoluteTolerance(1e-4);
         qp_solver_.settings()->setRelativeTolerance(1e-4);
-        qp_solver_.settings()->setScaledTerimination(true);
+        qp_solver_.settings()->setScaledTerimination(false);
         qp_solver_.settings()->setMaxIteration(1000);
-        qp_solver_.settings()->setRho(.0001);   // @Note: This makes a HUGE difference
+        qp_solver_.settings()->setRho(.001);   // @Note: This makes a HUGE difference
         qp_solver_.settings()->setAlpha(1.6);
         qp_solver_.settings()->setSigma(1e-6);
         qp_solver_.settings()->setWarmStart(true);
+        // Scaling 10 seems to respect the ee box constraint WORSE (than scaling 0)
         qp_solver_.settings()->setScaling(10);  // @Note: This has a pretty big effect on the timing and the solution quality
         qp_solver_.settings()->setLinearSystemSolver(1);
 

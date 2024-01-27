@@ -21,6 +21,8 @@ namespace mpc {
 
         vector_t GetFullTargetState(double time, const vector_t& state_guess);
 
+        std::vector<Eigen::Vector2d> GetEEBoxCenter() const;
+
     protected:
         void AddDynamicsConstraints(const vector_t& state) override;
 
@@ -34,7 +36,6 @@ namespace mpc {
         void InitalizeQPData();
 
         int num_run_;
-
     private:
     };
 } // mpc

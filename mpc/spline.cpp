@@ -485,7 +485,7 @@ namespace mpc {
             }
 
             if (end_pair_ && !(idx%2)) { // !start_pair_
-                return std::make_pair(idx/2, 1);
+                return std::make_pair((idx-2)/2+2, 1);
             }
 
             if (start_pair_) {
@@ -585,7 +585,7 @@ namespace mpc {
         bool added_constant = false;
 
         if (type_ == Constants) {
-            poly_vars_.push_back(ZERO_CONSTANT);
+            poly_vars_.emplace_back(poly_vars_.at(poly_vars_.size()-1));
             total_poly_++;
             num_constant_++;
             if (start_pair_ && !(poly_times_.size()%2) || !start_pair_ && (poly_times_.size()%2)) {
@@ -635,7 +635,7 @@ namespace mpc {
 
     void Spline::RemoveUnused(double time) {
         for (int i = 0; i < poly_times_.size() - 1; i++) {
-            if (poly_times_.at(i+1) < time && poly_times_.at(i) < time) {
+            if (poly_times_.at(i+1) < time && poly_times_.at(i) <= time) { // make the second inequality also equality
                 if (IsConstantPoly(i+1)) {
                     // Then we are getting rid of the first part of a constant, which is just an internal change
                     if (!start_pair_ && type_ == Constants) {

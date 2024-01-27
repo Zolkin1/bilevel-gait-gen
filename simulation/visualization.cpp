@@ -212,6 +212,8 @@ namespace simulation {
             const mjtNum pos[3] = {1, 1, 1};
             mjtNum from[3];
             mjtNum to[3];
+            mjtNum box_pos[3];
+            mjtNum box_size[3];
 
             for (int ee = 0; ee < traj_viz_.size(); ee++) { // end effectors
                 for (int node = 0; node < traj_viz_.at(ee).size() - 1; node++) {   // node
@@ -234,12 +236,35 @@ namespace simulation {
                                   from,
                                   to);
                 }
+
+                if (ee < 4) {
+                    for (int i = 0; i < 2; i++) {
+                        box_size[i] = box_sides_(i)/2;
+                        box_pos[i] = traj_viz_.at(4).at(0)(i) + box_centers_.at(ee)(i);
+                    }
+                    box_pos[2] = 0.05;
+                    box_size[2] = 0.05;
+
+                    const float box_color[4] = {0.5, 0, 0.5, 0.1};
+
+                    scn.ngeom += 1;
+                    mjv_initGeom(&scn.geoms[scn.ngeom - 1],
+                                 mjtGeom::mjGEOM_BOX,
+                                 box_size,
+                                 box_pos,
+                                 nullptr,
+                                 box_color);
+                }
             }
         }
     }
 
-    void Visualizer::GetTrajViz(const std::vector<std::vector<Eigen::Vector3d>>& traj_viz) {
+    void Visualizer::GetTrajViz(const std::vector<std::vector<Eigen::Vector3d>>& traj_viz,
+                                const Eigen::Vector2d& box_sides,
+                                const std::vector<Eigen::Vector2d>& box_centers) {
         traj_viz_ = traj_viz;
+        box_sides_ = box_sides;
+        box_centers_ = box_centers;
     }
 
 }

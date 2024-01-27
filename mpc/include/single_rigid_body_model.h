@@ -63,8 +63,9 @@ namespace mpc {
 
         vector_3t GetCOMToHip(int end_effector) const;
 
-        vector_t InverseKinematics(const man_state_t& state, vector_3t end_effector_location, int end_effector,
-                                   const vector_t& state_guess);
+        vector_t InverseKinematics(const man_state_t& state, const std::vector<vector_3t>& end_effector_location,
+                                   const vector_t& state_guess, const vector_t& joint_limits_ub,
+                                   const vector_t& joint_limits_lb);
 
         static constexpr int QUAT_SIZE = 4;
         static constexpr int QUAT_START = 6;

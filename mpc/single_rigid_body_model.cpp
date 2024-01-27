@@ -276,18 +276,39 @@ namespace mpc {
 //        std::cout << "hip (wrt com): \n " << pin_data_->oMi[com_joint_id].translation()
 //                                            - pin_data_->oMi[hip_joint_id].translation();
 
-        return -pin_data_->oMi[com_joint_id].translation() + pin_data_->oMi[hip_joint_id].translation();
+// TODO: This is adding an additional shift
+        vector_3t temp = -pin_data_->oMi[com_joint_id].translation() + pin_data_->oMi[hip_joint_id].translation();
+        if (temp(1) >= 0) {
+            temp(1) += 0.1;
+        } else {
+            temp(1) -= 0.1;
+        }
+
+        return temp;
     }
 
     vector_t SingleRigidBodyModel::InverseKinematics(const mpc::man_state_t& state,
-                                                     mpc::vector_3t end_effector_location, int end_effector,
-                                                     const vector_t& state_guess) {
+                                                     const std::vector<vector_3t>& end_effector_location,
+                                                     const vector_t& state_guess,
+                                                     const vector_t& joint_limits_ub,
+                                                     const vector_t& joint_limits_lb) {
+        utils::Timer ik_timer("IK solve");
+        ik_timer.StartTimer();
 
-        const int frame_id = frame_map_.at(frames_.at(end_effector));
         const int base_joint_id = pin_model_.getJointId("root_joint");
+        const int num_constraints = 6+(3*num_ee_);
 
-        // TODO: Check the rotation part
-        const pinocchio::SE3 ee_des(Eigen::Matrix3d::Identity(), end_effector_location);
+        assert(end_effector_location.size() == num_ee_);
+
+        vector_t state_out(pin_model_.nq);
+
+        std::vector<int> frames;
+        std::vector<pinocchio::SE3> ee_des;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            frames.push_back(frame_map_.at(frames_.at(ee)));
+            ee_des.emplace_back(matrix_33t::Identity(), end_effector_location.at(ee));
+        }
+//        const pinocchio::SE3 ee_des(Eigen::Matrix3d::Identity(), end_effector_location);
         const pinocchio::SE3 body_des(static_cast<Eigen::Quaterniond>(state.segment<QUAT_SIZE>(QUAT_START)).matrix(),
                                       state.segment<POS_VARS>(POS_START));
 
@@ -295,16 +316,6 @@ namespace mpc {
         q.head<POS_VARS>() = state.head<POS_VARS>();
         q.segment<QUAT_SIZE>(POS_VARS) = state.segment<QUAT_SIZE>(QUAT_START);
         q.tail(pin_model_.njoints-2) = state_guess.tail(pin_model_.njoints-2);
-
-//        q(8) += 0.1;
-//        q(7) -= 0.2;
-//        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
-//        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
-//        const pinocchio::SE3 ee_loc = pin_data_->oMf[frame_id];
-//        q(7) += 0.2;
-//        q(8) -= 0.1;
-
-//        q.segment<3>(7) << -0.0139083, 0.47, -0.709954;
 
         const double eps  = 1e-4;
         const int IT_MAX  = 1000;
@@ -317,64 +328,88 @@ namespace mpc {
         Eigen::Matrix<double, 6, Eigen::Dynamic> Jb(6, pin_model_.nv);
         Jb.setZero();
 
-        Eigen::Matrix<double, 9, Eigen::Dynamic> J(9, pin_model_.nv);
+        matrix_t J(9, pin_model_.nv);
         J.setZero();
 
         bool success = false;
         typedef Eigen::Matrix<double, 6, 1> Vector6d;
-        Eigen::Vector<double, 9> err;
+        vector_t err(9);
 
         Eigen::VectorXd v(pin_model_.nv);
-        for (int i = 0; i<IT_MAX; i++) {
 
-            Eigen::Quaterniond quat(q.segment<4>(3));
-            pinocchio::quaternion::firstOrderNormalize(quat);
-            q(3) = quat.x();
-            q(3 + 1) = quat.y();
-            q(3 + 2) = quat.z();
-            q(3 + 3) = quat.w();
+        std::vector<pinocchio::SE3> ee_err(num_ee_);
 
-            pinocchio::forwardKinematics(pin_model_,*pin_data_,q);
-            pinocchio::updateFramePlacements(pin_model_, *pin_data_);
+        // TODO: Figure out how to do this in one IK solve
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int i = 0; i < IT_MAX; i++) {
 
-            const pinocchio::SE3 ee_err = pin_data_->oMf[frame_id].actInv(ee_des); //GetSE3Error(frame_id, ee_des);
-            const pinocchio::SE3 body_err = pin_data_->oMi[base_joint_id].actInv(body_des); //GetSE3Error(base_joint_id, body_des);
+                Eigen::Quaterniond quat(q.segment<4>(3));
+                pinocchio::quaternion::firstOrderNormalize(quat);
+                q(3) = quat.x();
+                q(3 + 1) = quat.y();
+                q(3 + 2) = quat.z();
+                q(3 + 3) = quat.w();
 
-            // TODO: Maybe try just matching the position and not the orientation on the frame
-            err.head<3>() = ee_err.translation(); //pinocchio::log6(ee_err).toVector();
-            err.tail<6>() = pinocchio::log6(body_err).toVector();
+                pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+                pinocchio::updateFramePlacements(pin_model_, *pin_data_);
 
-            if(err.norm() < eps) {
-                success = true;
-                break;
-            }
+                ee_err.at(ee) = pin_data_->oMf[frames.at(ee)].actInv(
+                        ee_des.at(ee)); //GetSE3Error(frame_id, ee_des);
+                err.segment<3>(0) = ee_err.at(ee).translation();
 
-            ComputeJacobianForIK(q, ee_err, frame_id, Jee, true);
-            J.block(0, 0, 3, pin_model_.nv) = -Jee.topRows<3>();
+                const pinocchio::SE3 body_err = pin_data_->oMi[base_joint_id].actInv(
+                        body_des); //GetSE3Error(base_joint_id, body_des);
+                err.tail<6>() = pinocchio::log6(body_err).toVector();
 
-            ComputeJacobianForIK(q, body_err, base_joint_id, Jb, false);
-            J.block(3, 0, 6, pin_model_.nv) = Jb;
+                if (err.norm() < eps) {
+                    success = true;
+                    break;
+                }
 
-            Eigen::Matrix<double, 9, 9> JJt;
-            JJt.noalias() = J * J.transpose();
-            JJt.diagonal().array() += damp;
-            v.noalias() = -(J.transpose() * JJt.ldlt().solve(err));
-            q = pinocchio::integrate(pin_model_,q,v*DT);
+                ComputeJacobianForIK(q, ee_err.at(ee), frames.at(ee), Jee, true);
+                J.block(0, 0, 3, pin_model_.nv) = -Jee.topRows<3>();
+                Jee.setZero();
+
+                ComputeJacobianForIK(q, body_err, base_joint_id, Jb, false);
+                J.block(3, 0, 6, pin_model_.nv) = Jb;
+                Jb.setZero();
+
+                matrix_t JJt(9, 9);
+                JJt.noalias() = J * J.transpose();
+                JJt.diagonal().array() += damp;
+                v.noalias() = -(J.transpose() * JJt.ldlt().solve(err));
+                q = pinocchio::integrate(pin_model_, q, v * DT);
+                // TODO: Put in joint bounds
+//                for (int j = 0; j < q.size() - 7; j++) {
+//                    if (q(7+j) <= joint_limits_lb(j)) {
+//                        q(7+j) = joint_limits_lb(j);
+//                    } else if(q(7+j) >= joint_limits_ub(j)) {
+//                        q(7+j) = joint_limits_ub(j);
+//                    }
+//                }
 
 //            if(!(i%10)) {
 //                std::cout << i << ": error = " << err.transpose() << std::endl;
 //            }
+            }
+
+            if (success) {
+                std::cout << "Convergence achieved!" << std::endl;
+            } else {
+                std::cout << "\nWarning: the iterative algorithm has not reached convergence to the desired precision"
+                          << std::endl;
+            }
+
+            state_out.segment<3>(3*ee + 7) = q.segment<3>(3*ee + 7);
         }
 
-//        std::cout << "q: \n" << q << std::endl;
+        state_out.head<POS_VARS>() = state.head<POS_VARS>();
+        state_out.segment<QUAT_SIZE>(POS_VARS) = state.segment<QUAT_SIZE>(QUAT_START);
 
-        if(success) {
-            std::cout << "Convergence achieved!" << std::endl;
-        } else {
-            std::cout << "\nWarning: the iterative algorithm has not reached convergence to the desired precision" << std::endl;
-        }
+        ik_timer.StopTimer();
+        ik_timer.PrintElapsedTime();
 
-        return q.segment<3>(7 + end_effector*3);    // TODO: make thise not hard coded
+        return q;
     }
 
     pinocchio::SE3 SingleRigidBodyModel::GetSE3Error(int joint_id, const pinocchio::SE3& des_state) {

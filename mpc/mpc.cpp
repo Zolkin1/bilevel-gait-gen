@@ -29,6 +29,7 @@ namespace mpc {
         swing_height = info.swing_height;
         foot_offset = info.foot_offset;
         nom_state = info.nom_state;
+        ee_box_size = info.ee_box_size;
     }
 
     MPC::MPC(const MPCInfo& info, const std::string& robot_urdf) :

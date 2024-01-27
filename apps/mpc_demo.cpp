@@ -44,6 +44,7 @@ int main() {
     info.swing_height = config.ParseNumber<double>("swing_height");
     info.foot_offset = config.ParseNumber<double>("foot_offset");
     info.nom_state = config.ParseEigenVector("init_config");
+    info.ee_box_size = config.ParseEigenVector("ee_box_size");
 
     mpc::MPCSingleRigidBody mpc(info, config.ParseString("robot_urdf"));
 
@@ -59,6 +60,7 @@ int main() {
     // Create the goal state
     vector_t mpc_des_state = init_state;
     mpc_des_state.head<2>() << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
+    mpc_des_state.segment<2>(3) << config.ParseNumber<double>("xdot_des"), config.ParseNumber<double>("ydot_des");
 
     // Inital guess end effector positions
     std::array<std::array<double, 3>, 4> ee_pos{};
@@ -72,6 +74,8 @@ int main() {
     mpc.SetStateTrajectoryWarmStart(warm_start);
 
     matrix_t Q(config.ParseEigenVector("Q_srbd_diag").asDiagonal());
+
+    std::cout << "Q: " << Q << std::endl;
 
     // Desried state in the lie algebra
     const vector_t des_alg = mpc.GetModel()->ConvertManifoldStateToTangentState(mpc_des_state, init_state);
@@ -131,15 +135,16 @@ int main() {
 //        state.head<7>() = mpc.GetFullTargetState(i*info.integrator_dt, state).head<7>();
         state = mpc.GetFullTargetState(i*info.integrator_dt, state);
         for (int j = 0; j < ee_locations.size(); j++) {
-            ee_locations.at(j) = prev_traj.GetEndEffectorLocation(j, (i+1)*info.integrator_dt);
+            ee_locations.at(j) = prev_traj.GetEndEffectorLocation(j, (i)*info.integrator_dt);
         }
 
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(state)); //mpc.GetTargetConfig(i*info.integrator_dt)));
-        viz.GetTrajViz(mpc.CreateVizData());
+        viz.GetTrajViz(mpc.CreateVizData(), info.ee_box_size, mpc.GetEEBoxCenter());
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
+//        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"),
+//                prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
         prev_traj = mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"),
-                prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
-
+                                          prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
         // Gait optimization
 //        if (i == 0) {
 //            gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());

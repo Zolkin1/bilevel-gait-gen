@@ -16,7 +16,7 @@ foot_type: "POINT_FEET"
 
 # initial joint config
 # xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
-init_config: [0., 0., 0.3541, 0, 0, 0, 1.0, # -0.0004, 0.004, 0.0001,
+init_config: [0., 0., 0.3441, 0, 0, 0, 1.0, # -0.0004, 0.004, 0.0001,
               -0.02, 0.2, -0.977,       # front left
               0.02, 0.2, -0.977,        # front right
               0.08, 0.45, -1.03,        # rear left
@@ -91,7 +91,7 @@ force_tracking_weight: 0
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
 num_nodes: 50 # 50
-integrator_dt: 0.015 # 0.015
+integrator_dt: 0.015  # 0.015
 num_qp: 1
 #vel_bounds: [3, 3, 3,
 #             3, 3, 3,
@@ -125,14 +125,18 @@ swing_height: 0.1
 
 num_polys: 3
 
-x_des: 1
+x_des: 5
 y_des: 0
+xdot_des: 10
+ydot_des: 0
 
-run_time_iterations: 2000
+ee_box_size: [0.15, 0.075] #[0.12, 0.2]
+
+run_time_iterations: 3000
 
 foot_offset: 0.02
 
-force_cost: 0.000001
+force_cost: 0.000000
 
 Q_diag: [1, 1, 1,          # linear momentum
          1, 1, 1,           # angular momentum
@@ -143,7 +147,7 @@ Q_diag: [1, 1, 1,          # linear momentum
          60000, 500, 10,       # RL leg
          60000, 500, 10]       # RR leg
 
-Q_srbd_diag: [1, 1, 85, 0, 0, 0, 9, 9, 9, 1, 1, 1]  # Convergence seems to be better when the z tracking is high
+Q_srbd_diag: [0, 0, 5000, 1, 1, 0, 3000, 3000, 3000, 0, 0, 0]  # Convergence seems to be better when the z tracking is high
 
 #  [300, 300, 7500,   # COM position
 #              1, 1, 1,          # linear momentum
