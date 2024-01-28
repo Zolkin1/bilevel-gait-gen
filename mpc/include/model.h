@@ -57,6 +57,8 @@ namespace mpc {
 
         int GetFullModelConfigSpace() const;
 
+        virtual std::vector<Eigen::Vector3d> GetEndEffectorLocations(const vector_t& q) = 0;
+
     protected:
         virtual void ConvertMPCStateToPinocchioState(const vector_t& state, Eigen::Ref<vector_t> q_pin) const = 0;
 

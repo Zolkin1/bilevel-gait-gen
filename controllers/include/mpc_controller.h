@@ -44,7 +44,7 @@ namespace controller {
                                       double time) override;
                                       //double time) override;
 
-        void InitSolver(const vector_t& state) override;
+        void InitSolver(const vector_t& full_body_state, const vector_t& mpc_state) override;
 
         std::vector<std::vector<Eigen::Vector3d>> GetTrajViz() override;
 
@@ -55,6 +55,8 @@ namespace controller {
         vector_t ReconstructState(const vector_t& q, const vector_t& v, const vector_t& a) const;
 
         void MPCUpdate();
+
+        void FullBodyTrajUpdate(mpc::Trajectory& traj);
 
         vector_t NormalizeQuat(const vector_t& state);
 
@@ -80,7 +82,13 @@ namespace controller {
 
         std::vector<std::vector<Eigen::Vector3d>> fk_traj_;
 
+        std::vector<mpc::vector_3t> ee_locations_;
+
         mpc::GaitOptimizer gait_optimizer_;
+
+        mpc::SingleRigidBodyModel model_;
+
+        mpc::MPCInfo info_;
     };
 } // controller
 

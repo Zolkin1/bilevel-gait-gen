@@ -300,7 +300,7 @@ namespace mpc {
 
         assert(end_effector_location.size() == num_ee_);
 
-        vector_t state_out(pin_model_.nq);
+//        vector_t state_out(pin_model_.nq);
 
         std::vector<int> frames;
         std::vector<pinocchio::SE3> ee_des;
@@ -400,15 +400,16 @@ namespace mpc {
                           << std::endl;
             }
 
-            state_out.segment<3>(3*ee + 7) = q.segment<3>(3*ee + 7);
+//            state_out.segment<3>(3*ee + 7) = q.segment<3>(3*ee + 7);
         }
 
-        state_out.head<POS_VARS>() = state.head<POS_VARS>();
-        state_out.segment<QUAT_SIZE>(POS_VARS) = state.segment<QUAT_SIZE>(QUAT_START);
+//        state_out.head<POS_VARS>() = state.head<POS_VARS>();
+//        state_out.segment<QUAT_SIZE>(POS_VARS) = state.segment<QUAT_SIZE>(QUAT_START);
 
         ik_timer.StopTimer();
         ik_timer.PrintElapsedTime();
 
+//        return state_out;
         return q;
     }
 
@@ -427,6 +428,20 @@ namespace mpc {
             pinocchio::Jlog6(error.inverse(), Jlog);
             J = -Jlog * J;
         }
+    }
+
+    std::vector<vector_3t> SingleRigidBodyModel::GetEndEffectorLocations(const vector_t& q) {
+        std::vector<vector_3t> ee_locations(4);
+        assert(q.size() == pin_model_.nq);
+
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+        pinocchio::updateFramePlacements(pin_model_, *pin_data_);
+
+        for (int ee = 0; ee < num_ee_; ee++) {
+            ee_locations.at(ee) = pin_data_->oMf[frame_map_.at(frames_.at(ee))].translation();
+        }
+
+        return ee_locations;
     }
 
 } // mpc

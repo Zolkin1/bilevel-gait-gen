@@ -19,7 +19,7 @@ namespace mpc {
             node_dt_(node_dt) { // TODO: Make not hard coded
         for (int i = 0; i < len; i++) {
             states_.push_back(vector_t::Zero(state_size));
-            full_velocities_.push_back(vector_t::Zero(state_size));
+//            full_velocity_.push_back(vector_t::Zero(state_size));
         }
 
         for (const auto& switching_time : switching_times) {
@@ -36,6 +36,11 @@ namespace mpc {
                      Spline(3, switching_time, true, Spline::Force),
                      Spline(3, switching_time, true, Spline::Force)};
             forces_.emplace_back(force);
+        }
+
+        for (int i = 0; i < full_config_.size(); i++) {
+            full_config_.at(i) = vector_t::Zero(state_size);
+            full_velocity_.at(i) = vector_t::Zero(state_size-1);
         }
 
         contact_times_.resize(end_effector_pos_.size());
@@ -63,10 +68,12 @@ namespace mpc {
         this->states_ = traj.states_;
         this->end_effector_pos_ = traj.end_effector_pos_;
         this->mut_flags_ = traj.mut_flags_;
-        this->full_velocities_ = traj.full_velocities_;
+//        this->full_velocities_ = traj.full_velocities_;
         this->fk_traj_ = traj.fk_traj_;
         this->forces_ = traj.forces_;
         this->node_dt_ = traj.node_dt_;
+        this->full_config_ = traj.full_config_;
+        this->full_velocity_ = traj.full_velocity_;
 
         return *this;
     }
@@ -455,16 +462,24 @@ namespace mpc {
     }
 
     void Trajectory::UpdateFullVelocity(int node, const vector_t& vel) {
-        full_velocities_.at(node) = vel;
+        full_velocity_.at(node) = vel;
+    }
+
+    void Trajectory::UpdateFullConfig(int node, const mpc::vector_t& q) {
+        full_config_.at(node) = q;
     }
 
     vector_t Trajectory::GetFullVelocity(int node) {
-        return -full_velocities_.at(node);
+        return full_velocity_.at(node);
     }
 
-    vector_t Trajectory::GetAcc(int node, double dt) {
-        return -(full_velocities_.at(node+1) - full_velocities_.at(node))/dt;
+    vector_t Trajectory::GetFullConfig(int node) {
+        return full_config_.at(node);
     }
+
+//    vector_t Trajectory::GetAcc(int node, double dt) {
+//        return -(full_velocities_.at(node+1) - full_velocities_.at(node))/dt;
+//    }
 
 //    std::vector<std::vector<Eigen::Vector3d>> Trajectory::CreateVizData(const Model* model) {
 //        for (int ee = 0; ee < 5; ee++) {

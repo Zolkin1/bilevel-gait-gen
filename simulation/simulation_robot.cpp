@@ -20,8 +20,8 @@ namespace simulator {
         low_level_controller_->InitSolver();
     }
 
-    void SimulationRobot::InitController(const Eigen::VectorXd& state) {
-        low_level_controller_->InitSolver(state);
+    void SimulationRobot::InitController(const Eigen::VectorXd& full_body_state, const Eigen::VectorXd& mpc_state) {
+        low_level_controller_->InitSolver(full_body_state, mpc_state);
     }
 
     void SimulationRobot::UpdateTargetConfig(const Eigen::VectorXd& q) {

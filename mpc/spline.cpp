@@ -635,7 +635,7 @@ namespace mpc {
 
     void Spline::RemoveUnused(double time) {
         for (int i = 0; i < poly_times_.size() - 1; i++) {
-            if (poly_times_.at(i+1) < time && poly_times_.at(i) <= time) { // make the second inequality also equality
+            if (poly_times_.at(i+1) <= time && poly_times_.at(i) < time) { // make the second inequality also equality
                 if (IsConstantPoly(i+1)) {
                     // Then we are getting rid of the first part of a constant, which is just an internal change
                     if (!start_pair_ && type_ == Constants) {

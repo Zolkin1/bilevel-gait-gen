@@ -50,7 +50,8 @@ namespace controller {
         void UpdateTargetVel(const Eigen::VectorXd& v);
         void UpdateTargetAcc(const Eigen::VectorXd& a);
 
-        virtual void InitSolver(const Eigen::VectorXd& state);
+        virtual void InitSolver(const Eigen::VectorXd& full_body_state,
+                                const Eigen::VectorXd & mpc_state);
 
         virtual void UpdateDesiredContacts(const Contact& contact);
 

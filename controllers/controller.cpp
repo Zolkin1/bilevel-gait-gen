@@ -47,7 +47,7 @@ namespace controller {
 
     void Controller::InitSolver() {}
 
-    void Controller::InitSolver(const Eigen::VectorXd& state) {}
+    void Controller::InitSolver(const Eigen::VectorXd& full_body_state, const Eigen::VectorXd& mpc_state) {}
 
     double Controller::GetRate() const {
         return rate_;

@@ -67,6 +67,8 @@ namespace mpc {
                                    const vector_t& state_guess, const vector_t& joint_limits_ub,
                                    const vector_t& joint_limits_lb);
 
+        std::vector<vector_3t> GetEndEffectorLocations(const vector_t& q) override;
+
         static constexpr int QUAT_SIZE = 4;
         static constexpr int QUAT_START = 6;
         static constexpr int ORIENTATION_START = 6;

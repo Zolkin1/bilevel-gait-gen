@@ -59,7 +59,7 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
 
 
 #SRBD Configs:
-srbd_init: [0, 0, 0.3541,
+srb_init: [0, 0, 0.3541,
             0, 0, 0,
             0, 0, 0, 1,
             0, 0, 0]
@@ -125,14 +125,15 @@ swing_height: 0.1
 
 num_polys: 3
 
-x_des: 5
+x_des: 0
 y_des: 0
 xdot_des: 10
 ydot_des: 0
 
-ee_box_size: [0.15, 0.075] #[0.12, 0.2]
+ee_box_size: [0.25, 0.25] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
+#ee_box_size: [0.15, 0.075]
 
-run_time_iterations: 3000
+run_time_iterations: 150 # 150 works well
 
 foot_offset: 0.02
 

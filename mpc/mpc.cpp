@@ -30,6 +30,7 @@ namespace mpc {
         foot_offset = info.foot_offset;
         nom_state = info.nom_state;
         ee_box_size = info.ee_box_size;
+        real_time_iters = info.real_time_iters;
     }
 
     MPC::MPC(const MPCInfo& info, const std::string& robot_urdf) :
@@ -80,12 +81,12 @@ namespace mpc {
         return prev_traj_;
     }
 
-    Trajectory MPC::GetRealTimeUpdate(double run_time_iters, const vector_t& state, double init_time,
+    Trajectory MPC::GetRealTimeUpdate(const vector_t& state, double init_time,
                                       const std::vector<vector_3t>& ee_start_locations) {
         if (in_real_time_) {
             return Solve(state, init_time, ee_start_locations);
         } else {
-            qp_solver->ConfigureForRealTime(run_time_iters);
+            qp_solver->ConfigureForRealTime(info_.real_time_iters);
             in_real_time_ = true;
             return Solve(state, init_time, ee_start_locations);
         }

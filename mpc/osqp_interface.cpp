@@ -14,7 +14,7 @@ namespace mpc {
         verbose_ = verbose;
 
         // Set solver settings
-        qp_solver_.settings()->setVerbosity(true);
+        qp_solver_.settings()->setVerbosity(false);
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-4); // 1e-6
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-4); // 1e-6
@@ -78,7 +78,7 @@ namespace mpc {
 //            qp_solver_.updateGradient(data.cost_linear);
 //            qp_solver_.updateLinearConstraintsMatrix(data.sparse_constraint_);
 //            qp_solver_.updateBounds(data.lb_, data.ub_);
-////            qp_solver_.setWarmStart(warm_start, prev_dual_sol_);
+//            qp_solver_.setWarmStart(warm_start, prev_dual_sol_);
 //        }
 
 //        for (int i = 0; i < A_.rows(); i++) {

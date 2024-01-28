@@ -96,10 +96,12 @@ namespace mpc {
         bool IsSplineMutable(int ee, int coord) const;
 
         void UpdateFullVelocity(int node, const vector_t& vel);
+        void UpdateFullConfig(int node, const vector_t& q);
 
         vector_t GetFullVelocity(int node);
+        vector_t GetFullConfig(int node);
 
-        vector_t GetAcc(int node, double dt);
+//        vector_t GetAcc(int node, double dt);
 
 //        std::vector<std::vector<Eigen::Vector3d>> CreateVizData(const Model* model);
 
@@ -150,11 +152,14 @@ namespace mpc {
 
         double swing_height_;
         double foot_offset_;
-        std::vector<vector_t> full_velocities_; // TODO: Do this cleaner
+//        std::vector<vector_t> full_velocities_; // TODO: Do this cleaner
 
         std::vector<std::vector<Eigen::Vector3d>> fk_traj_;
 
         std::vector<std::vector<double>> contact_times_;
+
+        std::array<vector_t, 20> full_config_;
+        std::array<vector_t, 20> full_velocity_;
 
         double init_time_;
 

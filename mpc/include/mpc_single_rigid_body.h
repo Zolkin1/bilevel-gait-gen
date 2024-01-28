@@ -23,6 +23,8 @@ namespace mpc {
 
         std::vector<Eigen::Vector2d> GetEEBoxCenter() const;
 
+        void UpdateWholeBodyTrajectory(Trajectory& traj);
+
     protected:
         void AddDynamicsConstraints(const vector_t& state) override;
 

@@ -42,18 +42,21 @@ int main() {
     info.force_bound = config.ParseNumber<double>("force_bound");
     info.swing_height = config.ParseNumber<double>("swing_height");
     info.foot_offset = config.ParseNumber<double>("foot_offset");
-
-
+    info.nom_state = config.ParseEigenVector("init_config");
+    info.ee_box_size = config.ParseEigenVector("ee_box_size");
+    info.real_time_iters = config.ParseNumber<int>("run_time_iterations");
 
     vector_t standing = config.ParseEigenVector("init_config");
 
-    vector_t mpc_init_state = vector_t::Zero(6 + standing.size());
-    mpc_init_state.tail(standing.size()) = standing;
+    vector_t mpc_init_state = config.ParseEigenVector("srb_init");
 
     std::vector<vector_t> warm_start_states(info.num_nodes+1, mpc_init_state);
 
     vector_t mpc_des_state = mpc_init_state;
-    mpc_des_state.segment<2>(6) << 1, 0;
+    mpc_des_state.segment<2>(3) << config.ParseNumber<double>("xdot_des"), config.ParseNumber<double>("ydot_des");    // velocities
+
+    mpc::matrix_t Q(config.ParseEigenVector("Q_srbd_diag").asDiagonal());
+
 
     std::unique_ptr<controller::Controller> mpc_controller;
     mpc_controller = std::make_unique<controller::MPCController>(config.ParseNumber<double>("control_rate"),
@@ -72,7 +75,8 @@ int main() {
                                               info,
                                               warm_start_states,
                                               mpc_des_state,
-                                              config.ParseNumber<int>("num_polys"));
+                                              config.ParseNumber<int>("num_polys"),
+                                              Q);
 
     // Make the robot for simulation
     auto robot_file = config.ParseString("robot_xml");
@@ -82,12 +86,11 @@ int main() {
     simulator::Simulator sim(robot);
 
     // Set the robot's initial condition
-    vector_t init_config = config.ParseEigenVector("init_config");
     vector_t init_vel = config.ParseEigenVector("init_vel");
-    robot->SetInitialCondition(init_config, init_vel);
+    robot->SetInitialCondition(standing, init_vel);
 
     // Set up controller solver
-    robot->InitController(mpc_init_state);
+    robot->InitController(standing, mpc_init_state);
     robot->DefineContacts(config.ParseStringVector("collision_frames"),
                           config.ParseStdVector<int>("collision_bodies"));
 

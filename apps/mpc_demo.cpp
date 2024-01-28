@@ -45,13 +45,14 @@ int main() {
     info.foot_offset = config.ParseNumber<double>("foot_offset");
     info.nom_state = config.ParseEigenVector("init_config");
     info.ee_box_size = config.ParseEigenVector("ee_box_size");
+    info.real_time_iters = config.ParseNumber<int>("run_time_iterations");
 
     mpc::MPCSingleRigidBody mpc(info, config.ParseString("robot_urdf"));
 
 
     // Read in the inital config and parse it for MPC.
     vector_t standing = config.ParseEigenVector("init_config");
-    vector_t init_state = config.ParseEigenVector("srbd_init");
+    vector_t init_state = config.ParseEigenVector("srb_init");
 //    init_state.tail(standing.size()) = standing;
 
     // Create the warm start
@@ -143,8 +144,7 @@ int main() {
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
 //        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"),
 //                prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
-        prev_traj = mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"),
-                                          prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
+        prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
         // Gait optimization
 //        if (i == 0) {
 //            gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());

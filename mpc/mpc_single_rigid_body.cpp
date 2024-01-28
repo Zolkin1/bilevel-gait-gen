@@ -8,8 +8,9 @@ namespace mpc {
 
     /*
      * TODO:
-     * - Debug orientation
-     * - Determine why the end effector constraint causes the QP to be much harder to solve (bug?)
+     * - Determine why the QP is easier to solve when we have 24 position variables and 96 force variables
+     *      this is the pattern of full solves vs inaccurate solves. We can also see jumps in the trajectory
+     *      at certain places. I suspect this is realted to this problem.
      */
 
     MPCSingleRigidBody::MPCSingleRigidBody(const mpc::MPCInfo& info, const std::string& robot_urdf) :
@@ -35,6 +36,9 @@ namespace mpc {
         prev_traj_.RemoveUnusedPolys(init_time);
         poly_update_timer.StopTimer();
         UpdateNumInputs();
+
+        std::cout << "run num: " << num_run_ << ", force vars: " << prev_traj_.GetTotalForceSplineVars() <<
+                  ", position vars: " << prev_traj_.GetTotalPosSplineVars() << std::endl;
 
         utils::Timer data_update_timer("data update");
         data_update_timer.StartTimer();
@@ -128,7 +132,6 @@ namespace mpc {
             line_search_timer.StopTimer();
         }
 
-        num_run_++;
 //        if (run_num_ > 0){
 //            std::cout << (alpha*(qp_solver->GetDualSolution() - prev_dual_sol_) + prev_dual_sol_).lpNorm<Eigen::Infinity>() << std::endl;
 //        }
@@ -138,19 +141,20 @@ namespace mpc {
         prev_qp_sol = ((alpha * p) + prev_qp_sol).eval();
 
         prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, state);
-//        if (run_num_ == 50) {
-//            std::cout << "ee location: " << prev_traj_.GetEndEffectorLocation(1, init_time).transpose() << std::endl;
-//            std::cout << "lin vars: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).transpose() << std::endl;
-//            int vars_index, vars_affecting;
-//            std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(1, init_time, 0);
-//            std::cout << "qp solve vars: " << sol.segment(GetPosSplineStartIdx() + vars_index - vars_affecting, vars_affecting).transpose() << std::endl;
-//            std::cout << "product: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).dot(
-//                    sol.segment(GetPosSplineStartIdx() + vars_index - vars_affecting, vars_affecting)) << std::endl;
-//            std::cout << "ee start constraints: \n" << data_.sparse_constraint_.bottomRows<8>()*sol - data_.start_ee_constants_ << std::endl;
-//            std::cout << "constraint mat: " << data_.sparse_constraint_.block(data_.GetTotalNumConstraints() - data_.num_start_ee_constraints_,
-//                                                                              GetPosSplineStartIdx(), data_.num_start_ee_constraints_, prev_traj_.GetTotalPosSplineVars());
-//            std::cout << "solution val: " << sol(GetPosSplineStartIdx() + vars_index - vars_affecting) << std::endl;
-//        }
+        if (run_num_ == 50) {
+            std::cout << "ee location: " << prev_traj_.GetEndEffectorLocation(1, init_time).transpose() << std::endl;
+            std::cout << "lin vars: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).transpose() << std::endl;
+            int vars_index, vars_affecting;
+            std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(1, init_time, 0);
+            std::cout << "vars index, affecting: " << vars_index << ", " << vars_affecting << std::endl;
+            std::cout << "qp solve vars: " << sol.segment(GetPosSplineStartIdx() + vars_index - vars_affecting, vars_affecting).transpose() << std::endl;
+            std::cout << "product: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).dot(
+                    sol.segment(GetPosSplineStartIdx() + vars_index - vars_affecting, vars_affecting)) << std::endl;
+            std::cout << "ee start constraints: \n" << data_.sparse_constraint_.bottomRows<8>()*sol - data_.start_ee_constants_ << std::endl;
+            std::cout << "constraint mat: " << data_.sparse_constraint_.block(data_.GetTotalNumConstraints() - data_.num_start_ee_constraints_,
+                                                                              GetPosSplineStartIdx(), data_.num_start_ee_constraints_, prev_traj_.GetTotalPosSplineVars());
+            std::cout << "solution val: " << sol(GetPosSplineStartIdx() + vars_index - vars_affecting) << std::endl;
+        }
 
 //        std::cout << "ee location ub constraints: \n" << data_.sparse_constraint_.middleRows(
 //                data_.GetTotalNumConstraints() - data_.num_ee_location_constraints_,
@@ -225,7 +229,9 @@ namespace mpc {
 //            std::cout << "Node: " << i << ", net force: " << net_force.transpose() << std::endl;
 //        }
 
-        prev_traj_.PrintTrajectoryToFile("mpc_demo_traj.txt");
+//        prev_traj_.PrintTrajectoryToFile("mpc_demo_traj.txt");
+
+        num_run_++;
 
         return prev_traj_;
     }
@@ -524,6 +530,25 @@ namespace mpc {
         }
 
         return box_centers;
+    }
+
+    void MPCSingleRigidBody::UpdateWholeBodyTrajectory(mpc::Trajectory& traj) {
+        // TODO: Figure out a better initial guess
+        vector_t prev_state = vector_t::Zero(model_.GetNumManifoldStates());
+        for (int i = 0; i < 20; i++) {
+            std::vector<vector_3t> ee_locations(num_ee_);
+            for (int ee = 0; ee < num_ee_; ee++) {
+                // Grab state and end effector locations at that time
+                ee_locations.at(ee) = prev_traj_.GetEndEffectorLocation(ee, traj.GetTime(i));
+            }
+            traj.UpdateFullConfig(i, model_.InverseKinematics(traj.GetState(i),
+                                                              ee_locations, prev_state,
+                                                              info_.joint_bounds_ub,
+                                                              info_.joint_bounds_lb));
+
+            // TODO: Do the velocity IK
+            traj.UpdateFullVelocity(i, vector_t::Zero(model_.GetFullModelConfigSpace()-1));
+        }
     }
 
 //    bool MPCSingleRigidBody::ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) {

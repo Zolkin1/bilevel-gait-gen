@@ -45,6 +45,7 @@ namespace mpc {
         double foot_offset;
         vector_t nom_state;
         Eigen::Vector2d ee_box_size;
+        int real_time_iters;
 
         MPCInfo();
         MPCInfo(const MPCInfo& info);
@@ -63,7 +64,7 @@ namespace mpc {
         // TODO: Figure out how to not explicitly pass the ee location
         Trajectory CreateInitialRun(const vector_t& state, const std::vector<vector_3t>& ee_start_locations);
 
-        Trajectory GetRealTimeUpdate(double run_time_iters, const vector_t& state, double init_time,
+        Trajectory GetRealTimeUpdate(const vector_t& state, double init_time,
                                      const std::vector<vector_3t>& ee_start_locations);
 
         virtual Trajectory Solve(const vector_t& state, double init_time,
