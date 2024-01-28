@@ -469,11 +469,11 @@ namespace mpc {
         full_config_.at(node) = q;
     }
 
-    vector_t Trajectory::GetFullVelocity(int node) {
+    vector_t Trajectory::GetFullVelocity(int node) const {
         return full_velocity_.at(node);
     }
 
-    vector_t Trajectory::GetFullConfig(int node) {
+    vector_t Trajectory::GetFullConfig(int node) const {
         return full_config_.at(node);
     }
 
@@ -626,5 +626,10 @@ namespace mpc {
 
         return qp_vec;
     }
+
+    int Trajectory::GetNode(double time) const {
+        return std::ceil((time - init_time_)/node_dt_);
+    }
+
 
 } // mpc

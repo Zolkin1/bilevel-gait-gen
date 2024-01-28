@@ -51,12 +51,12 @@ int main() {
 
 
     // Read in the inital config and parse it for MPC.
-    vector_t standing = config.ParseEigenVector("init_config");
-    vector_t init_state = config.ParseEigenVector("srb_init");
+    const vector_t standing = config.ParseEigenVector("init_config");
+    const vector_t init_state = config.ParseEigenVector("srb_init");
 //    init_state.tail(standing.size()) = standing;
 
     // Create the warm start
-    std::vector<vector_t> warm_start(info.num_nodes+1, init_state);
+    const std::vector<vector_t> warm_start(info.num_nodes+1, init_state);
 
     // Create the goal state
     vector_t mpc_des_state = init_state;

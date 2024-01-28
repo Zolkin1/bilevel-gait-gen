@@ -4,7 +4,7 @@
 #include "osqp_interface.h"
 
 namespace mpc {
-    OSQPInterface::OSQPInterface(QPData data, bool verbose)
+    OSQPInterface::OSQPInterface(const QPData& data, bool verbose)
         : sparse_conversion_timer_("sparse conversion"),
           matrix_gather_timer_("matrix formation"),
           osqp_interface_timer_("osqp setup") {
@@ -56,15 +56,15 @@ namespace mpc {
             qp_solver_.data()->clearHessianMatrix();
             qp_solver_.clearSolver();
 
+            // Set solver costs
+            if (!(qp_solver_.data()->setHessianMatrix(data.sparse_cost_) &&
+                  qp_solver_.data()->setGradient(data.cost_linear))) {
+                throw std::runtime_error("Unable to add the costs to the QP solver.");
+            }
+
             if (!(qp_solver_.data()->setLinearConstraintsMatrix(data.sparse_constraint_) &&
                   qp_solver_.data()->setBounds(data.lb_, data.ub_))) {
                 throw std::runtime_error("Unable to add the constraints to the QP solver.");
-            }
-
-            // Set solver costs
-            if (!(qp_solver_.data()->setHessianMatrix(data.sparse_cost_) &&
-            qp_solver_.data()->setGradient(data.cost_linear))) {
-                throw std::runtime_error("Unable to add the costs to the QP solver.");
             }
 
             // Re-init

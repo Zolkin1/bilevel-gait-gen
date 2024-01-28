@@ -98,8 +98,8 @@ namespace mpc {
         void UpdateFullVelocity(int node, const vector_t& vel);
         void UpdateFullConfig(int node, const vector_t& q);
 
-        vector_t GetFullVelocity(int node);
-        vector_t GetFullConfig(int node);
+        vector_t GetFullVelocity(int node) const;
+        vector_t GetFullConfig(int node) const;
 
 //        vector_t GetAcc(int node, double dt);
 
@@ -128,6 +128,8 @@ namespace mpc {
         int GetTotalVariables() const;    // TODO: Consider if we have joint information
 
         vector_t SplinesAsVec() const;
+
+        int GetNode(double time) const;
 
     protected:
     private:

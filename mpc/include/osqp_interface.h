@@ -15,7 +15,7 @@
 namespace mpc {
     class OSQPInterface {
     public:
-        OSQPInterface(QPData data, bool verbose);
+        OSQPInterface(const QPData& data, bool verbose);
 
         void SetupQP(QPData& data, const vector_t& warm_start);
 

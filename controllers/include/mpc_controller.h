@@ -58,6 +58,12 @@ namespace controller {
 
         void FullBodyTrajUpdate(mpc::Trajectory& traj);
 
+        void GetTargetsFromTraj(const mpc::Trajectory& traj, double time);
+
+        vector_t ComputeGroundForceTorques(int end_effector);
+
+        vector_t ComputeSwingTorques(int end_effector);
+
         vector_t NormalizeQuat(const vector_t& state);
 
         double prev_time_;
@@ -73,7 +79,7 @@ namespace controller {
         vector_t q_des_;
         vector_t v_des_;
         vector_t a_des_;
-        vector_t force_des_;
+        std::vector<mpc::vector_3t> force_des_;
         mpc::Trajectory traj_;
 
         std::mutex state_time_mut_;

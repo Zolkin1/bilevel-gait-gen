@@ -35,6 +35,10 @@ namespace controller {
                                  info_(info),
                                  model_(robot_urdf, info.ee_frames, info.discretization_steps, info.integrator_dt, info.nom_state){  // TODO: Not hard coded
 
+        // TODO: Do I need the model if the basic controller also has pinocchio data?
+
+        force_des_.resize(4);
+
         // TODO: Get this from IC
         std::array<std::array<double, 3>, 4> ee_pos{};
         ee_pos.at(0) = {0.2, 0.2, 0};
@@ -65,21 +69,33 @@ namespace controller {
 
     void MPCController::InitSolver(const vector_t& full_body_state, const vector_t& mpc_state) {
         state_ = mpc_state;
-        ee_locations_ = model_.GetEndEffectorLocations(full_body_state);
+//        ee_locations_ = model_.GetEndEffectorLocations(full_body_state);
+        std::array<std::array<double, 3>, 4> ee_pos{};
+        ee_pos.at(0) = {0.2, 0.2, 0};
+        ee_pos.at(1) = {0.2, -0.2, 0};
+        ee_pos.at(2) = {-0.2, 0.2, 0};
+        ee_pos.at(3) = {-0.2, -0.2, 0};
 
+        ee_locations_.resize(4);
+        for (int i = 0; i < ee_locations_.size(); i++) {
+            for (int j = 0; j < 3; j++) {
+                ee_locations_.at(i)(j) = ee_pos.at(i).at(j);
+            }
+        }
 
         // TODO: Debug in release mode
         mpc_.CreateInitialRun(mpc_state, ee_locations_);
         mpc_.PrintStats();
 
-        time_ = 0;
-        q_des_ = mpc_.GetTargetConfig(time_);
-//        v_des_ = mpc_.GetTargetVelocity(time_);
-        force_des_ = mpc_.GetForceTarget(time_);
         traj_viz_mut_.lock();
         traj_ = mpc_.GetTrajectory();
         FullBodyTrajUpdate(traj_);
         traj_viz_mut_.unlock();
+
+        time_ = 0;
+
+        GetTargetsFromTraj(traj_, time_);
+
         UpdateTrajViz();
         mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
     }
@@ -90,7 +106,6 @@ namespace controller {
         const vector_t state = ReconstructState(q, v, a);
         std::vector<mpc::vector_3t> ee_locations = model_.GetEndEffectorLocations(q);
 
-
         state_time_mut_.lock();
         state_ = state;
         time_ = time;
@@ -98,25 +113,29 @@ namespace controller {
         state_time_mut_.unlock();
 
         mpc_res_mut_.lock();
-        int node = mpc_.GetNode(time)+1;
-
-        // TODO:
-        // Inverse Dynamics to get toruqes
-        // PD control
-
-        if (node > 19) {
-            node = 19;
-        }
-        qp_controller_.UpdateTargetConfig(traj_.GetFullConfig(node));
-        qp_controller_.UpdateTargetVel(traj_.GetFullVelocity(node)); // TODO: Fix
-//        qp_controller_.UpdateTargetAcc(traj_.GetAcc(node, 0.015)); // TODO: Make not hard coded
-        qp_controller_.UpdateForceTargets(force_des_);
+        GetTargetsFromTraj(traj_, time_);
         mpc_res_mut_.unlock();
 
-        Contact contact1 = mpc_.GetDesiredContacts(time);
-        qp_controller_.UpdateDesiredContacts(contact1);
+        // TODO: DMA
+        vector_t control_action = vector_t::Zero(3*num_inputs_);    // joints, joint velocities, torques
+        control_action.head(num_inputs_) = q_des_.tail(num_inputs_);
+        control_action.segment(num_inputs_, num_inputs_) = v_des_.tail(num_inputs_);
+        for (int ee = 0; ee < contact.in_contact_.size(); ee++) {
+            if (contact.in_contact_.at(ee)) {
+                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeGroundForceTorques(ee); // TODO: Make not hard coded
+            } else {
+                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeSwingTorques(ee); // TODO: Make not hard coded
+            }
+        }
 
-        return qp_controller_.ComputeControlAction(q, v, a, contact, time);
+        return control_action;
+
+        // Recover torques using ID
+
+//        Contact contact1 = mpc_.GetDesiredContacts(time);
+//        qp_controller_.UpdateDesiredContacts(contact1);
+
+//        return qp_controller_.ComputeControlAction(q, v, a, contact, time);
     }
 
     vector_t MPCController::ReconstructState(const controller::vector_t& q, const controller::vector_t& v,
@@ -243,6 +262,51 @@ namespace controller {
             // TODO: Do the velocity IK
             traj.UpdateFullVelocity(i, vector_t::Zero(model_.GetFullModelConfigSpace()-1));
         }
+    }
+
+    void MPCController::GetTargetsFromTraj(const mpc::Trajectory& traj, double time) {
+        const int node = traj.GetNode(time)+1;
+
+        q_des_ = traj.GetFullConfig(node);
+        v_des_ = traj.GetFullVelocity(node);
+
+        // TODO: Do I want to use the ZoH or the full spline force?
+        for (int ee = 0; ee < 4; ee++) {
+            force_des_.at(ee) = traj.GetForce(ee, time + info_.integrator_dt);
+        }
+    }
+
+    vector_t MPCController::ComputeGroundForceTorques(int end_effector) {
+        vector_t torques(3);    // TODO: Make not hard coded
+
+        mpc::matrix_33t J = model_.GetEEJacobian(end_effector, q_des_);
+        mpc::matrix_33t R = model_.GetBaseRotationMatrix(q_des_);
+
+        torques = J*R*force_des_.at(end_effector);
+
+        return torques;
+    }
+
+    vector_t MPCController::ComputeSwingTorques(int end_effector) {
+        mpc::vector_3t acc;
+        acc.setZero();
+
+        for (int ee = 0; ee < 4; ee++) {
+            acc += force_des_.at(ee);
+        }
+        acc = acc/model_.GetMass();
+
+
+        const mpc::matrix_33t J = model_.GetEEJacobian(end_effector, q_des_);
+        const mpc::matrix_33t Jdot = model_.GetEEJacobianDeriv(end_effector, q_des_, v_des_);
+        const mpc::matrix_33t Lambda = model_.GetOperationalSpaceInertia(end_effector, q_des_);
+
+        const mpc::matrix_3t C = model_.GetCoriolisMat(q_des_, v_des_);
+        const mpc::vector_3t G = model_.GetGravityVec(q_des_);
+
+        vector_t torques = J.transpose()*Lambda*(acc - Jdot*v_des_) + C*v_des_ + G;
+
+        return torques;
     }
 
 } // controller

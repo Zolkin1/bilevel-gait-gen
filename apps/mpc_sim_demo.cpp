@@ -29,7 +29,6 @@ int main() {
     mpc::MPCInfo info;
     info.discretization_steps = config.ParseNumber<double>("discretization_steps");
     info.num_nodes = config.ParseNumber<int>("num_nodes");
-//    info.time_horizon = config.ParseNumber<double>("time_horizon");
     info.num_qp_iterations = config.ParseNumber<int>("num_qp");
     info.friction_coef = config.ParseNumber<double>("friction_coef");
     info.vel_bounds = config.ParseEigenVector("vel_bounds");
@@ -46,11 +45,11 @@ int main() {
     info.ee_box_size = config.ParseEigenVector("ee_box_size");
     info.real_time_iters = config.ParseNumber<int>("run_time_iterations");
 
-    vector_t standing = config.ParseEigenVector("init_config");
+    const vector_t standing = config.ParseEigenVector("init_config");
 
-    vector_t mpc_init_state = config.ParseEigenVector("srb_init");
+    const vector_t mpc_init_state = config.ParseEigenVector("srb_init");
 
-    std::vector<vector_t> warm_start_states(info.num_nodes+1, mpc_init_state);
+    const std::vector<vector_t> warm_start_states(info.num_nodes+1, mpc_init_state);
 
     vector_t mpc_des_state = mpc_init_state;
     mpc_des_state.segment<2>(3) << config.ParseNumber<double>("xdot_des"), config.ParseNumber<double>("ydot_des");    // velocities

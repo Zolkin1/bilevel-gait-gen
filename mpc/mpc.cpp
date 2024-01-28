@@ -232,6 +232,7 @@ namespace mpc {
         for (int node = 0; node < info_.num_nodes; node++) {
             data_.cost_mat_.SetMatrix(Q_, node*num_states_, node*num_states_);
         }
+
         if (Q_forces_.size() > 0) {
             data_.cost_mat_.SetMatrix(Q_forces_, GetForceSplineStartIdx(), GetForceSplineStartIdx());
         }
@@ -430,8 +431,9 @@ namespace mpc {
     void MPC::AddForceCost(double weight) {
         const int num_forces = prev_traj_.GetTotalForceSplineVars();
         Q_forces_.resize(num_forces, num_forces);
+        Q_forces_.setZero();        // TODO: Note. Without this my performance was totally shot and occasional errors
         for (int i = 0; i < num_forces; i++) {
-            Q_forces_(i,i) = weight * ((i+1) % 2);
+            Q_forces_(i,i) = weight;
         }
     }
 

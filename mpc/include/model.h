@@ -17,8 +17,10 @@
 namespace mpc {
     using vector_t = Eigen::VectorXd;
     using matrix_t =  Eigen::MatrixXd;
+    using vector_3t = Eigen::Vector3d;
     using vector6_t = Eigen::Vector<double, 6>;
     using matrix_3t = Eigen::Matrix3Xd;
+    using matrix_33t = Eigen::Matrix3d;
 
     // TODO: Have the model hold which constraints it works with
     class Model {
@@ -58,6 +60,15 @@ namespace mpc {
         int GetFullModelConfigSpace() const;
 
         virtual std::vector<Eigen::Vector3d> GetEndEffectorLocations(const vector_t& q) = 0;
+
+        matrix_33t GetEEJacobian(int end_effector, const vector_t& q);
+        matrix_33t GetEEJacobianDeriv(int end_effector, const vector_t& q, const vector_t& v);
+
+        matrix_33t GetBaseRotationMatrix(const vector_t& q);
+
+        matrix_33t GetOperationalSpaceInertia(int end_effector, const vector_t& q);
+        matrix_3t GetCoriolisMat(const vector_t& q, const vector_t& v);
+        vector_3t GetGravityVec(const vector_t& q);
 
     protected:
         virtual void ConvertMPCStateToPinocchioState(const vector_t& state, Eigen::Ref<vector_t> q_pin) const = 0;

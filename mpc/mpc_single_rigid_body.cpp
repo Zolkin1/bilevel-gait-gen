@@ -58,6 +58,8 @@ namespace mpc {
         AddGradientCost();
         AddFinalCost();
 
+//        data_.cost_mat_.SetDiagonalMatrix(1, 0, 0, data_.num_decision_vars);
+
         // -------------------- Constraints ---------------------- //
         constraint_idx_ = 0;
         utils::Timer dynamics_timer("dynamics constraints");
@@ -85,9 +87,9 @@ namespace mpc {
 
         data_.ConstructSparseMats();
         data_.ConstructVectors();
-        if (constraint_projection_) {
-            data_.ApplyProjection();
-        }
+//        if (constraint_projection_) {
+//            data_.ApplyProjection();
+//        }
 
         // ----------------------- Solve ------------------------- //
         qp_solver->SetupQP(data_, prev_qp_sol);
@@ -418,24 +420,6 @@ namespace mpc {
         // TODO: I think this may not be doing what I want... looks weird
         for (int node = 0; node < info_.num_nodes+1; node++) {
             for (int ee = 0; ee < num_ee_; ee++) {
-//                switch (ee) {
-//                    case 0:
-//                        data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) << 0.15, 0.1;
-//                        data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) << 0.1, 0.05;
-//                        break;
-//                    case 1:
-//                        data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) << 0.15, -0.05;
-//                        data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) << 0.1, -0.1;
-//                        break;
-//                    case 2:
-//                        data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) << -0.15, 0.1;
-//                        data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) << -0.25, 0.05;
-//                        break;
-//                    case 3:
-//                        data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) << -0.15, -0.05;
-//                        data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) << -0.25, -0.1;
-//                        break;
-//                }
                 data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) = bounds + model_.GetCOMToHip(ee).head<CONSTRAINT_COORDS>();
                 data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) = -bounds + model_.GetCOMToHip(ee).head<CONSTRAINT_COORDS>();
 
@@ -469,7 +453,7 @@ namespace mpc {
 
         // -------------- End Effector Start Constraints -------------- //
         idx = 0;
-        // TODO: DMA
+//         TODO: DMA
         matrix_t M(data_.num_start_ee_constraints_, prev_traj_.GetTotalPosSplineVars());
         M.setZero();
         for (int ee = 0; ee < num_ee_; ee++) {
@@ -486,7 +470,6 @@ namespace mpc {
 
                 assert(vars_lin.size() == vars_affecting);
 
-//                vars_idx = (ee*2*3) + coord*3 + vars_affecting;
                 M.block(idx, vars_idx - vars_affecting, 1, vars_affecting) =
                         vars_lin.transpose();
                 idx++;
