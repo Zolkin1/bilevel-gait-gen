@@ -53,7 +53,7 @@ namespace simulator {
          * Interface with Mujoco to provide the current control action.
          * Puts the controls into the control vector provided.
          */
-        void GetControlAction(const mjData* data, mjtNum* control);
+        void GetControlAction(mjData* data, mjtNum* control); // TODO: make the data constant again!
 
         /**
          * Creates the mapping of the joints from mujoco to pinocchio.

@@ -16,7 +16,7 @@ foot_type: "POINT_FEET"
 
 # initial joint config
 # xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
-init_config: [0., 0., 0.3441, 0, 0, 0, 1.0, # -0.0004, 0.004, 0.0001,
+init_config: [0., 0., 0.361, 0, 0, 0, 1.0, # -0.0004, 0.004, 0.0001,
               -0.02, 0.2, -0.977,       # front left
               0.02, 0.2, -0.977,        # front right
               0.08, 0.45, -1.03,        # rear left
@@ -59,10 +59,15 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
 
 
 #SRBD Configs:
-srb_init: [0, 0, 0.3541,
-            0, 0, 0,
-            0, 0, 0, 1,
-            0, 0, 0]
+#srb_init: [0, 0, 0.3541,
+#            0, 0, 0,
+#            0, 0, 0, 1,
+#            0, 0, 0]
+
+srb_init: [0, 0, 0.361,
+           0, 0, 0,
+           0, 0, 0, 1,
+           0, 0, 0]
 
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
@@ -75,7 +80,7 @@ torque_bounds: [100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100]
-friction_coef: 0.6
+friction_coef: 0.3
 
 # TODO: Tune
 base_pos_gains: [0, 0]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
@@ -119,7 +124,7 @@ joint_bounds_ub: [0.802851, 4.18879, -0.916298,
 #   0.802851, 4.18879, -0.916298]
 
 num_switches: 2
-force_bound: 300
+force_bound: 200 #200
 
 swing_height: 0.1
 

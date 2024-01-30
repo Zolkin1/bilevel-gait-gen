@@ -87,7 +87,7 @@ namespace mpc {
         J.setZero();
 
         const int id = frame_map_.at(frames_.at(end_effector));
-        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, id, J);
+        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, id, pinocchio::WORLD, J);
 
         return J.block<3,3>(0, 6 + 3*end_effector);    // TODO: Make not hard coded
     }
@@ -100,7 +100,7 @@ namespace mpc {
         Jdot.setZero();
 
         const int id = frame_map_.at(frames_.at(end_effector));
-        pinocchio::getFrameJacobianTimeVariation(pin_model_, *pin_data_, id, pinocchio::LOCAL_WORLD_ALIGNED, Jdot);
+        pinocchio::getFrameJacobianTimeVariation(pin_model_, *pin_data_, id, pinocchio::WORLD, Jdot);
 
         return Jdot.block<3,3>(0, 6 + 3*end_effector);    // TODO: Make not hard coded
     }
@@ -110,31 +110,52 @@ namespace mpc {
         return pin_data_->oMi[pin_model_.getJointId("root_joint")].rotation().matrix();
     }
 
-    matrix_3t Model::GetCoriolisMat(const vector_t& q, const vector_t& v) {
-        // Get C
-        pinocchio::computeCoriolisMatrix(pin_model_, *pin_data_, q, v);
-        return pin_data_->C;
-    }
+//    matrix_t Model::GetCoriolisMat(const vector_t& q, const vector_t& v) {
+//
+//        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+//
+//        std::cout << "omi: \n" << pin_data_->oMi[7].rotation() << std::endl;
+//
+//        // Get C
+//        pinocchio::computeCoriolisMatrix(pin_model_, *pin_data_, q, v);
+//        return pin_data_->C;
+//    }
 
-    vector_3t Model::GetGravityVec(const mpc::vector_t& q) {
-        // Get g
-        pinocchio::computeGeneralizedGravity(pin_model_, *pin_data_, q);
-
-        return pin_data_->g;
-    }
+//    vector_t Model::GetGravityVec(const mpc::vector_t& q) {
+//        // Get g
+//        pinocchio::computeGeneralizedGravity(pin_model_, *pin_data_, q);
+//
+//        return pin_data_->g;
+//    }
 
     matrix_33t Model::GetOperationalSpaceInertia(int end_effector, const mpc::vector_t& q) {
         pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
 
-        // Get M
+//        vector_t q1 = q;
+//        q1.segment<4>(0) << 0, 0, 0, 1;
+
+//        std::cout << "quat norm: " << q.segment<4>(3).norm() << std::endl;
+
+        // Get
         pinocchio::crba(pin_model_, *pin_data_,  q);
 
         // Make M symmetric
         pin_data_->M.triangularView<Eigen::StrictlyLower>() =
-        pin_data_->M.transpose().triangularView<Eigen::StrictlyLower>();
+                pin_data_->M.transpose().triangularView<Eigen::StrictlyLower>();
 
-        matrix_33t J = GetEEJacobian(end_effector, q);
+//        matrix_t M = pin_data_->M;
+//        M.triangularView<Eigen::StrictlyLower>() = M.transpose().triangularView<Eigen::StrictlyLower>();
 
-        return J*pin_data_->M.ldlt().solve(J.transpose());
+        pinocchio::Data::Matrix6x J(6, pin_model_.nv);
+        J.setZero();
+        const int id = frame_map_.at(frames_.at(end_effector));
+        pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, id, J);
+
+
+        return J.topRows<3>()*pin_data_->M.inverse()*J.topRows<3>().transpose();
+    }
+
+    vector_t Model::GetNonlinearEffects(const mpc::vector_t& q, const mpc::vector_t& v) {
+        return pinocchio::nonLinearEffects(pin_model_, *pin_data_, q, v);
     }
 } // mpc

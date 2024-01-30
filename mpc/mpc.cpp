@@ -271,7 +271,7 @@ namespace mpc {
         data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
     }
 
-    void MPC::SetDefaultGaitTrajectory(Gaits gait, int num_polys, const std::array<std::array<double, 3>, 4>& ee_pos) {
+    void MPC::SetDefaultGaitTrajectory(Gaits gait, int num_polys, const std::vector<vector_3t>& ee_pos) {
         if (num_ee_ != 4) {
             throw std::runtime_error("Default gaits have only been implemented for 4 end effectors!");
         }

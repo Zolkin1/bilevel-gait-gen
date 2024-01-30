@@ -191,16 +191,16 @@ namespace mpc {
 
 
         // TODO: Turn into unit test
-        vector_t temp = ConvertTrajToQPVec(prev_traj_);
-        assert(temp.size() == prev_qp_sol.size());
-        for (int i = 0; i < temp.size(); i++) {
-            if (std::abs(temp(i) - prev_qp_sol(i)) > 1e-4) {
-                std::cout << "i: " << i << " error: " << std::abs(temp(i) - prev_qp_sol(i)) << std::endl;
-                std::cout << "traj->vec: " << temp(i) << std::endl;
-                std::cout << "vec: " << prev_qp_sol(i) << std::endl;
-                std::cout << "----------" << std::endl;
-            }
-        }
+//        vector_t temp = ConvertTrajToQPVec(prev_traj_);
+//        assert(temp.size() == prev_qp_sol.size());
+//        for (int i = 0; i < temp.size(); i++) {
+//            if (std::abs(temp(i) - prev_qp_sol(i)) > 1e-4) {
+//                std::cout << "i: " << i << " error: " << std::abs(temp(i) - prev_qp_sol(i)) << std::endl;
+//                std::cout << "traj->vec: " << temp(i) << std::endl;
+//                std::cout << "vec: " << prev_qp_sol(i) << std::endl;
+//                std::cout << "----------" << std::endl;
+//            }
+//        }
 
         solve_timer.StopTimer();
 
@@ -231,7 +231,7 @@ namespace mpc {
 //            std::cout << "Node: " << i << ", net force: " << net_force.transpose() << std::endl;
 //        }
 
-//        prev_traj_.PrintTrajectoryToFile("mpc_demo_traj.txt");
+        prev_traj_.PrintTrajectoryToFile("mpc_demo_traj.txt");
 
         num_run_++;
 

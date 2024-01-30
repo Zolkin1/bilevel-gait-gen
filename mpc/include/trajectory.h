@@ -8,11 +8,13 @@
 #include <Eigen/Core>
 
 #include "spline.h"
+#include "controller.h"
 //#include "model.h"
 
 namespace mpc {
     using vector_t = Eigen::VectorXd;
     using matrix_t = Eigen::MatrixXd;
+    using vector_3t = Eigen::Vector3d;
 
     class Trajectory {
         static int constexpr POS_VARS = 3;
@@ -61,7 +63,7 @@ namespace mpc {
 
         std::pair<int, int> GetForceSplineIndex(int ee, double time,  int coord) const;
 
-        void SetPositionsForAllTime(int ee, const std::array<double, POS_VARS>& ee_pos);
+        void SetPositionsForAllTime(int ee, const vector_3t& ee_pos);
 
         void PrintTrajectoryToFile(const std::string& file_name) const;
 
@@ -131,6 +133,8 @@ namespace mpc {
 
         int GetNode(double time) const;
 
+        controller::Contact GetDesiredContacts(double time) const;
+
     protected:
     private:
         void UpdateSplineVarsCount();
@@ -160,8 +164,8 @@ namespace mpc {
 
         std::vector<std::vector<double>> contact_times_;
 
-        std::array<vector_t, 20> full_config_;
-        std::array<vector_t, 20> full_velocity_;
+        std::array<vector_t, 50> full_config_;
+        std::array<vector_t, 50> full_velocity_;
 
         double init_time_;
 

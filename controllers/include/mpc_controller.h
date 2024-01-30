@@ -95,6 +95,10 @@ namespace controller {
         mpc::SingleRigidBodyModel model_;
 
         mpc::MPCInfo info_;
+
+        int num_polys_;
+
+        vector_t full_body_state_;
     };
 } // controller
 

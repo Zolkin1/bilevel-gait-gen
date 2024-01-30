@@ -35,20 +35,14 @@ namespace controller {
                                  info_(info),
                                  model_(robot_urdf, info.ee_frames, info.discretization_steps, info.integrator_dt, info.nom_state){  // TODO: Not hard coded
 
+        num_polys_ = num_polys;
+
         // TODO: Do I need the model if the basic controller also has pinocchio data?
 
         force_des_.resize(4);
 
-        // TODO: Get this from IC
-        std::array<std::array<double, 3>, 4> ee_pos{};
-        ee_pos.at(0) = {0.2, 0.2, 0};
-        ee_pos.at(1) = {0.2, -0.2, 0};
-        ee_pos.at(2) = {-0.2, 0.2, 0};
-        ee_pos.at(3) = {-0.2, -0.2, 0};
-
         mpc_.SetStateTrajectoryWarmStart(warm_start_states);
 
-        mpc_.SetDefaultGaitTrajectory(mpc::Gaits::Trot, num_polys, ee_pos);
 
         const vector_t des_alg = model_.ConvertManifoldStateToTangentState(state_des, warm_start_states.at(0));
 
@@ -69,21 +63,24 @@ namespace controller {
 
     void MPCController::InitSolver(const vector_t& full_body_state, const vector_t& mpc_state) {
         state_ = mpc_state;
-//        ee_locations_ = model_.GetEndEffectorLocations(full_body_state);
-        std::array<std::array<double, 3>, 4> ee_pos{};
-        ee_pos.at(0) = {0.2, 0.2, 0};
-        ee_pos.at(1) = {0.2, -0.2, 0};
-        ee_pos.at(2) = {-0.2, 0.2, 0};
-        ee_pos.at(3) = {-0.2, -0.2, 0};
+        full_body_state_ = full_body_state;
+        q_des_ = full_body_state;
+        ee_locations_ = model_.GetEndEffectorLocations(full_body_state);
+        mpc_.SetDefaultGaitTrajectory(mpc::Gaits::Trot, num_polys_, ee_locations_);
 
-        ee_locations_.resize(4);
-        for (int i = 0; i < ee_locations_.size(); i++) {
-            for (int j = 0; j < 3; j++) {
-                ee_locations_.at(i)(j) = ee_pos.at(i).at(j);
-            }
-        }
+//        std::array<std::array<double, 3>, 4> ee_pos{};
+//        ee_pos.at(0) = {0.2, 0.2, 0};
+//        ee_pos.at(1) = {0.2, -0.2, 0};
+//        ee_pos.at(2) = {-0.2, 0.2, 0};
+//        ee_pos.at(3) = {-0.2, -0.2, 0};
+//
+//        ee_locations_.resize(4);
+//        for (int i = 0; i < ee_locations_.size(); i++) {
+//            for (int j = 0; j < 3; j++) {
+//                ee_locations_.at(i)(j) = ee_pos.at(i).at(j);
+//            }
+//        }
 
-        // TODO: Debug in release mode
         mpc_.CreateInitialRun(mpc_state, ee_locations_);
         mpc_.PrintStats();
 
@@ -103,36 +100,52 @@ namespace controller {
     vector_t MPCController::ComputeControlAction(const vector_t& q, const vector_t& v,
                                                  const vector_t& a, const controller::Contact& contact,
                                                  double time) {
+
+
         const vector_t state = ReconstructState(q, v, a);
         std::vector<mpc::vector_3t> ee_locations = model_.GetEndEffectorLocations(q);
 
         state_time_mut_.lock();
         state_ = state;
-        time_ = time;
+
+        if (time > time_) {
+            time_ = time;
+        }
+
         ee_locations_ = ee_locations;
         state_time_mut_.unlock();
 
         mpc_res_mut_.lock();
         GetTargetsFromTraj(traj_, time_);
+        Contact contact1 = traj_.GetDesiredContacts(time);  // TODO: Implement
         mpc_res_mut_.unlock();
 
         // TODO: DMA
         vector_t control_action = vector_t::Zero(3*num_inputs_);    // joints, joint velocities, torques
+//        control_action.head(num_inputs_) << -0.02, 0.3, -0.977, 0.02, 0.2, -0.977, 0.08, 0.45, -1.03, -0.08, 0.45, -1.03; //= q_des_.tail(num_inputs_);
+//        control_action.head(pin_model_.nq) = q_des_;
+
+        // Configurations look ok (still need more checking), but need to focus on torques first
         control_action.head(num_inputs_) = q_des_.tail(num_inputs_);
-        control_action.segment(num_inputs_, num_inputs_) = v_des_.tail(num_inputs_);
-        for (int ee = 0; ee < contact.in_contact_.size(); ee++) {
-            if (contact.in_contact_.at(ee)) {
+        control_action.segment(num_inputs_, num_inputs_) = vector_t::Zero(12); //v_des_.tail(num_inputs_);
+
+
+        for (int ee = 0; ee < contact1.in_contact_.size(); ee++) {
+            // TODO: Should I be going on actual or desired contacts?
+            if (contact1.in_contact_.at(ee)) {
                 control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeGroundForceTorques(ee); // TODO: Make not hard coded
             } else {
-                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeSwingTorques(ee); // TODO: Make not hard coded
+//                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeSwingTorques(ee); // TODO: Make not hard coded
             }
         }
+
+
+//        control_action.segment(num_inputs_*2 + 6, 3) = vector_t::Zero(3);
 
         return control_action;
 
         // Recover torques using ID
 
-//        Contact contact1 = mpc_.GetDesiredContacts(time);
 //        qp_controller_.UpdateDesiredContacts(contact1);
 
 //        return qp_controller_.ComputeControlAction(q, v, a, contact, time);
@@ -151,8 +164,16 @@ namespace controller {
         state.segment<POS_VARS>(mpc::SingleRigidBodyModel::LIN_MOM_START) = v.head<3>() * mpc_.GetModel()->GetMass();
 
         // Orientation
-        state.segment<mpc::SingleRigidBodyModel::QUAT_SIZE>(mpc::SingleRigidBodyModel::ORIENTATION_START) =
-                q.segment<mpc::SingleRigidBodyModel::QUAT_SIZE>(POS_VARS);
+        Eigen::Quaterniond quat(static_cast<Eigen::Vector4d>(q.segment<4>(3)));
+        // Note the warning on the pinocchio function!
+        pinocchio::quaternion::firstOrderNormalize(quat);
+        state(mpc::SingleRigidBodyModel::ORIENTATION_START) = quat.x();
+        state(mpc::SingleRigidBodyModel::ORIENTATION_START + 1) = quat.y();
+        state(mpc::SingleRigidBodyModel::ORIENTATION_START + 2) = quat.z();
+        state(mpc::SingleRigidBodyModel::ORIENTATION_START + 3) = quat.w();
+
+//        state.segment<mpc::SingleRigidBodyModel::QUAT_SIZE>(mpc::SingleRigidBodyModel::ORIENTATION_START) =
+//                q.segment<mpc::SingleRigidBodyModel::QUAT_SIZE>(POS_VARS);
 
         // Angular Momentum
         state.segment<POS_VARS>(mpc::SingleRigidBodyModel::ANG_VEL_START) =
@@ -160,13 +181,7 @@ namespace controller {
 
 //        state.segment<3>(3) = v.segment<3>(3) * mpc_.GetModel()->GetMass();
 
-//        Eigen::Quaterniond quat(static_cast<Eigen::Vector4d>(q.segment<4>(3)));
-        // Note the warning on the pinocchio function!
-//        pinocchio::quaternion::firstOrderNormalize(quat);
-//        state(9) = quat.x();
-//        state(10) = quat.y();
-//        state(11) = quat.z();
-//        state(12) = quat.w();
+
 //
 //        state.segment<mpc::CentroidalModel::POS_VARS>(mpc::CentroidalModel::MOMENTUM_OFFSET) = q.head<mpc::CentroidalModel::POS_VARS>();
 //
@@ -246,26 +261,41 @@ namespace controller {
     }
 
     void MPCController::FullBodyTrajUpdate(mpc::Trajectory& traj) {
-        // TODO: Figure out a better initial guess
-        vector_t prev_state = vector_t::Zero(model_.GetNumManifoldStates());
-        for (int i = 0; i < 20; i++) {
+        vector_t state_guess = q_des_;
+        for (int i = 0; i < 50; i++) {
             std::vector<mpc::vector_3t> traj_ee_locations(4);
             for (int ee = 0; ee < 4; ee++) {
                 // Grab state and end effector locations at that time
                 traj_ee_locations.at(ee) = traj.GetEndEffectorLocation(ee, traj.GetTime(i));
             }
             traj.UpdateFullConfig(i, model_.InverseKinematics(traj.GetState(i),
-                                                              traj_ee_locations, prev_state,
+                                                              traj_ee_locations, state_guess,
                                                               info_.joint_bounds_ub,
                                                               info_.joint_bounds_lb));
+            state_guess = traj.GetFullConfig(i);
 
-            // TODO: Do the velocity IK
-            traj.UpdateFullVelocity(i, vector_t::Zero(model_.GetFullModelConfigSpace()-1));
+            if (i >= 1) {
+                // TODO: Do the velocity IK
+
+                vector_t vel(model_.GetFullModelConfigSpace() - 1);
+                vel.head<6>() << traj.GetState(i).segment<3>(3), traj.GetState(i).segment<3>(9);
+                vel.tail(num_inputs_) = (traj.GetFullConfig(i) - traj.GetFullConfig(i-1)).tail(num_inputs_)/info_.integrator_dt;
+
+                traj.UpdateFullVelocity(i-1, vel);
+            }
         }
+        traj.UpdateFullVelocity(49, vector_t::Zero(pin_model_.nv));
     }
 
     void MPCController::GetTargetsFromTraj(const mpc::Trajectory& traj, double time) {
-        const int node = traj.GetNode(time)+1;
+        if (time < traj.GetTime(0)) {
+            time = traj.GetTime(0);
+        }
+
+        int node = traj.GetNode(time)+1;
+//        if (node > 19) {
+//            node = 19;
+//        }
 
         q_des_ = traj.GetFullConfig(node);
         v_des_ = traj.GetFullVelocity(node);
@@ -282,7 +312,7 @@ namespace controller {
         mpc::matrix_33t J = model_.GetEEJacobian(end_effector, q_des_);
         mpc::matrix_33t R = model_.GetBaseRotationMatrix(q_des_);
 
-        torques = J*R*force_des_.at(end_effector);
+        torques = J.transpose()*force_des_.at(end_effector); // TODO: Investigate R
 
         return torques;
     }
@@ -297,14 +327,15 @@ namespace controller {
         acc = acc/model_.GetMass();
 
 
+        const mpc::matrix_33t Lambda = model_.GetOperationalSpaceInertia(end_effector, q_des_);
+        const vector_t NL = model_.GetNonlinearEffects(q_des_, v_des_);
+
         const mpc::matrix_33t J = model_.GetEEJacobian(end_effector, q_des_);
         const mpc::matrix_33t Jdot = model_.GetEEJacobianDeriv(end_effector, q_des_, v_des_);
-        const mpc::matrix_33t Lambda = model_.GetOperationalSpaceInertia(end_effector, q_des_);
 
-        const mpc::matrix_3t C = model_.GetCoriolisMat(q_des_, v_des_);
-        const mpc::vector_3t G = model_.GetGravityVec(q_des_);
-
-        vector_t torques = J.transpose()*Lambda*(acc - Jdot*v_des_) + C*v_des_ + G;
+        vector_t torques = J.transpose()*Lambda*(acc - Jdot*v_des_.segment<3>(6 + 3*end_effector))
+                + NL.segment<3>(6 + 3*end_effector);
+                //(C*v_des_).segment<3>(6 + 3*end_effector) + G.segment<3>(6 + 3*end_effector);   // TODO: Check the indexing
 
         return torques;
     }

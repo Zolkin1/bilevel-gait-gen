@@ -300,8 +300,6 @@ namespace mpc {
 
         assert(end_effector_location.size() == num_ee_);
 
-//        vector_t state_out(pin_model_.nq);
-
         std::vector<int> frames;
         std::vector<pinocchio::SE3> ee_des;
         for (int ee = 0; ee < num_ee_; ee++) {
@@ -387,27 +385,15 @@ namespace mpc {
 //                        q(7+j) = joint_limits_ub(j);
 //                    }
 //                }
-
-//            if(!(i%10)) {
-//                std::cout << i << ": error = " << err.transpose() << std::endl;
-//            }
             }
 
-            if (success) {
-                std::cout << "Convergence achieved!" << std::endl;
-            } else {
-                std::cout << "\nWarning: the iterative algorithm has not reached convergence to the desired precision"
-                          << std::endl;
+            if (!success) {
+                std::cerr << "IK did not converge." << std::endl;
             }
-
-//            state_out.segment<3>(3*ee + 7) = q.segment<3>(3*ee + 7);
         }
 
-//        state_out.head<POS_VARS>() = state.head<POS_VARS>();
-//        state_out.segment<QUAT_SIZE>(POS_VARS) = state.segment<QUAT_SIZE>(QUAT_START);
-
         ik_timer.StopTimer();
-        ik_timer.PrintElapsedTime();
+//        ik_timer.PrintElapsedTime();
 
 //        return state_out;
         return q;
@@ -443,5 +429,84 @@ namespace mpc {
 
         return ee_locations;
     }
+
+//    vector_t SingleRigidBodyModel::VelocityInverseKinematics(const vector_t& config,
+//                                                             const std::vector<vector_3t>& end_effector_velocity,
+//                                                             const vector_t& vel_guess) {
+//
+//        std::vector<int> frames;
+//        for (int ee = 0; ee < num_ee_; ee++) {
+//            frames.push_back(frame_map_.at(frames_.at(ee)));
+//            ee_des.emplace_back(matrix_33t::Identity(), end_effector_location.at(ee));
+//        }
+//
+//        const double eps  = 1e-4;
+//        const int IT_MAX  = 1000;
+//        const double DT   = 1e-1;
+//        const double damp = 1e-6;
+//
+//        pinocchio::Data::Matrix6x Jdotee(6,pin_model_.nv);
+//        Jdotee.setZero();
+//
+//        Eigen::Matrix<double, 6, Eigen::Dynamic> Jdotb(6, pin_model_.nv);
+//        Jdotb.setZero();
+//
+//        matrix_t Jdot(9, pin_model_.nv);
+//        Jdot.setZero();
+//
+//        bool success = false;
+//        typedef Eigen::Matrix<double, 6, 1> Vector6d;
+//        vector_t err(9);
+//
+//        Eigen::VectorXd v(pin_model_.nv);
+//        v.setZero();
+//
+//        Eigen::VectorXd a(pin_model_.nv);
+//        a.setZero();
+//
+//        std::vector<vector_3t> ee_err(num_ee_);
+//
+//        // TODO: Figure out how to do this in one IK solve
+//        for (int ee = 0; ee < num_ee_; ee++) {
+//            for (int i = 0; i < IT_MAX; i++) {
+//                pinocchio::forwardKinematics(pin_model_, *pin_data_, config, v);
+//                pinocchio::updateFramePlacements(pin_model_, *pin_data_);
+//
+//                ee_err.at(ee) = pin_data_->oMf[frames.at(ee)].translation() - J*qdot;
+//                err.segment<3>(0) = ee_err.at(ee);
+//
+//                const pinocchio::SE3 body_err = pin_data_->oMi[base_joint_id].actInv(
+//                        body_des); //GetSE3Error(base_joint_id, body_des);
+//                err.tail<6>() = pinocchio::log6(body_err).toVector();
+//
+//                if (err.norm() < eps) {
+//                    success = true;
+//                    break;
+//                }
+//
+//                ComputeJacobianForIK(q, ee_err.at(ee), frames.at(ee), Jee, true);
+//                J.block(0, 0, 3, pin_model_.nv) = -Jee.topRows<3>();
+//                Jee.setZero();
+//
+//                ComputeJacobianForIK(q, body_err, base_joint_id, Jb, false);
+//                J.block(3, 0, 6, pin_model_.nv) = Jb;
+//                Jb.setZero();
+//
+//                matrix_t JJt(9, 9);
+//                JJt.noalias() = J * J.transpose();
+//                JJt.diagonal().array() += damp;
+//                v.noalias() = -(J.transpose() * JJt.ldlt().solve(err));
+//                q = pinocchio::integrate(pin_model_, q, v * DT);
+//            }
+//
+//            if (!success) {
+//                std::cerr << "IK did not converge." << std::endl;
+//            }
+//        }
+//
+//        ik_timer.StopTimer();
+//
+//        return q;
+//    }
 
 } // mpc

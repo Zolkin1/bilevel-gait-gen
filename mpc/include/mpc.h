@@ -88,7 +88,7 @@ namespace mpc {
          */
         static std::vector<std::vector<double>> CreateDefaultSwitchingTimes(int num_switches, int num_ee, double horizon);
 
-        void SetDefaultGaitTrajectory(Gaits gait, int num_polys, const std::array<std::array<double, 3>, 4>& ee_pos);
+        void SetDefaultGaitTrajectory(Gaits gait, int num_polys, const std::vector<vector_3t>& ee_pos);
 
         void SetStateTrajectoryWarmStart(const std::vector<vector_t>& states);
 

@@ -67,6 +67,10 @@ namespace mpc {
                                    const vector_t& state_guess, const vector_t& joint_limits_ub,
                                    const vector_t& joint_limits_lb);
 
+//        vector_t VelocityInverseKinematics(const vector_t& config,
+//                                           const std::vector<vector_3t>& end_effector_velocity,
+//                                           const vector_t& vel_guess);
+
         std::vector<vector_3t> GetEndEffectorLocations(const vector_t& q) override;
 
         static constexpr int QUAT_SIZE = 4;

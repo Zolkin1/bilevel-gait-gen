@@ -63,8 +63,8 @@ namespace simulator {
         return low_level_controller_.get();
     }
 
-    // TODO: make data const again
-    void SimulationRobot::GetControlAction(const mjData* data, mjtNum* cntrl) {
+    // TODO: make data const again!
+    void SimulationRobot::GetControlAction(mjData* data, mjtNum* cntrl) {
         // Check that the dimensions allign
         if (muj_model_->nu != 3 * low_level_controller_->GetNumInputs()) {
             std::cerr << "Input mismatch! Mujoco is expecting " << muj_model_->nu/3 << " inputs while Pinocchio expects "
@@ -83,12 +83,18 @@ namespace simulator {
         // Compute control actions
         Eigen::VectorXd control = low_level_controller_->ComputeControlAction(q, v, a, contact_, data->time);
 
+//        Eigen::VectorXd control2 = ConvertPinocchioConfigToMujoco(control.head(muj_model_->nq));
+
         // Convert the control back to mujoco
         std::vector<mjtNum> muj_control = ConvertControlToMujoco(control);
 
         for (int i = 0; i < muj_model_->nu; i++) {
             cntrl[i] = muj_control.at(i);
         }
+
+//        for (int i = 0; i < muj_model_->nq; i++) {
+//            data->qpos[i] = control2(i);
+//        }
     }
 
     // ---------------------- Joint Map ---------------------- //
@@ -305,7 +311,7 @@ namespace simulator {
     }
 
     std::vector<mjtNum> SimulationRobot::ConvertControlToMujoco(const Eigen::VectorXd& control) const {
-        std::vector<mjtNum> muj_control(3*control.size());
+        std::vector<mjtNum> muj_control(control.size());
         for (int i = 0; i < 3; i++) {
             Eigen::VectorXd control_part = ConvertPinocchioJointToMujoco(control.segment(i*num_inputs_, num_inputs_));
             for (int j = 0; j < num_inputs_; j++) {

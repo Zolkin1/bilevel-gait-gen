@@ -70,8 +70,15 @@ int main() {
     ee_pos.at(2) = {-0.2, 0.2, 0};
     ee_pos.at(3) = {-0.2, -0.2, 0};
 
+    std::vector<Eigen::Vector3d> ee_locations(4);
+    for (int i = 0; i < ee_locations.size(); i++) {
+        for (int j = 0; j < 3; j++) {
+            ee_locations.at(i)(j) = ee_pos.at(i).at(j);
+        }
+    }
+
     // Set warm starts and defaults
-    mpc.SetDefaultGaitTrajectory(mpc::Gaits::Trot, config.ParseNumber<int>("num_polys"), ee_pos);
+    mpc.SetDefaultGaitTrajectory(mpc::Gaits::Trot, config.ParseNumber<int>("num_polys"), ee_locations);
     mpc.SetStateTrajectoryWarmStart(warm_start);
 
     matrix_t Q(config.ParseEigenVector("Q_srbd_diag").asDiagonal());
@@ -113,13 +120,6 @@ int main() {
     // Make the robot for visualization
     auto robot_file = config.ParseString("robot_xml");
     std::unique_ptr<simulator::SimulationRobot> robot = std::make_unique<simulator::SimulationRobot>(robot_file, mpc_controller);
-
-    std::vector<Eigen::Vector3d> ee_locations(4);
-    for (int i = 0; i < ee_locations.size(); i++) {
-        for (int j = 0; j < 3; j++) {
-            ee_locations.at(i)(j) = ee_pos.at(i).at(j);
-        }
-    }
 
     mpc.CreateInitialRun(init_state, ee_locations);
     mpc.PrintStats();

@@ -74,6 +74,7 @@ namespace mpc {
         this->node_dt_ = traj.node_dt_;
         this->full_config_ = traj.full_config_;
         this->full_velocity_ = traj.full_velocity_;
+        this->init_time_ = traj.init_time_;
 
         return *this;
     }
@@ -206,10 +207,10 @@ namespace mpc {
         return std::make_pair(num_spline_vars_before + idx_into_ee_coord_spline_vars + vars_idx, vars_affecting);
     }
 
-    void Trajectory::SetPositionsForAllTime(int ee, const std::array<double, POS_VARS>& ee_pos) {
+    void Trajectory::SetPositionsForAllTime(int ee, const vector_3t& ee_pos) {
         for (int coord = 0; coord < POS_VARS; coord++) {
             if (mut_flags_.at(ee).at(coord)) {
-                end_effector_pos_.at(ee).at(coord).SetAllPositions(ee_pos.at(coord));
+                end_effector_pos_.at(ee).at(coord).SetAllPositions(ee_pos(coord));
             }
         }
     }
@@ -631,5 +632,18 @@ namespace mpc {
         return std::ceil((time - init_time_)/node_dt_);
     }
 
+    controller::Contact Trajectory::GetDesiredContacts(double time) const {
+        controller::Contact contact(forces_.size());
+        for (int ee = 0; ee < forces_.size(); ee++) {
+            if (GetForce(ee, time)(2) <= 0.0) {
+                contact.in_contact_.at(ee) = false;
+            } else {
+                contact.in_contact_.at(ee) = true;
+            }
+        }
+        // TODO: Get the contact frames
+
+        return contact;
+    }
 
 } // mpc

@@ -67,8 +67,9 @@ namespace mpc {
         matrix_33t GetBaseRotationMatrix(const vector_t& q);
 
         matrix_33t GetOperationalSpaceInertia(int end_effector, const vector_t& q);
-        matrix_3t GetCoriolisMat(const vector_t& q, const vector_t& v);
-        vector_3t GetGravityVec(const vector_t& q);
+//        matrix_t GetCoriolisMat(const vector_t& q, const vector_t& v);
+//        vector_t GetGravityVec(const vector_t& q);
+        vector_t GetNonlinearEffects(const vector_t& q, const vector_t& v);
 
     protected:
         virtual void ConvertMPCStateToPinocchioState(const vector_t& state, Eigen::Ref<vector_t> q_pin) const = 0;
