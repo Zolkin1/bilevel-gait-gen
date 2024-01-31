@@ -298,7 +298,16 @@ namespace mpc {
     }
 
     int Spline::GetPolyIdx(double time) const {
-        assert(time >= poly_times_.at(0));
+        if (time - poly_times_.at(0) < 0 && time - poly_times_.at(0) > -1e-3) {
+            time = poly_times_.at(0);
+        } else if (time < poly_times_.at(0)) {
+            throw std::runtime_error("Invalid time to query spline, time too small.");
+        }
+
+        if (time > poly_times_.at(poly_times_.size()-1) && (time - poly_times_.at(poly_times_.size()-1)) < 1e-3) {
+            time = poly_times_.at(poly_times_.size()-1);
+        }
+
         for (int i = 1; i < poly_times_.size(); i++) {     // Start at i = 1 because t = 0  at 0
             if (time < poly_times_.at(i)) {     // Note: removed equality here
                 return i;
@@ -822,6 +831,22 @@ namespace mpc {
 
     bool Spline::IsEndPairConstant() const {
         return end_pair_;
+    }
+
+    void Spline::ChangeSplineTimes(const std::vector<double>& times) {
+        // Need to assign the times at every point associated with a constant
+        int times_idx = 0;
+        for (int i = 0; i < poly_times_.size(); i++) {
+            if (poly_vars_.at(i).size() == 1) {
+                poly_times_.at(i) = times.at(times_idx);
+                times_idx++;
+            } else if (times_idx > 0) {
+                poly_times_.at(i) = poly_times_.at(i-1) + (times.at(times_idx) - times.at(times_idx-1))/num_polys_;
+            } else {
+                poly_times_.at(i + 1) = poly_times_.at(i) + (times.at(times_idx) - poly_times_.at(0))/num_polys_;
+                i++;
+            }
+        }
     }
 
 } // mpc

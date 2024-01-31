@@ -270,30 +270,18 @@ namespace mpc {
             B_ = integrator_.GetDt()*B_;
             C_ = integrator_.GetDt()*C_;
 
-//            std::cout << "A: \n" << A_ << std::endl;
-//            std::cout << "A*state: \n" << A_ * model_.ConvertManifoldStateToTangentState(prev_traj_.GetState(node), state) << std::endl;
-//            std::cout << "B: \n" << B_ << std::endl;
-//            std::cout << "C: \n" << C_ << std::endl;
-
-//            B_.topRows(3).setZero();
-
             assert(B_.cols() == num_inputs_);
             get_dyn_timer.StopTimer();
-//            get_dyn_timer.PrintElapsedTime();
+
             data_.constraint_mat_.SetMatrix(A_, constraint_idx_ + (node + 1) * num_states_, node * num_states_);
 
             data_.constraint_mat_.SetDiagonalMatrix(-1, constraint_idx_ + (node + 1) * num_states_,
                                                     (node + 1) * num_states_, num_states_);
 
-//            const matrix_t B_forces = B_.leftCols(force_spline_vars);
-//            const matrix_t B_positions = B_.rightCols(position_spline_vars);
-
             assert(B_.cols() == force_spline_vars + position_spline_vars);
             data_.constraint_mat_.SetMatrix(B_, constraint_idx_ + (node+1)*num_states_,
                                             GetForceSplineStartIdx());
 
-//            data_.constraint_mat_.SetMatrix(B_forces, constraint_idx_ + (node + 1) * num_states_, GetForceSplineStartIdx());
-//            data_.constraint_mat_.SetMatrix(B_positions, constraint_idx_ + (node + 1) * num_states_, GetPosSplineStartIdx());
             data_.dynamics_constants.segment(constraint_idx_ + (node + 1) * num_states_, num_states_) = -C_;
         }
         constraint_idx_ = (info_.num_nodes+1)*num_states_;
@@ -426,22 +414,18 @@ namespace mpc {
                 for (int coord = 0; coord < CONSTRAINT_COORDS; coord++) {
                     A(idx, node*num_states_ + coord) = -1;
 
-                    if (coord < 2) {
-                        int vars_idx, vars_affecting;
-                        std::tie(vars_idx, vars_affecting) =
-                                prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
+                    int vars_idx, vars_affecting;
+                    std::tie(vars_idx, vars_affecting) =
+                            prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
 
-                        // TODO: DMA
-                        vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position,
-                                                                    ee, coord, GetTime(node));
+                    // TODO: DMA
+                    vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position,
+                                                                ee, coord, GetTime(node));
 
-                        A.block(idx,
-                                pos_start_idx + vars_idx - vars_affecting,
-                                1, vars_affecting) = vars_lin.transpose();
-                    } else {
-                        data_.ee_location_ub_(idx) += prev_traj_.GetEndEffectorLocation(ee, GetTime(node))(2) - 0.45;
-                        data_.ee_location_lb_(idx) += prev_traj_.GetEndEffectorLocation(ee, GetTime(node))(2) - 0.45 + 0.0;
-                    }
+                    A.block(idx,
+                            pos_start_idx + vars_idx - vars_affecting,
+                            1, vars_affecting) = vars_lin.transpose();
+
                     idx++;
                 }
             }
@@ -534,114 +518,127 @@ namespace mpc {
         }
     }
 
-//    bool MPCSingleRigidBody::ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) {
-//        if (solve_type_.at(solve_type_.size()-1) == "Solved") {
-//            QPData partial_data = data_;
-//            partial_data.InitQPMats();
-//
-//            // For now the cost terms are not effected by the contact times
-//
-//            partials.dP.resize(data_.num_decision_vars, data_.num_decision_vars);
-//            partials.dq.resize(data_.num_decision_vars);
-//            partials.dA.resize(data_.GetTotalNumConstraints(), data_.num_decision_vars);
-//            partials.du.resize(data_.GetTotalNumConstraints());
-//            partials.dl.resize(data_.GetTotalNumConstraints());
-//
-//            // TODO: Make this more general
-//            partials.dP *= 0;
-//            partials.dq *= 0;
-//
-//
-//            // Box constraints have no effect
-//            // Force box constraints have no effect
-//            // Cone constraints have on effect
-//
-//            // Dynamics constraints have an effect
-////            utils::SparseMatrixBuilder A;
-//            partial_data.constraint_mat_.Reserve(data_.sparse_constraint_.nonZeros());
-////        const int contact_nodes = prev_traj_.GetNumContactNodes(ee);
-//            matrix_t Adyn_deriv, Bdyn_deriv;
-//            vector_t Cdyn_deriv;
-//
-//            for (int node = 0; node < info_.num_nodes; node++) {
+    bool MPCSingleRigidBody::ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int contact_time_idx) {
+        if (solve_type_.at(solve_type_.size()-1) == "Solved") {
+            QPData partial_data = data_;
+            partial_data.InitQPMats();
+
+            // For now the cost terms are not effected by the contact times
+
+            partials.dP.resize(data_.num_decision_vars, data_.num_decision_vars);
+            partials.dq.resize(data_.num_decision_vars);
+            partials.dA.resize(data_.GetTotalNumConstraints(), data_.num_decision_vars);
+            partials.du.resize(data_.GetTotalNumConstraints());
+            partials.dl.resize(data_.GetTotalNumConstraints());
+
+            // TODO: Make this more general
+            partials.dP.setZero();
+            partials.dq.setZero();
+
+
+            // Force box constraints have no effect
+            // Cone constraints have on effect
+
+            // Dynamics constraints have an effect
+            partial_data.constraint_mat_.Reserve(data_.sparse_constraint_.nonZeros());
+
+            matrix_t Adyn_deriv, Bdyn_deriv;
+            vector_t Cdyn_deriv;
+
+            for (int node = 0; node < info_.num_nodes; node++) {
 //                matrix_t A, B;
 //                vector_t C;
 //                model_.GetLinearDiscreteDynamics(traj.GetState(node), traj.GetState(0), traj,
 //                                                 GetTime(node), A, B, C);
-//
-//                model_.ComputeLinearizationPartialWrtContactTimes(Adyn_deriv, Bdyn_deriv, Cdyn_deriv,
-//                                                                  traj.GetState(node),
-//                                                                  traj, GetTime(node),
-//                                                                  ee, idx);
-//                // TODO: Is this sparsity pattern legit?
-////                std::cout << "A: \n" << A << std::endl;
-////                std::cout << "Adyn_deriv: \n" << Adyn_deriv << std::endl;
-////                std::cout << "Bdyn_deriv: \n" << Bdyn_deriv << std::endl;
-//
-//                partial_data.constraint_mat_.SetMatrix(Adyn_deriv, (node + 1) * num_states_, node * num_states_);
-//
-//                const matrix_t B_spline = Bdyn_deriv.leftCols(traj.GetTotalForceSplineVars());
-//                const matrix_t B_vels = Bdyn_deriv.rightCols(traj.GetTotalPosSplineVars());
-//
-//                partial_data.constraint_mat_.SetMatrix(B_vels, (node + 1) * num_states_, GetVelocityIndex(node));
-//                partial_data.constraint_mat_.SetMatrix(B_spline, (node + 1) * num_states_, GetForceSplineStartIdx());
-//
-//                partial_data.dynamics_constants.segment((node + 1) * num_states_, num_states_) = -Cdyn_deriv;
-//                partial_data.dynamics_constants.segment((node + 1) * num_states_, num_states_) = -Cdyn_deriv;
-//            }
-//
-//
-//            // FK constraints have an effect
-//            const int spline_offset = GetPosSplineStartIdx();
-//            int idx_eq = 0;
-//            int idx_ineq = 0;
-//
-//            for (int node = 0; node < info_.num_nodes+1; node++) {
-//                const int time = GetTime(node);
-//                for (int coord = 0; coord < POS_VARS; coord++) {
-//                    if (traj.IsSplineMutable(ee, coord)) {
-//                        int vars_index, vars_affecting;
-//                        std::tie(vars_index, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
-//
-//                        if (node >= num_ineq_fk_ || coord != 2) {
-//                            partial_data.constraint_mat_.SetMatrix(
-//                                    -traj.GetPositions().at(ee).at(coord).ComputeCoefPartialWrtTime(time, idx).transpose(),
-//                                    constraint_idx_ + idx_eq + data_.num_fk_ineq_constraints_,
-//                                    spline_offset + vars_index - vars_affecting);
-//                            idx_eq++;
-//                        } else {
-//                            partial_data.constraint_mat_.SetMatrix(
-//                                    -traj.GetPositions().at(ee).at(coord).ComputeCoefPartialWrtTime(time, idx).transpose(),
-//                                    constraint_idx_ + idx_ineq,
-//                                    spline_offset + vars_index - vars_affecting);
-//                            idx_ineq++;
-//                        }
-//                    } else {
-//                        if (node >= num_ineq_fk_ || coord != 2) {
-//                            partial_data.fk_constants_(idx_eq) +=
-//                                    traj.GetPositions().at(ee).at(coord).ComputePartialWrtTime(time, idx);
-//                            idx_eq++;
-//                        } else {
-//                            partial_data.fk_lb_(idx_ineq) +=
-//                                    traj.GetPositions().at(ee).at(coord).ComputePartialWrtTime(time, idx);
-//                            partial_data.fk_ub_(idx_ineq) +=
-//                                    traj.GetPositions().at(ee).at(coord).ComputePartialWrtTime(time, idx);
-//                            idx_ineq++;
-//                        }
-//                    }
-//                }
-//            }
-//
-//            partial_data.ConstructSparseMats();
-//            partial_data.ConstructVectors();
-//
-//            partials.dA = partial_data.sparse_constraint_;
-//            partials.dl = partial_data.lb_;
-//            partials.du = partial_data.ub_;
-//
-//            return true;
-//        } else {
-//            return false;
-//        }
-//    }
+
+                model_.ComputeLinearizationPartialWrtContactTimes(Adyn_deriv, Bdyn_deriv, Cdyn_deriv,
+                                                                  traj.GetState(node),
+                                                                  traj, GetTime(node),
+                                                                  ee, contact_time_idx);
+                Adyn_deriv = integrator_.GetDt()*Adyn_deriv;
+                Bdyn_deriv = integrator_.GetDt()*Bdyn_deriv;
+                Cdyn_deriv = integrator_.GetDt()*Cdyn_deriv;
+
+                // TODO: Is this sparsity pattern legit?
+//                std::cout << "A: \n" << A << std::endl;
+//                std::cout << "ee: " << ee << ", idx: " << idx << " Adyn_deriv: \n" << Adyn_deriv << std::endl;
+//                std::cout << "ee: " << ee << ", idx: " << idx << " Bdyn_deriv: \n" << Bdyn_deriv << std::endl;
+
+
+                partial_data.constraint_mat_.SetMatrix(Adyn_deriv, (node + 1) * num_states_, node * num_states_);
+
+                partial_data.constraint_mat_.SetMatrix(Bdyn_deriv, (node+1)*num_states_,
+                                                GetForceSplineStartIdx());
+
+                partial_data.dynamics_constants.segment((node + 1) * num_states_, num_states_) = -Cdyn_deriv;
+            }
+
+
+            // EE Box constraints have an effect
+            const int spline_offset = GetPosSplineStartIdx();
+            int ee_constraint_start = data_.num_dynamics_constraints + data_.num_force_box_constraints_
+                                            + data_.num_cone_constraints_;
+            int idx = ee*(data_.num_ee_location_constraints_/num_ee_);
+
+            for (int node = 0; node < info_.num_nodes+1; node++) {
+
+                const double time = GetTime(node);
+
+                for (int coord = 0; coord < 2; coord++) {
+
+                    if (traj.IsSplineMutable(ee, coord)) {
+                        int vars_index, vars_affecting;
+                        std::tie(vars_index, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
+
+                        // position coef dependence
+                        const vector_t pos_coef_partials = traj.GetPositionCoefPartialsWrtContactTime(ee, coord, time,
+                                                                                                      contact_time_idx);
+
+                        partial_data.constraint_mat_.SetMatrix(pos_coef_partials.transpose(),
+                                                               ee_constraint_start + idx,
+                                                               spline_offset + vars_index - vars_affecting);
+                        idx++;
+                    }
+                }
+            }
+
+            assert(idx - ee*(data_.num_ee_location_constraints_/num_ee_) == data_.num_ee_location_constraints_/num_ee_);
+
+
+
+            ee_constraint_start += data_.num_ee_location_constraints_;
+            idx = 2*ee;
+//         TODO: DMA
+            matrix_t M(data_.num_start_ee_constraints_, traj.GetTotalPosSplineVars());
+            M.setZero();
+
+            for (int coord = 0; coord < 2; coord++) {
+                int vars_idx, vars_affecting;
+                std::tie(vars_idx, vars_affecting) =
+                        prev_traj_.GetPositionSplineIndex(ee, GetTime(0), coord);
+
+                // Position coef dependence
+
+                // TODO: DMA
+                vector_t pos_coef_partials = traj.GetPositionCoefPartialsWrtContactTime(ee, coord, GetTime(0), contact_time_idx);
+
+                M.block(idx, vars_idx - vars_affecting, 1, vars_affecting) =
+                        pos_coef_partials.transpose();
+                idx++;
+            }
+
+            data_.constraint_mat_.SetMatrix(M, constraint_idx_, GetPosSplineStartIdx());
+
+            partial_data.ConstructSparseMats();
+            partial_data.ConstructVectors();
+
+            partials.dA = partial_data.sparse_constraint_;
+            partials.dl = partial_data.lb_;
+            partials.du = partial_data.ub_;
+
+            return true;
+        } else {
+            return false;
+        }
+    }
 } // mpc

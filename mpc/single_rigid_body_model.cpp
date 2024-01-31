@@ -430,12 +430,103 @@ namespace mpc {
         return ee_locations;
     }
 
+    void SingleRigidBodyModel::ComputeLinearizationPartialWrtContactTimes(matrix_t& dA, matrix_t& dB,
+                                                                 vector_t& dC, const vector_t& state,
+                                                                 const Trajectory& traj, double time,
+                                                                 int end_effector, int contact_time_idx) {
+
+        // TODO: Can do this quicker by using the stuff computed for the original linearization
+
+        const int num_inputs = traj.GetTotalPosSplineVars() + traj.GetTotalForceSplineVars();
+
+        dA.resize(num_tangent_states_, num_tangent_states_);
+        dB.resize(num_tangent_states_, num_inputs);
+        dC.resize(num_tangent_states_);
+
+        dA.setZero();
+        dB.setZero();
+        dC.setZero();
+
+        const matrix_33t Id = matrix_33t::Identity();
+        const vector_3t force_partial = traj.GetForcePartialWrtContactTime(end_effector, time, contact_time_idx);
+        const vector_3t position_partial = traj.GetPositionPartialWrtContactTime(end_effector, time, contact_time_idx);
+
+        // dA
+        // COM position -- no dependence on contact times
+        // Linear momentum -- no dependence in A
+        // Orientation -- no dependence on contact times
+        // Angular momentum
+        for (int coord = 0; coord < POS_VARS; coord++) {
+            // Omega dependence -- no dependence on contact times
+            // TODO: confirm I shouldn't use the chain rule to back out to the contact times
+
+            // COM dependence -- force appears here, which depends on contact times
+            dA.block<3, 1>(ANG_VEL_START, POS_START + coord) += -Id.col(coord).cross(force_partial);
+        }
+
+        // dB
+        const vector_3t ee_pos_wrt_com = traj.GetEndEffectorLocation(end_effector, time) - GetCOMPosition(state);
+        const vector_3t force = traj.GetForce(end_effector, time);
+        const int pos_spline_start = traj.GetTotalForceSplineVars();
+
+        for (int coord = 0; coord < 3; coord++) {
+            if (traj.IsForceMutable(end_effector, coord, time)) {
+                // TODO: DMA
+                const vector_t force_coef_partials =
+                        traj.GetForceCoefPartialsWrtContactTime(end_effector, coord, time, contact_time_idx);
+
+                const vector_t vars_lin = traj.GetSplineLin(Trajectory::SplineTypes::Force, end_effector, coord, time);
+
+                int vars_idx, vars_affecting;
+                std::tie(vars_idx, vars_affecting) = traj.GetForceSplineIndex(end_effector, time, coord);
+
+                // linear momentum -- force coefficients depend on contact times
+                dB.block(LIN_MOM_START + coord, vars_idx - vars_affecting, 1, vars_affecting) =
+                        force_coef_partials.transpose();
+
+                // Angular momentum - force -- force coefficients depend on contact times
+                for (int poly = 0; poly < force_coef_partials.size(); poly++) {
+                    dB.block(ANG_VEL_START, vars_idx - vars_affecting + poly, 3, 1).noalias() =
+                            ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * force_coef_partials(poly) +
+                            position_partial.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
+                }
+            }
+
+            // Angular momentum - position -- position coefficients depend on contact times
+            if (coord != 2) {
+                // TODO: DMA
+                const vector_t pos_coef_partials =
+                        traj.GetPositionCoefPartialsWrtContactTime(end_effector, coord, time, contact_time_idx);
+                const vector_t vars_lin = traj.GetSplineLin(Trajectory::SplineTypes::Position, end_effector, coord, time);
+
+                int vars_idx, vars_affecting;
+                std::tie(vars_idx, vars_affecting) = traj.GetPositionSplineIndex(end_effector, time, coord);
+                for (int poly = 0; poly < pos_coef_partials.size(); poly++) {
+                    dB.block(ANG_VEL_START, pos_spline_start + vars_idx - vars_affecting + poly, 3, 1).noalias() =
+                            Id.col(coord).cross(force) * pos_coef_partials(poly) +
+                            Id.col(coord).cross(force_partial) * vars_lin(poly);
+                }
+            }
+        }
+
+        // dC
+        // Linear momentum depends on the force
+        dC.segment<POS_VARS>(LIN_MOM_START) = force_partial;
+
+        // Angular momentum depends on force and position
+        for (int coord = 0; coord < POS_VARS; coord++) {
+            // position and force
+            dC.segment<POS_VARS>(ANG_VEL_START).noalias() +=
+                        ee_pos_wrt_com.cross(force_partial) + position_partial.cross(force);
+        }
+    }
+
 //    vector_t SingleRigidBodyModel::VelocityInverseKinematics(const vector_t& config,
 //                                                             const std::vector<vector_3t>& end_effector_velocity,
 //                                                             const vector_t& vel_guess) {
 //
 //        std::vector<int> frames;
-//        for (int ee = 0; ee < num_ee_; ee++) {
+//        for (int ee = 0; ee < num_ee_; ee++) {traj.GetForcePartialWrtContactTime(en
 //            frames.push_back(frame_map_.at(frames_.at(ee)));
 //            ee_des.emplace_back(matrix_33t::Identity(), end_effector_location.at(ee));
 //        }

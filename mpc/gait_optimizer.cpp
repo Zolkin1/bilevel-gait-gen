@@ -104,14 +104,16 @@ namespace mpc {
             }
         }
         std::cout << "max qp partial dA: " << qp_partials_.dA.coeffs().maxCoeff() << std::endl;
-
+        std::cout << "gradient term: \n" << dHdth << std::endl;
 
 //        dHdth.normalize();
     }
 
     void GaitOptimizer::OptimizeContactTimes() {
         const int num_decision_vars = GetNumTimeNodes(num_ee_);
-        const int num_constraints = num_ee_ + num_decision_vars;
+        const int num_constraints = num_ee_ + num_decision_vars + num_decision_vars;
+
+        A_builder_.Reserve(20);
 
         qp_solver_.data()->setNumberOfVariables(num_decision_vars);
         qp_solver_.data()->setNumberOfConstraints(num_constraints);
@@ -128,12 +130,15 @@ namespace mpc {
         ub_.resize(num_constraints);
         ub_.setZero();
 
-        CreatePolytopeConstraint();
+        int next_row = CreatePolytopeConstraint(0);
+        CreateStepBoundConstraint(next_row);
 
         Eigen::SparseMatrix<double> A(num_constraints, num_decision_vars);
         A.setFromTriplets(A_builder_.GetTriplet().begin(), A_builder_.GetTriplet().end());
 
-//        std::cout << "A: \n" << A.toDense() << std::endl;
+        std::cout << "A: \n" << A.toDense() << std::endl;
+        std::cout << "lb: \n" << lb_ << std::endl;
+        std::cout << "ub: \n" << ub_ << std::endl;
 
         if (!(qp_solver_.data()->setLinearConstraintsMatrix(A) &&
               qp_solver_.data()->setBounds(lb_, ub_))) {
@@ -159,8 +164,6 @@ namespace mpc {
 
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int idx = 0; idx < contact_times_.at(ee).size(); idx++) {
-                // TODO: Try normalizing the gradient step vector
-
                 contact_times_.at(ee).at(idx) = qp_sol(GetNumTimeNodes(ee) + idx);
 
                 // TODO: Min time not respected at the end of the time frame (i.e. at the upper bound)
@@ -223,8 +226,9 @@ namespace mpc {
         contact_times_ = contact_times;
     }
 
-    void GaitOptimizer::CreatePolytopeConstraint() {
+    int GaitOptimizer::CreatePolytopeConstraint(int start_row) {
         // Each node is constrained to be between the node before and after it. At the ends there are constant bounds
+        int end_row = start_row;
         for (int ee = 0; ee < num_ee_; ee++) {
             const int nodes = contact_times_.at(ee).size();
             matrix_t A = matrix_t::Zero(nodes+1, nodes);
@@ -235,18 +239,46 @@ namespace mpc {
             }
             A(nodes,nodes-1) = 1;
 
-            lb_.segment(GetNumTimeNodes(ee)+1, nodes+1).setZero();
+            vector_t lb = vector_t::Constant(nodes+1, -2);
+            lb(0) = 0;
+            lb(nodes) = 0.5;   // TODO: Make this not hard coded and time horizon - might not need this
+            lb_.segment(start_row + GetNumTimeNodes(ee) + ee, nodes+1) = lb;
             vector_t ub = vector_t::Zero(nodes+1);
             ub(0) = 1;
             ub(nodes) = 1;
-            ub_.segment(GetNumTimeNodes(ee)+1, nodes+1) = ub;
+            ub_.segment(start_row + GetNumTimeNodes(ee) + ee, nodes+1) = ub;
 
             if (ee > 0) {
-                A_builder_.SetMatrix(A, GetNumTimeNodes(ee)+ee, GetNumTimeNodes(ee));
+                A_builder_.SetMatrix(A, start_row + GetNumTimeNodes(ee)+ee, GetNumTimeNodes(ee));
             } else {
-                A_builder_.SetMatrix(A, GetNumTimeNodes(ee), GetNumTimeNodes(ee));
+                A_builder_.SetMatrix(A, start_row + GetNumTimeNodes(ee), GetNumTimeNodes(ee));
+            }
+            end_row += nodes + 1;
+        }
+        return end_row;
+    }
+
+    int GaitOptimizer::CreateStepBoundConstraint(int start_row) {
+        const double bound = 0.05; // TODO: Make not hard coded
+
+        // Note: The first contact time node can never be changed.
+        int idx = 0;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int node = 0; node < contact_times_.at(ee).size(); node++) {
+                if (node == 0) {
+                    // TODO: This constraint ensures the first contact time never moves.
+                    // TODO: The problem is that there will always be a node at 0 then.
+                    ub_(start_row + idx) = contact_times_.at(ee).at(node);
+                    lb_(start_row + idx) = contact_times_.at(ee).at(node);
+                } else {
+                    ub_(start_row + idx) = 1e30; //bound + contact_times_.at(ee).at(node);
+                    lb_(start_row + idx) = -1e30; //-bound + contact_times_.at(ee).at(node);
+                }
+                idx++;
             }
         }
+        A_builder_.SetDiagonalMatrix(1, start_row, 0, idx);
+        return start_row + idx;
     }
 
     void GaitOptimizer::ModifyQPPartials(const vector_t& xstar) {

@@ -40,14 +40,6 @@ namespace mpc {
 //        vector_t GetDiscreteDynamics(const vector_t& state, const Trajectory& traj, double time,
 //                                     const vector_t& ref_state);
 
-        void ComputeLinearizationPartialWrtContactTimes(matrix_t& dA,
-                                                        matrix_t& dB,
-                                                        vector_t& dC,
-                                                        const vector_t& state,
-                                                        const Trajectory& traj,
-                                                        double time,
-                                                        int ee, int idx);
-
         tan_state_t CalcDynamics(const vector_t& state, const Trajectory& traj, double time,
                               const vector_t& ref_state);
 
@@ -72,6 +64,15 @@ namespace mpc {
 //                                           const vector_t& vel_guess);
 
         std::vector<vector_3t> GetEndEffectorLocations(const vector_t& q) override;
+
+        void ComputeLinearizationPartialWrtContactTimes(matrix_t& dA,
+                                                        matrix_t& dB,
+                                                        vector_t& dC,
+                                                        const vector_t& state,
+                                                        const Trajectory& traj,
+                                                        double time,
+                                                        int end_effector,
+                                                        int contact_time_idx);
 
         static constexpr int QUAT_SIZE = 4;
         static constexpr int QUAT_START = 6;

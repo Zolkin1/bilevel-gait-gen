@@ -129,11 +129,13 @@ namespace mpc {
          * @param ee
          * @param idx
          */
-        bool ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx);
+        virtual bool ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) = 0;
 
         vector_t GetQPSolution() const;
 
         virtual std::vector<std::vector<Eigen::Vector3d>> CreateVizData() = 0;
+
+        void UpdateContactTimes(const std::vector<std::vector<double>>& contact_times);
 
     protected:
         // ---------------- Protected Member Functions ---------------- //

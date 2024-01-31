@@ -135,6 +135,16 @@ namespace mpc {
 
         controller::Contact GetDesiredContacts(double time) const;
 
+        vector_3t GetForcePartialWrtContactTime(int end_effector, double time, int contact_idx) const;
+
+        vector_3t GetPositionPartialWrtContactTime(int end_effector, double time, int contact_idx) const;
+
+        vector_t GetForceCoefPartialsWrtContactTime(int end_effector, int coord, double time, int contact_idx) const;
+
+        vector_t GetPositionCoefPartialsWrtContactTime(int end_effector, int coord, double time, int contact_idx) const;
+
+        void UpdateContactTimes(const std::vector<std::vector<double>>& contact_times);
+
     protected:
     private:
         void UpdateSplineVarsCount();

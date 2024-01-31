@@ -132,44 +132,47 @@ int main() {
     robot->SetSimModel(viz.GetModel());
     vector_t state = standing;
     for (int i = 0; i < info.num_nodes + 200; i++) {
-        // Only grabbing the COM states for now (for debugging)
-//        state.head<7>() = mpc.GetFullTargetState(i*info.integrator_dt, state).head<7>();
+        // Get full state through IK
         state = mpc.GetFullTargetState(i*info.integrator_dt, state);
+
+        // Get end effector locations from trajectory
         for (int j = 0; j < ee_locations.size(); j++) {
             ee_locations.at(j) = prev_traj.GetEndEffectorLocation(j, (i)*info.integrator_dt);
         }
 
+        // Update Viz
         viz.UpdateState(robot->ConvertPinocchioConfigToMujoco(state)); //mpc.GetTargetConfig(i*info.integrator_dt)));
         viz.GetTrajViz(mpc.CreateVizData(), info.ee_box_size, mpc.GetEEBoxCenter());
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
-//        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"),
-//                prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
-        prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
-        // Gait optimization
-//        if (i == 0) {
-//            gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
-//        }
-        // TODO: Is this being performed with linearizations from the new trajectory and/or is that messing up the calcs?
-//        gait_optimizer.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
-//        if (mpc.ComputeDerivativeTerms()) {
-//            mpc.GetQPPartials(gait_optimizer.GetPartials());
-//            const mpc::Trajectory traj = mpc.GetTrajectory();
-//            for (int ee = 0; ee < 4; ee++) {
-//                gait_optimizer.SetNumContactTimes(ee, traj.GetNumContactNodes(ee));
-//                for (int idx = 0; idx < traj.GetNumContactNodes(ee); idx++) {
-//                    mpc.ComputeParamPartials(prev_traj, gait_optimizer.GetParameterPartials(ee, idx), ee, idx);
-//                }
-//            }
-//
-//            gait_optimizer.ModifyQPPartials(mpc.GetQPSolution());
-//            gait_optimizer.ComputeCostFcnDerivWrtContactTimes();
-//
-//            gait_optimizer.OptimizeContactTimes();
 
-//                mpc.UpdateContactTimes(gait_optimizer_.GetContactTimes());
+        // Gait optimization
+        if (i == 0) {
+            gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
+        }
+        // TODO: Is this being performed with linearizations from the new trajectory and/or is that messing up the calcs?
+        gait_optimizer.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
+        if (mpc.ComputeDerivativeTerms()) {
+            mpc.GetQPPartials(gait_optimizer.GetPartials());
+            for (int ee = 0; ee < 4; ee++) {
+                gait_optimizer.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
+                // TODO: Make sure derivatives and indexing are all for contact times only
+                for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {
+                    mpc.ComputeParamPartials(prev_traj, gait_optimizer.GetParameterPartials(ee, idx), ee, idx);
+                }
+            }
+
+            gait_optimizer.ModifyQPPartials(mpc.GetQPSolution());
+            gait_optimizer.ComputeCostFcnDerivWrtContactTimes();
+
+            gait_optimizer.OptimizeContactTimes();
+
+            mpc.UpdateContactTimes(gait_optimizer.GetContactTimes());
 
 //        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
-//        }
+        }
+
+        // Run next MPC
+        prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
 
 //        prev_traj = mpc.GetTrajectory();
     }

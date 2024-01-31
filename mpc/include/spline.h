@@ -166,6 +166,8 @@ namespace mpc {
 
         bool IsEndPairConstant() const;
 
+        void ChangeSplineTimes(const std::vector<double>& times);
+
     protected:
     private:
         double Getx0Coef(double time, double DeltaT) const;

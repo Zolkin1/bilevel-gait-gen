@@ -85,11 +85,14 @@ namespace mpc {
         void SetContactTimes(std::vector<std::vector<double>> contact_times);
 
         void ModifyQPPartials(const vector_t& xstar);
+
     protected:
     private:
         int GetNumTimeNodes(int ee) const;
 
-        void CreatePolytopeConstraint();
+        int CreatePolytopeConstraint(int start_row);
+
+        int CreateStepBoundConstraint(int start_row);
 
         std::vector<std::vector<double>> contact_times_;
         std::vector<std::vector<double>> contact_times_lb_, contact_times_ub_;

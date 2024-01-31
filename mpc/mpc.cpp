@@ -577,4 +577,8 @@ namespace mpc {
         return num_inputs_;
     }
 
+    void MPC::UpdateContactTimes(const std::vector<std::vector<double>>& contact_times) {
+        prev_traj_.UpdateContactTimes(contact_times);
+    }
+
 } // mpc

@@ -25,6 +25,8 @@ namespace mpc {
 
         void UpdateWholeBodyTrajectory(Trajectory& traj);
 
+    bool ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) override;
+
     protected:
         void AddDynamicsConstraints(const vector_t& state) override;
 

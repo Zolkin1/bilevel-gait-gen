@@ -308,10 +308,13 @@ namespace mpc {
     }
 
     void Trajectory::AddPolys(double final_time) {
-        while (GetTotalTime() < final_time) {
-            for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
+        for (int ee = 0; ee < end_effector_pos_.size(); ee++) {
+            while (end_effector_pos_.at(ee).at(0).GetEndTime() < final_time) {
                 assert(end_effector_pos_.at(ee).at(0).IsStartPairConstant() == end_effector_pos_.at(ee).at(1).IsStartPairConstant());
                 assert(end_effector_pos_.at(ee).at(0).IsEndPairConstant() == end_effector_pos_.at(ee).at(1).IsEndPairConstant());
+
+                assert(end_effector_pos_.at(ee).at(0).GetEndTime() == forces_.at(ee).at(0).GetEndTime());
+
                 for (int coord = 0; coord < POS_VARS; coord++) {
                     end_effector_pos_.at(ee).at(coord).AddPoly(0.2);
                     forces_.at(ee).at(coord).AddPoly(0.2);
@@ -319,6 +322,7 @@ namespace mpc {
                 assert(end_effector_pos_.at(ee).at(0).IsStartPairConstant() == end_effector_pos_.at(ee).at(1).IsStartPairConstant());
                 assert(end_effector_pos_.at(ee).at(0).IsEndPairConstant() == end_effector_pos_.at(ee).at(1).IsEndPairConstant());
             }
+            assert(end_effector_pos_.at(ee).at(0).GetEndTime() == forces_.at(ee).at(0).GetEndTime());
         }
         SetSwingPosZ();
         UpdateSplineVarsCount();
@@ -501,7 +505,7 @@ namespace mpc {
 //    }
 
     int Trajectory::GetNumContactNodes(int ee) const {
-        return contact_times_.at(ee).size();
+        return end_effector_pos_.at(ee).at(0).GetNumPolyTimes();
     }
 
     void Trajectory::UpdateContactTimes() {
@@ -644,6 +648,47 @@ namespace mpc {
         // TODO: Get the contact frames
 
         return contact;
+    }
+
+
+    vector_3t Trajectory::GetForcePartialWrtContactTime(int end_effector, double time, int contact_idx) const {
+        vector_3t force_partials = vector_3t::Zero();
+
+        for (int coord = 0; coord < POS_VARS; coord++) {
+            force_partials(coord) = forces_.at(end_effector).at(coord).ComputePartialWrtTime(time, contact_idx);
+        }
+
+        return force_partials;
+    }
+
+    vector_3t Trajectory::GetPositionPartialWrtContactTime(int end_effector, double time, int contact_idx) const {
+        vector_3t position_partials = vector_3t::Zero();
+
+        for (int coord = 0; coord < POS_VARS; coord++) {
+            // TODO: Confirm this is correct
+            position_partials(coord) = end_effector_pos_.at(end_effector).at(coord).ComputePartialWrtTime(time, contact_idx);
+        }
+
+        return position_partials;
+    }
+
+    vector_t Trajectory::GetForceCoefPartialsWrtContactTime(int end_effector, int coord, double time,
+                                                            int contact_idx) const {
+        return forces_.at(end_effector).at(coord).ComputeCoefPartialWrtTime(time, contact_idx);
+    }
+
+    vector_t Trajectory::GetPositionCoefPartialsWrtContactTime(int end_effector, int coord, double time,
+                                                               int contact_idx) const {
+        return end_effector_pos_.at(end_effector).at(coord).ComputeCoefPartialWrtTime(time, contact_idx);
+    }
+
+    void Trajectory::UpdateContactTimes(const std::vector<std::vector<double>>& contact_times) {
+        for (int ee = 0; ee < forces_.size(); ee++) {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                forces_.at(ee).at(coord).ChangeSplineTimes(contact_times.at(ee));
+                end_effector_pos_.at(ee).at(coord).ChangeSplineTimes(contact_times.at(ee));
+            }
+        }
     }
 
 } // mpc
