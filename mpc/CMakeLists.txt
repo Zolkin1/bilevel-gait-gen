@@ -13,7 +13,9 @@ set(MPC_HEADER_LIST "include/mpc.h"
         "include/single_rigid_body_model.h"
         "include/model.h"
         "include/mpc_single_rigid_body.h"
-        "include/mpc_centroidal.h")
+        "include/mpc_centroidal.h"
+        "include/spline_node.h"
+        "include/end_effector_splines.h")
 
 add_library(mpc mpc.cpp
         qp_interface.cpp
@@ -30,6 +32,8 @@ add_library(mpc mpc.cpp
         model.cpp
         mpc_single_rigid_body.cpp
         mpc_centroidal.cpp
+        spline_node.cpp
+        end_effector_splines.cpp
         ${MPC_HEADER_LIST})
 target_include_directories(mpc PUBLIC include)
 
