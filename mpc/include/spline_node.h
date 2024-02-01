@@ -20,6 +20,10 @@ namespace mpc {
     public:
         SplineNode(NodeType type, int node_idx, const vector_2t& vars);
 
+        SplineNode(const SplineNode& node);
+
+        SplineNode& operator=(const SplineNode& node);
+
         NodeType GetType() const;
         vector_2t GetVars() const;
         int GetNodeIdx() const;
@@ -28,8 +32,8 @@ namespace mpc {
 
     protected:
     private:
-        const NodeType type_;   // Node type
-        const int node_idx_;    // Where I am in the spline
+        NodeType type_;   // Node type
+        int node_idx_;    // Where I am in the spline
         vector_2t vars_;        // position and derivative that describe the spline at the point
     };
 } // mpc

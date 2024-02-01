@@ -11,7 +11,11 @@
 #include "end_effector_splines.h"
 
 TEST_CASE("End Effector Splines", "[splines]") {
+    constexpr double MARGIN = 1e-3;
+
     using namespace mpc;
+    using Catch::Matchers::WithinAbs;
+
     std::vector<double> times;
     const int num_contacts = 10;
     const bool start_constant = true;
@@ -28,23 +32,175 @@ TEST_CASE("End Effector Splines", "[splines]") {
 
     SECTION("Setting Vars") {
         for (auto& spline : splines) {
-            int temp = 0;
-            for (int node = 0; node < spline.GetNumNodes(); node++) {
+            const std::vector<double> spline_times = spline.GetTimes();
+
+            const std::vector<int> position_nodes = spline.GetMutableNodes(EndEffectorSplines::Position);
+            for (auto& it : position_nodes) {
                 Eigen::Vector2d vars;
-                vars << temp, 2;
-
-                if (spline.GetNodeType(EndEffectorSplines::Position, node) != NodeType::Empty) {
-                    spline.SetVars(EndEffectorSplines::Position, node, vars);
-                    temp++;
-                }
-                spline.SetVars(EndEffectorSplines::Force, node, vars);
-
-//                std::cout << spline.ValueAt(EndEffectorSplines::Position, times.at(node)) << std::endl;
+                vars << it, 2;
+                spline.SetVars(EndEffectorSplines::Position, it, vars);
+                REQUIRE(spline.ValueAt(EndEffectorSplines::Position, spline_times.at(it)) == it);
             }
 
-            for (int node = 0; node < times.size()-1; node++) {
-                REQUIRE(spline.ValueAt(EndEffectorSplines::Position, times.at(node)) == node);
-                REQUIRE(spline.ValueAt(EndEffectorSplines::Force, times.at(node)) == node);
+            const std::vector<int> force_nodes = spline.GetMutableNodes(EndEffectorSplines::Force);
+            for (auto& it : force_nodes) {
+                Eigen::Vector2d vars;
+                vars << it, 2;
+                spline.SetVars(EndEffectorSplines::Force, it, vars);
+                REQUIRE(spline.ValueAt(EndEffectorSplines::Force, spline_times.at(it)) == it);
+            }
+        }
+    }
+
+    SECTION("Checking Values") {
+
+        const std::vector<int> position_nodes = splines.at(0).GetMutableNodes(EndEffectorSplines::Position);
+        for (auto& it : position_nodes) {
+            Eigen::Vector2d vars;
+            vars << it, it-1;
+            splines.at(0).SetVars(EndEffectorSplines::Position, it, vars);
+        }
+        REQUIRE(splines.at(0).ValueAt(EndEffectorSplines::Position, 0) == 0);
+        REQUIRE_THAT(splines.at(0).ValueAt(EndEffectorSplines::Position, 0.103448), WithinAbs(0.525852, MARGIN));
+        REQUIRE_THAT(splines.at(0).ValueAt(EndEffectorSplines::Position, 0.503448), WithinAbs(3.10341, MARGIN));
+
+        const std::vector<int> position_nodes2 = splines.at(1).GetMutableNodes(EndEffectorSplines::Position);
+        for (auto& it : position_nodes2) {
+            Eigen::Vector2d vars;
+            vars << it, it-1;
+            splines.at(1).SetVars(EndEffectorSplines::Position, it, vars);
+        }
+        REQUIRE(splines.at(1).ValueAt(EndEffectorSplines::Position, 0) == 0);
+        REQUIRE_THAT(splines.at(1).ValueAt(EndEffectorSplines::Position, 0.103448), WithinAbs(0.0, MARGIN));
+        REQUIRE_THAT(splines.at(1).ValueAt(EndEffectorSplines::Position, 0.25517), WithinAbs(0.74525, MARGIN));
+
+        const std::vector<int> force_nodes = splines.at(0).GetMutableNodes(EndEffectorSplines::Force);
+        for (auto& it : force_nodes) {
+            Eigen::Vector2d vars;
+            vars << it, it-1;
+            splines.at(0).SetVars(EndEffectorSplines::Force, it, vars);
+        }
+        REQUIRE(splines.at(0).ValueAt(EndEffectorSplines::Force, 0) == 0);
+        REQUIRE_THAT(splines.at(0).ValueAt(EndEffectorSplines::Force, 0.103448), WithinAbs(0.0, MARGIN));
+        REQUIRE_THAT(splines.at(0).ValueAt(EndEffectorSplines::Force, 0.26666 + 0.0551724), WithinAbs(2.90697, MARGIN));
+    }
+
+    SECTION("Linearization/Coefficients") {
+        for (auto& spline : splines) {
+            const std::vector<double> spline_times = spline.GetTimes();
+            const double total_time = spline.GetEndTime();
+
+            const std::vector<int> position_nodes = spline.GetMutableNodes(EndEffectorSplines::Position);
+            for (auto& it : position_nodes) {
+                Eigen::Vector2d vars;
+                vars << it, 3.1;
+                spline.SetVars(EndEffectorSplines::Position, it, vars);
+            }
+
+            const double N = 100.0;
+            const vector_t spline_as_vec = spline.GetSplineAsQPVec(EndEffectorSplines::Position);
+            for (int i = 0; i < N; i++) {
+                const double time = static_cast<double>(i)*(total_time/N);
+                int vars_idx, vars_effecting;
+                std::tie(vars_idx, vars_effecting) = spline.GetVarsIdx(EndEffectorSplines::Position, time);
+                const vector_t vars_lin = spline.GetPolyVarsLin(EndEffectorSplines::Position, time);
+                REQUIRE(vars_lin.size() == vars_effecting);
+                const double val = spline_as_vec.segment(vars_idx, vars_effecting).dot(vars_lin);
+                REQUIRE_THAT(spline.ValueAt(EndEffectorSplines::Position, time), WithinAbs(val, MARGIN));
+            }
+
+            const std::vector<int> force_nodes = spline.GetMutableNodes(EndEffectorSplines::Force);
+            for (auto& it : force_nodes) {
+                Eigen::Vector2d vars;
+                vars << it, 1.4;
+                spline.SetVars(EndEffectorSplines::Force, it, vars);
+            }
+
+            const vector_t spline_as_vec2 = spline.GetSplineAsQPVec(EndEffectorSplines::Force);
+            for (int i = 0; i < N; i++) {
+                const double time = static_cast<double>(i)*(total_time/N);
+
+                if (spline.IsForceMutable(time)) {
+                    int vars_idx, vars_effecting;
+                    std::tie(vars_idx, vars_effecting) = spline.GetVarsIdx(EndEffectorSplines::Force, time);
+                    const vector_t vars_lin = spline.GetPolyVarsLin(EndEffectorSplines::Force, time);
+                    REQUIRE(vars_lin.size() == vars_effecting);
+                    const double val = spline_as_vec2.segment(vars_idx, vars_effecting).dot(vars_lin);
+                    REQUIRE_THAT(spline.ValueAt(EndEffectorSplines::Force, time), WithinAbs(val, MARGIN));
+                } else {
+                    REQUIRE(spline.ValueAt(EndEffectorSplines::Force, time) == 0);
+                }
+            }
+        }
+    }
+
+    SECTION("Adding and removing polys") {
+        const double addt_time = 0.2;
+        for (auto& spline : splines) {
+
+            // ---------------- Adding ---------------- //
+            for (int i = 0; i < 3; i++) {
+                spline.AddPoly(addt_time);
+                REQUIRE_THAT(spline.GetEndTime(), WithinAbs(times.at(times.size() - 1) + (i + 1) * addt_time, MARGIN));
+            }
+
+
+            // Checking values after adding polys
+            const std::vector<int> force_nodes = spline.GetMutableNodes(EndEffectorSplines::Force);
+            for (auto& it : force_nodes) {
+                Eigen::Vector2d vars;
+                vars << it-1, .75;
+                spline.SetVars(EndEffectorSplines::Force, it, vars);
+            }
+
+            const double total_time = spline.GetEndTime();
+            const double N = 100.0;
+            const vector_t spline_as_vec2 = spline.GetSplineAsQPVec(EndEffectorSplines::Force);
+            for (int i = 0; i < N; i++) {
+                const double time = static_cast<double>(i)*(total_time/N);
+
+                if (spline.IsForceMutable(time)) {
+                    int vars_idx, vars_effecting;
+                    std::tie(vars_idx, vars_effecting) = spline.GetVarsIdx(EndEffectorSplines::Force, time);
+                    const vector_t vars_lin = spline.GetPolyVarsLin(EndEffectorSplines::Force, time);
+                    REQUIRE(vars_lin.size() == vars_effecting);
+                    const double val = spline_as_vec2.segment(vars_idx, vars_effecting).dot(vars_lin);
+                    REQUIRE_THAT(spline.ValueAt(EndEffectorSplines::Force, time), WithinAbs(val, MARGIN));
+                } else {
+                    REQUIRE(spline.ValueAt(EndEffectorSplines::Force, time) == 0);
+                }
+            }
+        }
+
+        // ---------------- Removing ---------------- //
+        for (auto& spline : splines) {
+            spline.RemovePoly(0.5);
+            REQUIRE_THAT(spline.GetEndTime(), WithinAbs(times.at(times.size() - 1) + (3) * addt_time, MARGIN));
+
+            // Now check values again
+            const std::vector<int> force_nodes = spline.GetMutableNodes(EndEffectorSplines::Force);
+            for (auto& it : force_nodes) {
+                Eigen::Vector2d vars;
+                vars << 2*it-1, .5;
+                spline.SetVars(EndEffectorSplines::Force, it, vars);
+            }
+
+            const double total_time = spline.GetEndTime();
+            const double N = 100.0;
+            const vector_t spline_as_vec2 = spline.GetSplineAsQPVec(EndEffectorSplines::Force);
+            for (int i = 0; i < N; i++) {
+                const double time = static_cast<double>(i)*((total_time - spline.GetStartTime())/N) + spline.GetStartTime();
+
+                if (spline.IsForceMutable(time)) {
+                    int vars_idx, vars_effecting;
+                    std::tie(vars_idx, vars_effecting) = spline.GetVarsIdx(EndEffectorSplines::Force, time);
+                    const vector_t vars_lin = spline.GetPolyVarsLin(EndEffectorSplines::Force, time);
+                    REQUIRE(vars_lin.size() == vars_effecting);
+                    const double val = spline_as_vec2.segment(vars_idx, vars_effecting).dot(vars_lin);
+                    REQUIRE_THAT(spline.ValueAt(EndEffectorSplines::Force, time), WithinAbs(val, MARGIN));
+                } else {
+                    REQUIRE(spline.ValueAt(EndEffectorSplines::Force, time) == 0);
+                }
             }
         }
     }

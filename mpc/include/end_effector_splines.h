@@ -25,6 +25,20 @@ namespace mpc {
 
         double ValueAt(SplineType type, double time) const;
 
+        vector_t GetPolyVarsLin(SplineType type, double time) const;
+
+        std::pair<int, int> GetVarsIdx(SplineType type, double time) const;
+
+        bool IsForceMutable(double time) const;
+
+        void AddPoly(double additional_time);
+
+        void RemovePoly(double start_time);
+
+        double ComputePartialWrtTime(SplineType type, double time, int time_idx) const;     // Note: time_idx is only of contact times
+
+        vector_t ComputeCoefPartialWrtTime(SplineType type, double time, int time_idx) const; // Note: time_idx is only of contact times
+
         // ------------------ Setters ------------------ //
         void SetVars(SplineType type, int node_idx, const vector_2t& vars);
 
@@ -33,6 +47,16 @@ namespace mpc {
         NodeType GetNodeType(SplineType type, int node_idx) const;
 
         int GetNumNodes() const;        // Nodes (includes intermediate nodes)
+
+        std::vector<int> GetMutableNodes(SplineType type) const;    // Should return compressed view nodes (i.e. no double counts)
+
+        std::vector<double> GetTimes() const;
+
+        vector_t GetSplineAsQPVec(SplineType type) const;
+
+        double GetEndTime() const;
+
+        double GetStartTime() const;
 
         // Function list:
         // - Spline Value
@@ -48,6 +72,11 @@ namespace mpc {
     private:
         int GetLowerNodeIdx(SplineType type, double time) const;
         int GetUpperNodeIdx(SplineType type, double time) const;
+
+        double Getx0Coef(double time, double deltat) const;
+        double Getx1Coef(double time, double deltat) const;
+        double Getx0dotCoef(double time, double deltat) const;
+        double Getx1dotCoef(double time, double deltat) const;
 
         node_v& SelectSpline(SplineType type);
 
