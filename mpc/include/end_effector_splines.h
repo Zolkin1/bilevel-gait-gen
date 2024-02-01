@@ -42,6 +42,7 @@ namespace mpc {
         // ------------------ Setters ------------------ //
         void SetVars(SplineType type, int node_idx, const vector_2t& vars);
 
+        void SetContactTimes(std::vector<double> contact_times);
 
         // ------------------ Getters ------------------ //
         NodeType GetNodeType(SplineType type, int node_idx) const;
@@ -73,10 +74,17 @@ namespace mpc {
         int GetLowerNodeIdx(SplineType type, double time) const;
         int GetUpperNodeIdx(SplineType type, double time) const;
 
+        int ConvertContactNodeToSplineNode(int contact_idx) const;
+
         double Getx0Coef(double time, double deltat) const;
         double Getx1Coef(double time, double deltat) const;
         double Getx0dotCoef(double time, double deltat) const;
         double Getx1dotCoef(double time, double deltat) const;
+
+        double Getx0CoefPartial(double time, double DeltaT, bool wrt_t1) const;
+        double Getx1CoefPartial(double time, double DeltaT, bool wrt_t1) const;
+        double Getx0dotCoefPartial(double time, double DeltaT, bool wrt_t1) const;
+        double Getx1dotCoefPartial(double time, double DeltaT, bool wrt_t1) const;
 
         node_v& SelectSpline(SplineType type);
 
