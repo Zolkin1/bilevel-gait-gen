@@ -146,30 +146,30 @@ int main() {
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
 
         // Gait optimization
-        if (i == 0) {
-            gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
-        }
+//        if (i == 0) {
+//            gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
+//        }
         // TODO: Is this being performed with linearizations from the new trajectory and/or is that messing up the calcs?
-        gait_optimizer.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
-        if (mpc.ComputeDerivativeTerms()) {
-            mpc.GetQPPartials(gait_optimizer.GetPartials());
-            for (int ee = 0; ee < 4; ee++) {
-                gait_optimizer.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
-                // TODO: Make sure derivatives and indexing are all for contact times only
-                for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {
-                    mpc.ComputeParamPartials(prev_traj, gait_optimizer.GetParameterPartials(ee, idx), ee, idx);
-                }
-            }
+//        gait_optimizer.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
+//        if (mpc.ComputeDerivativeTerms()) {
+//            mpc.GetQPPartials(gait_optimizer.GetPartials());
+//            for (int ee = 0; ee < 4; ee++) {
+//                gait_optimizer.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
+//                // TODO: Make sure derivatives and indexing are all for contact times only
+//                for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {
+//                    mpc.ComputeParamPartials(prev_traj, gait_optimizer.GetParameterPartials(ee, idx), ee, idx);
+//                }
+//            }
 
-            gait_optimizer.ModifyQPPartials(mpc.GetQPSolution());
-            gait_optimizer.ComputeCostFcnDerivWrtContactTimes();
+//            gait_optimizer.ModifyQPPartials(mpc.GetQPSolution());
+//            gait_optimizer.ComputeCostFcnDerivWrtContactTimes();
 
-            gait_optimizer.OptimizeContactTimes();
+//            gait_optimizer.OptimizeContactTimes();
 
-            mpc.UpdateContactTimes(gait_optimizer.GetContactTimes());
+//            mpc.UpdateContactTimes(gait_optimizer.GetContactTimes());
 
 //        mpc.GetRealTimeUpdate(config.ParseNumber<int>("run_time_iterations"), temp_state, i*info.integrator_dt);
-        }
+//        }
 
         // Run next MPC
         prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), i*info.integrator_dt, ee_locations);

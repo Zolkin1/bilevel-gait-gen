@@ -9,6 +9,7 @@
 
 #include "spline.h"
 #include "controller.h"
+#include "end_effector_splines.h"
 //#include "model.h"
 
 namespace mpc {
@@ -35,7 +36,7 @@ namespace mpc {
 
         std::vector<vector_t> GetStates() const;
 
-        const std::vector<std::array<Spline, 3>>& GetPositions() const;
+//        const std::vector<std::array<Spline, 3>>& GetPositions() const;
 
         /**
          * Resets all states_ and inputs to 0
@@ -67,9 +68,9 @@ namespace mpc {
 
         void PrintTrajectoryToFile(const std::string& file_name) const;
 
-        int GetTotalPosConstantsZ() const;
+//        int GetTotalPosConstantsZ() const;
 
-        double GetTotalTime() const;
+//        double GetTotalTime() const;
 
         // Add an additional spline knot point
         void AddPolys(double final_time);
@@ -78,24 +79,24 @@ namespace mpc {
 
         void SetInitTime(double time);
 
-        void SetEndEffectorSplines(int ee, const Spline& force_spline,
-                                   const Spline& pos_spline);
+//        void SetEndEffectorSplines(int ee, const Spline& force_spline,
+//                                   const Spline& pos_spline);
 
 //        vector_t ConvertToQPVector(const SingleRigidBodyModel& model) const;
 
-        vector_t PositionAsQPVector() const;
+//        vector_t PositionAsQPVector() const;
 
         vector_t GetState(int node) const;
 
-        Eigen::Vector3d GetPosition(int ee, double time) const;
+//        Eigen::Vector3d GetPosition(int ee, double time) const;
 
         std::vector<bool> GetContacts(double time) const;
 
-        bool PosIsConstant(int ee, int coord, double time) const;
+//        bool PosIsConstant(int ee, int coord, double time) const;
 
-        int GetTotalPosNonConstantZ() const;
+//        int GetTotalPosNonConstantZ() const;
 
-        bool IsSplineMutable(int ee, int coord) const;
+//        bool IsSplineMutable(int ee, int coord) const;
 
         void UpdateFullVelocity(int node, const vector_t& vel);
         void UpdateFullConfig(int node, const vector_t& q);
@@ -113,8 +114,8 @@ namespace mpc {
 
         int GetTotalForceSplineVars() const; // TODO: impelement
 
-        bool IsForceMutable(int ee, int coord, double time) const;
-        bool IsForceMutable(int ee, int coord, int idx) const;
+        bool IsForceMutable(int ee, double time) const;
+//        bool IsForceMutable(int ee, int coord, int idx) const;
 
         vector_t GetSplineLin(const SplineTypes& spline_type, int end_effector, int coord, double time) const;
 
@@ -159,9 +160,11 @@ namespace mpc {
 
         std::vector<vector_t> states_;
 //        Inputs inputs_;
-        std::vector<std::array<Spline, 3>> end_effector_pos_;
-        std::vector<std::array<Spline, 3>> forces_;
-        std::vector<std::array<bool, 3>> mut_flags_;
+//        std::vector<std::array<Spline, 3>> end_effector_pos_;
+//        std::vector<std::array<Spline, 3>> forces_;
+//        std::vector<std::array<bool, 3>> mut_flags_;
+
+        std::vector<EndEffectorSplines> ee_splines_;
 
         int pos_spline_vars_;
         int force_spline_vars_;
@@ -172,7 +175,7 @@ namespace mpc {
 
         std::vector<std::vector<Eigen::Vector3d>> fk_traj_;
 
-        std::vector<std::vector<double>> contact_times_;
+//        std::vector<std::vector<double>> contact_times_;
 
         std::array<vector_t, 50> full_config_;
         std::array<vector_t, 50> full_velocity_;

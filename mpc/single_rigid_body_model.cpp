@@ -105,7 +105,7 @@ namespace mpc {
             const vector_3t force = traj.GetForce(ee, time);
 
             for (int coord = 0; coord < 3; coord++) {
-                if (traj.IsForceMutable(ee, coord, time)) {
+                if (traj.IsForceMutable(ee, time)) {
                     // TODO: DMA
                     vector_t vars_lin = traj.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord, time);
 
@@ -113,12 +113,12 @@ namespace mpc {
                     std::tie(vars_idx, vars_affecting) = traj.GetForceSplineIndex(ee, time, coord);
 
                     // linear momentum
-                    B.block(LIN_MOM_START + coord, vars_idx - vars_affecting, 1, vars_affecting) =
+                    B.block(LIN_MOM_START + coord, vars_idx, 1, vars_affecting) =
                             vars_lin.transpose();
 
                     // Angular momentum - force
                     for (int poly = 0; poly < vars_lin.size(); poly++) {
-                        B.block(ANG_VEL_START, vars_idx - vars_affecting + poly, 3, 1).noalias() =
+                        B.block(ANG_VEL_START, vars_idx + poly, 3, 1).noalias() =
                                 ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
                     }
                 }
@@ -130,7 +130,7 @@ namespace mpc {
                     int vars_idx, vars_affecting;
                     std::tie(vars_idx, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
                     for (int poly = 0; poly < vars_lin.size(); poly++) {
-                        B.block(ANG_VEL_START, pos_spline_start + vars_idx - vars_affecting + poly, 3, 1).noalias() =
+                        B.block(ANG_VEL_START, pos_spline_start + vars_idx + poly, 3, 1).noalias() =
                                 Id.col(coord).cross(force) * vars_lin(poly);
                     }
                 }
@@ -470,7 +470,7 @@ namespace mpc {
         const int pos_spline_start = traj.GetTotalForceSplineVars();
 
         for (int coord = 0; coord < 3; coord++) {
-            if (traj.IsForceMutable(end_effector, coord, time)) {
+            if (traj.IsForceMutable(end_effector, time)) {
                 // TODO: DMA
                 const vector_t force_coef_partials =
                         traj.GetForceCoefPartialsWrtContactTime(end_effector, coord, time, contact_time_idx);
@@ -481,12 +481,12 @@ namespace mpc {
                 std::tie(vars_idx, vars_affecting) = traj.GetForceSplineIndex(end_effector, time, coord);
 
                 // linear momentum -- force coefficients depend on contact times
-                dB.block(LIN_MOM_START + coord, vars_idx - vars_affecting, 1, vars_affecting) =
+                dB.block(LIN_MOM_START + coord, vars_idx, 1, vars_affecting) =
                         force_coef_partials.transpose();
 
                 // Angular momentum - force -- force coefficients depend on contact times
                 for (int poly = 0; poly < force_coef_partials.size(); poly++) {
-                    dB.block(ANG_VEL_START, vars_idx - vars_affecting + poly, 3, 1).noalias() =
+                    dB.block(ANG_VEL_START, vars_idx + poly, 3, 1).noalias() =
                             ee_pos_wrt_com.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * force_coef_partials(poly) +
                             position_partial.cross(static_cast<Eigen::Vector3d>(Id.col(coord))) * vars_lin(poly);
                 }
@@ -502,7 +502,7 @@ namespace mpc {
                 int vars_idx, vars_affecting;
                 std::tie(vars_idx, vars_affecting) = traj.GetPositionSplineIndex(end_effector, time, coord);
                 for (int poly = 0; poly < pos_coef_partials.size(); poly++) {
-                    dB.block(ANG_VEL_START, pos_spline_start + vars_idx - vars_affecting + poly, 3, 1).noalias() =
+                    dB.block(ANG_VEL_START, pos_spline_start + vars_idx + poly, 3, 1).noalias() =
                             Id.col(coord).cross(force) * pos_coef_partials(poly) +
                             Id.col(coord).cross(force_partial) * vars_lin(poly);
                 }

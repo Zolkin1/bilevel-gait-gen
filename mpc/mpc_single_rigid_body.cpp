@@ -121,7 +121,6 @@ namespace mpc {
                 max_idx = i;
             }
         }
-
 //        std::cout << "max difference is: " << max << " and occurs at index: " << max_idx << std::endl;
 //        std::cout << "force variables start: " << num_states_*(info_.num_nodes+1) << std::endl;
 //        std::cout << "position variables start: " << GetPosSplineStartIdx() << std::endl;
@@ -308,8 +307,8 @@ namespace mpc {
                 traj.UpdateForceSpline(ee, coord, qp_sol.segment(force_idx, vars_in_spline));
                 force_idx += vars_in_spline;
 
-                if (traj.IsSplineMutable(ee, coord)) {
-                    vars_in_spline = traj.GetPositions().at(ee).at(coord).GetTotalPolyVars();
+                if (coord < 2) {
+                    vars_in_spline = traj.GetTotalPolyVars(Trajectory::SplineTypes::Position, ee ,coord); //traj.GetPositions().at(ee).at(coord).GetTotalPolyVars();
                     traj.UpdatePositionSpline(ee, coord, qp_sol.segment(pos_idx, vars_in_spline));
                     pos_idx += vars_in_spline;
                 }
@@ -423,7 +422,7 @@ namespace mpc {
                                                                 ee, coord, GetTime(node));
 
                     A.block(idx,
-                            pos_start_idx + vars_idx - vars_affecting,
+                            pos_start_idx + vars_idx,
                             1, vars_affecting) = vars_lin.transpose();
 
                     idx++;
@@ -454,7 +453,7 @@ namespace mpc {
 
                 assert(vars_lin.size() == vars_affecting);
 
-                M.block(idx, vars_idx - vars_affecting, 1, vars_affecting) =
+                M.block(idx, vars_idx, 1, vars_affecting) =
                         vars_lin.transpose();
                 idx++;
             }
@@ -586,7 +585,7 @@ namespace mpc {
 
                 for (int coord = 0; coord < 2; coord++) {
 
-                    if (traj.IsSplineMutable(ee, coord)) {
+                    if (coord < 2) {
                         int vars_index, vars_affecting;
                         std::tie(vars_index, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
 
@@ -622,7 +621,7 @@ namespace mpc {
                 // TODO: DMA
                 vector_t pos_coef_partials = traj.GetPositionCoefPartialsWrtContactTime(ee, coord, GetTime(0), contact_time_idx);
 
-                M.block(idx, vars_idx - vars_affecting, 1, vars_affecting) =
+                M.block(idx, vars_idx, 1, vars_affecting) =
                         pos_coef_partials.transpose();
                 idx++;
             }

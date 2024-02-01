@@ -20,14 +20,18 @@ namespace mpc {
 
         EndEffectorSplines(int num_contacts,
                            const std::vector<double>& times,
-                           bool start_on_constant,
+                           bool start_in_contact,
                            int num_force_polys);
 
-        double ValueAt(SplineType type, double time) const;
+        // TODO: Write copy/assignment operator
+        EndEffectorSplines& operator=(const EndEffectorSplines& ee_spline);
 
-        vector_t GetPolyVarsLin(SplineType type, double time) const;
 
-        std::pair<int, int> GetVarsIdx(SplineType type, double time) const;
+        double ValueAt(SplineType type, int coord, double time) const;
+
+        vector_t GetPolyVarsLin(SplineType type, int coord, double time) const;
+
+        std::pair<int, int> GetVarsIdx(SplineType type, int coord, double time) const;
 
         bool IsForceMutable(double time) const;
 
@@ -35,14 +39,14 @@ namespace mpc {
 
         void RemovePoly(double start_time);
 
-        double ComputePartialWrtTime(SplineType type, double time, int time_idx) const;     // Note: time_idx is only of contact times
+        double ComputePartialWrtTime(SplineType type, int coord, double time, int time_idx) const;     // Note: time_idx is only of contact times
 
-        vector_t ComputeCoefPartialWrtTime(SplineType type, double time, int time_idx) const; // Note: time_idx is only of contact times
+        vector_t ComputeCoefPartialWrtTime(SplineType type, int coord, double time, int time_idx) const; // Note: time_idx is only of contact times
 
         // ------------------ Setters ------------------ //
-        void SetVars(SplineType type, int node_idx, const vector_2t& vars);
+        void SetVars(SplineType type, int coord, int node_idx, const vector_2t& vars);
 
-        void SetContactTimes(std::vector<double> contact_times);
+        void SetContactTimes(const std::vector<double>& contact_times);
 
         // ------------------ Getters ------------------ //
         NodeType GetNodeType(SplineType type, int node_idx) const;
@@ -53,11 +57,13 @@ namespace mpc {
 
         std::vector<double> GetTimes() const;
 
-        vector_t GetSplineAsQPVec(SplineType type) const;
+        vector_t GetSplineAsQPVec(SplineType type, int coord) const;
 
         double GetEndTime() const;
 
         double GetStartTime() const;
+
+        int GetTotalPolyVars(SplineType type) const;
 
         // Function list:
         // - Spline Value
@@ -86,17 +92,18 @@ namespace mpc {
         double Getx0dotCoefPartial(double time, double DeltaT, bool wrt_t1) const;
         double Getx1dotCoefPartial(double time, double DeltaT, bool wrt_t1) const;
 
-        node_v& SelectSpline(SplineType type);
+        node_v& SelectSpline(SplineType type, int coord);
 
-        const node_v& SelectSpline(SplineType type) const;
+        const node_v& SelectSpline(SplineType type, int coord) const;
 
 
         static void UnsupportedSpline() ;
 
-        node_v forces_;
-        node_v positions_;
+        std::array<node_v, 3> forces_;
+        std::array<node_v, 3> positions_;
         time_v times_;
-        const int num_force_polys_;
+        int num_force_polys_;
+        static constexpr int POS_VARS = 3;
     };
 } // mpc
 

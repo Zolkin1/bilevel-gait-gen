@@ -150,7 +150,7 @@ namespace mpc {
             double time = GetTime(node);
             for (int ee = 0; ee < num_ee_; ee++) {
                 for (int coord = 0; coord < POS_VARS; coord++) {
-                    if (prev_traj_.IsForceMutable(ee, coord, time)) {
+                    if (prev_traj_.IsForceMutable(ee, time)) {
                         vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord, time);
 
                         int vars_index, vars_affecting;
@@ -185,7 +185,7 @@ namespace mpc {
             double time = GetTime(node);
             for (int ee = 0; ee < num_ee_; ee++) {
                 const int coord = 2;
-                if (prev_traj_.IsForceMutable(ee, coord, time)) {
+                if (prev_traj_.IsForceMutable(ee, time)) {
                     int vars_index, vars_affecting;
                     std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
                     vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord, time);
@@ -254,9 +254,18 @@ namespace mpc {
         std::vector<std::vector<double>> switching_times;
         for (int i = 0; i < num_ee; i++) {
             std::vector<double> times;
-            for (int j = 0; j < num_switches; j++) {
-                times.push_back((j+1)*horizon/num_switches);
-            }
+//            times.push_back(0);
+//            for (int j = 0; j < num_switches; j++) {
+//                times.push_back((j+1)*horizon/num_switches);
+//            }
+//            for (int ee = 0; ee < num_ee_; ee++) {
+                times.push_back(0);
+                times.push_back(0.2);
+                times.push_back(0.4);
+                times.push_back(0.6);
+                times.push_back(0.8);
+//            }
+
             switching_times.push_back(times);
         }
 
@@ -280,17 +289,23 @@ namespace mpc {
 
         switch (gait) {
             case Trot: {
-                std::vector<double> times;
-                times.push_back(0.2);
-                times.push_back(0.4);
-                times.push_back(0.6);
-                times.push_back(0.8);
+                std::vector<std::vector<double>> times(num_ee_);
 
-                Spline position1(1, times, true, Spline::Constants);
-                Spline position2(1, times, false, Spline::Constants);
+                for (int ee = 0; ee < num_ee_; ee++) {
+                    times.at(ee).push_back(0);
+                    times.at(ee).push_back(0.2);
+                    times.at(ee).push_back(0.4);
+                    times.at(ee).push_back(0.6);
+                    times.at(ee).push_back(0.8);
+                }
 
-                Spline force1(num_polys, times, false, Spline::Force);
-                Spline force2(num_polys, times, true, Spline::Force);
+//                prev_traj_.UpdateContactTimes(times);
+
+//                Spline position1(1, times, true, Spline::Constants);
+//                Spline position2(1, times, false, Spline::Constants);
+//
+//                Spline force1(num_polys, times, false, Spline::Force);
+//                Spline force2(num_polys, times, true, Spline::Force);
 //                for (int j = 0; j < force1.GetNumPolyTimes(); j++) {
 //                    if (force1.IsMutable(j)) {
 //                        std::vector<double> vars(2);
@@ -308,17 +323,17 @@ namespace mpc {
 //                    }
 //                }
 
-
-                for (int ee = 0; ee < num_ee_; ee++) {
-                    if (ee == 0 || ee == 3) {
-                        prev_traj_.SetEndEffectorSplines(ee, force1, position1);
-                    } else {
-                        prev_traj_.SetEndEffectorSplines(ee, force2, position2);
-                    }
-                    for (int coord = 0; coord < POS_VARS; coord++) {
-                        prev_traj_.SetPositionsForAllTime(ee, ee_pos.at(ee));
-                    }
-                }
+//
+//                for (int ee = 0; ee < num_ee_; ee++) {
+//                    if (ee == 0 || ee == 3) {
+//                        prev_traj_.SetEndEffectorSplines(ee, force1, position1);
+//                    } else {
+//                        prev_traj_.SetEndEffectorSplines(ee, force2, position2);
+//                    }
+//                    for (int coord = 0; coord < POS_VARS; coord++) {
+//                        prev_traj_.SetPositionsForAllTime(ee, ee_pos.at(ee));
+//                    }
+//                }
 
                 prev_traj_.PrintTrajectoryToFile("trot_test.txt");
                 break;
@@ -501,7 +516,7 @@ namespace mpc {
         for (int node = 0; node < info_.num_nodes+1; node++) {
             for (int ee = 0; ee < num_ee_; ee++) {
                 const int coord = 2;
-                if (prev_traj_.IsForceMutable(ee, coord, GetTime(node))) {
+                if (prev_traj_.IsForceMutable(ee, GetTime(node))) {
                     count++;
                 }
             }
