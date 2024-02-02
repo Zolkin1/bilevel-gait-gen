@@ -600,24 +600,62 @@ namespace mpc {
             }
         }
 
-        if (direct_dep) {
-            coef_partials(0) = Getx0CoefPartial(time, deltat, wrt_lower);
-            const int node = ConvertContactNodeToSplineNode(time_idx);
-            // Now need to determine if it is x0dot, or x1 next
-            if (spline.at(lower_node).GetType() == FullDeriv) {
-                coef_partials(1) = Getx0dotCoefPartial(time, deltat, wrt_lower);
-                coef_partials(2) = Getx1CoefPartial(time, deltat, !wrt_lower);
-                if (spline.at(upper_node).GetType() == FullDeriv) {
-                    coef_partials(3) = Getx1dotCoefPartial(time, deltat, !wrt_lower);
+        if (type == Force) {
+            if (direct_dep) {
+                if (spline.at(lower_node).GetType() == FullDeriv) {
+                    assert(vars_affecting >= 2);
+                    coef_partials(0) = Getx0CoefPartial(time, deltat, wrt_lower);
+                    coef_partials(1) = Getx0dotCoefPartial(time, deltat, wrt_lower);
+                    if (spline.at(upper_node).GetType() == FullDeriv) {
+                        assert(vars_affecting == 4);
+                        coef_partials(2) = Getx1CoefPartial(time, deltat, !wrt_lower);
+                        coef_partials(3) = Getx1dotCoefPartial(time, deltat, !wrt_lower);
+                    }
+                } else {
+                    assert(vars_affecting == 2);
+                    coef_partials(0) = Getx1CoefPartial(time, deltat, !wrt_lower);
+                    coef_partials(1) = Getx1dotCoefPartial(time, deltat, !wrt_lower);
                 }
+
+//                coef_partials(0) = Getx0CoefPartial(time, deltat, wrt_lower);
+//                const int node = ConvertContactNodeToSplineNode(time_idx);
+//                // Now need to determine if it is x0dot, or x1 next
+//                if (spline.at(lower_node).GetType() == FullDeriv) {
+//                    coef_partials(1) = Getx0dotCoefPartial(time, deltat, wrt_lower);
+//                    coef_partials(2) = Getx1CoefPartial(time, deltat, !wrt_lower);
+//                    if (spline.at(upper_node).GetType() == FullDeriv) {
+//                        coef_partials(3) = Getx1dotCoefPartial(time, deltat, !wrt_lower);
+//                    }
+//                } else {
+//                    coef_partials(1) = Getx1CoefPartial(time, deltat, !wrt_lower);
+//                    if (spline.at(upper_node).GetType() == FullDeriv) {
+//                        coef_partials(2) = Getx1dotCoefPartial(time, deltat, !wrt_lower);
+//                    }
+//                }
             } else {
-                coef_partials(1) = Getx1CoefPartial(time, deltat, !wrt_lower);
-                if (spline.at(upper_node).GetType() == FullDeriv) {
-                    coef_partials(2) = Getx1dotCoefPartial(time, deltat, !wrt_lower);
-                }
+                // TODO: Implement
             }
         } else {
-            // TODO: Implement
+            if (direct_dep) {
+                if (spline.at(lower_node).GetType() == FullDeriv) {
+                    assert(vars_affecting >= 2);
+                    coef_partials(0) = Getx0CoefPartial(time, deltat, wrt_lower);
+                    coef_partials(1) = Getx0dotCoefPartial(time, deltat, wrt_lower);
+                    if (spline.at(upper_node).GetType() == NoDeriv) {
+                        assert(vars_affecting == 4);
+                        coef_partials(2) = Getx1CoefPartial(time, deltat, !wrt_lower);
+                        coef_partials(3) = Getx1dotCoefPartial(time, deltat, !wrt_lower);
+                    }
+                } else if (vars_affecting == 1) {
+                    coef_partials(0) = Getx0CoefPartial(time, deltat, wrt_lower);
+                } else {
+                    assert(vars_affecting == 2);
+                    coef_partials(0) = Getx0CoefPartial(time, deltat, wrt_lower);
+                    coef_partials(1) = Getx1CoefPartial(time, deltat, wrt_lower);
+                }
+            } else {
+                // TODO: Implement
+            }
         }
 
         return coef_partials;
@@ -668,23 +706,28 @@ namespace mpc {
 
     }
 
-    // TODO: Check
     void EndEffectorSplines::SetContactTimes(const std::vector<double>& contact_times) {
-        throw std::runtime_error("Need to re-do this function! (SetContactTimes)");
+
+        assert(contact_times.size() == GetNumContacts()); // TODO: Check this
+
+        const int num_nodes_start = GetNumNodes();
         int contact_idx = 0;
         for (int i = 0; i < GetNumNodes(); i++) {
-            if (forces_.at(0).at(i).GetType() == NoDeriv) {
+            if (positions_.at(0).at(i).GetType() == NoDeriv) {
                 times_.at(i) = contact_times.at(contact_idx);
                 contact_idx++;
+            } else if (forces_.at(0).at(i).GetType() == Empty) {
+                times_.at(i) = times_.at(i-1) + (contact_times.at(contact_idx) - contact_times.at(contact_idx-1))/2;
             } else {
                 double contact_time = 0.2 + contact_times.at(contact_idx - 1);
                 if (contact_idx < contact_times.size()) {
-                    contact_time = contact_times.at(contact_idx);
+                    contact_time = contact_times.at(contact_idx) - contact_times.at(contact_idx - 1);
                 }
-
                 times_.at(i) = times_.at(i-1) + contact_time/num_force_polys_;
             }
         }
+
+        assert(num_nodes_start == GetNumNodes());
     }
 
     NodeType EndEffectorSplines::GetNodeType(SplineType type, int coord, int node_idx) const {
@@ -786,6 +829,28 @@ namespace mpc {
         } else {
             return GetMutableNodes(type, coord).size();
         }
+    }
+
+    int EndEffectorSplines::GetNumContacts() const {
+        int count = 0;
+        for (int i = 0; i < GetNumNodes(); i++) {
+            if (positions_.at(0).at(i).GetType() == NoDeriv) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    std::vector<double> EndEffectorSplines::GetContactTimes() const {
+        std::vector<double> contact_times;
+        for (int i = 0; i < GetNumNodes(); i++) {
+            if (positions_.at(0).at(i).GetType() == NoDeriv) {
+                contact_times.push_back(times_.at(i));
+            }
+        }
+
+        return contact_times;
     }
 
     int EndEffectorSplines::GetLowerNodeIdx(SplineType type, int coord, double time) const {

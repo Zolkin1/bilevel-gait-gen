@@ -326,16 +326,13 @@ namespace mpc {
     }
 
     int Trajectory::GetNumContactNodes(int ee) const {
-        return ee_splines_.at(ee).GetMutableNodes(EndEffectorSplines::Position, 0).size();
+        return ee_splines_.at(ee).GetNumContacts();
     }
 
     std::vector<std::vector<double>> Trajectory::GetContactTimes() const {
         std::vector<std::vector<double>> contact_times(ee_splines_.size());
         for (int ee = 0; ee < ee_splines_.size(); ee++) {
-            std::vector<int> mut_nodes = ee_splines_.at(ee).GetMutableNodes(EndEffectorSplines::Position, 0);
-            for (int mut_node : mut_nodes) {
-                contact_times.at(ee).push_back(ee_splines_.at(ee).GetTimes().at(mut_node));
-            }
+            contact_times.at(ee) = ee_splines_.at(ee).GetContactTimes();
         }
 
         return contact_times;

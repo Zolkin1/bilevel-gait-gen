@@ -64,6 +64,10 @@ namespace mpc {
 
         int GetTotalPolyVars(SplineType type, int coord) const;
 
+        int GetNumContacts() const;
+
+        std::vector<double> GetContactTimes() const;
+
         // Function list:
         // - Spline Value
         // - Vars coefficients -- Compressed view
