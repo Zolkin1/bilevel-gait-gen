@@ -32,11 +32,7 @@ namespace mpc {
 
         Trajectory& operator=(const Trajectory& traj);
 
-//        Trajectory(const Trajectory& traj);
-
         std::vector<vector_t> GetStates() const;
-
-//        const std::vector<std::array<Spline, 3>>& GetPositions() const;
 
         /**
          * Resets all states_ and inputs to 0
@@ -68,10 +64,6 @@ namespace mpc {
 
         void PrintTrajectoryToFile(const std::string& file_name) const;
 
-//        int GetTotalPosConstantsZ() const;
-
-//        double GetTotalTime() const;
-
         // Add an additional spline knot point
         void AddPolys(double final_time);
 
@@ -79,34 +71,15 @@ namespace mpc {
 
         void SetInitTime(double time);
 
-//        void SetEndEffectorSplines(int ee, const Spline& force_spline,
-//                                   const Spline& pos_spline);
-
-//        vector_t ConvertToQPVector(const SingleRigidBodyModel& model) const;
-
-//        vector_t PositionAsQPVector() const;
-
         vector_t GetState(int node) const;
 
-//        Eigen::Vector3d GetPosition(int ee, double time) const;
-
         std::vector<bool> GetContacts(double time) const;
-
-//        bool PosIsConstant(int ee, int coord, double time) const;
-
-//        int GetTotalPosNonConstantZ() const;
-
-//        bool IsSplineMutable(int ee, int coord) const;
 
         void UpdateFullVelocity(int node, const vector_t& vel);
         void UpdateFullConfig(int node, const vector_t& q);
 
         vector_t GetFullVelocity(int node) const;
         vector_t GetFullConfig(int node) const;
-
-//        vector_t GetAcc(int node, double dt);
-
-//        std::vector<std::vector<Eigen::Vector3d>> CreateVizData(const Model* model);
 
         int GetNumContactNodes(int ee) const;
 

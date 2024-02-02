@@ -69,30 +69,10 @@ namespace mpc {
         return states_;
     }
 
-//    const std::vector<std::array<Spline, 3>>& Trajectory::GetPositions() const {
-//        return end_effector_pos_;
-//    }
-
-//    void Trajectory::UpdatePosition(int end_effector, int coord,
-//                                    const std::vector<std::array<double, Spline::POLY_ORDER>>& vars) {
-//        end_effector_pos_.at(end_effector).at(coord).SetAllSplineVars(vars);
-//    }
-//
-//    void Trajectory::UpdateForce(int end_effector, int coord,
-//                                 const std::vector<std::array<double, Spline::POLY_ORDER>>& vars) {
-//        inputs_.UpdateForce(end_effector, coord, vars);
-//    }
-
     void Trajectory::SetState(int idx, const vector_t& state) {
         assert(state.size() == states_.at(idx).size());
         states_.at(idx) = state;
     }
-
-//    void Trajectory::SetInputVels(int idx, const vector_t& joint_vels) {
-//        if (!using_joints_) {
-//            throw std::runtime_error("Cannot set input velocities");
-//        }
-//    }
 
     int Trajectory::GetTotalPosSplineVars() const {
         return pos_spline_vars_;
@@ -102,6 +82,7 @@ namespace mpc {
         int idx = 0;
 
         const std::vector<int> mut_nodes = ee_splines_.at(end_effector).GetMutableNodes(EndEffectorSplines::Force, coord);
+        assert(vars.size() == ee_splines_.at(end_effector).GetTotalPolyVars(EndEffectorSplines::Force, coord));
         for(auto& node : mut_nodes) {
             vector_2t temp;
             for (int j = 0; j < 2; j++) {
@@ -111,82 +92,20 @@ namespace mpc {
             ee_splines_.at(end_effector).SetVars(EndEffectorSplines::Force, coord, node, temp);
             idx += 2;
         }
-
-//        for (int i = 0; i < forces_.at(end_effector).at(coord).GetNumPolyTimes(); i++) {
-//            if (IsForceMutable(end_effector, coord, i)) {
-//
-//                // TODO: DMA
-//                std::vector<double> temp(2);
-//                for (int j = 0; j < 2; j++) {
-//                    temp.at(j) = vars(idx + j);
-//                }
-//
-//                forces_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
-//                idx += 2;
-//            }
-//        }
     }
 
     void Trajectory::UpdatePositionSpline(int end_effector, int coord, const vector_t& vars) {
         int idx = 0;
 
         const std::vector<int> mut_nodes = ee_splines_.at(end_effector).GetMutableNodes(EndEffectorSplines::Position, coord);
+        assert(mut_nodes.size() == vars.size());
         for(auto& node : mut_nodes) {
             vector_2t temp;
             temp << vars(idx), 0;
-//            for (int j = 0; j < 2; j++) {
-//                temp(j) = vars(idx + j);
-//            }
 
             ee_splines_.at(end_effector).SetVars(EndEffectorSplines::Position, coord, node, temp);
             idx++;
         }
-//
-//        for (int i = 0; i < end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes(); i++) {
-//            // TODO: The below only works with constant splines (see commented code for otherwise)
-//            std::vector<double> temp(1);
-//            temp.at(0) = vars.segment(idx, 1)(0);
-//
-//            if (i == 0) {
-//                end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
-//                if (end_effector_pos_.at(end_effector).at(coord).IsStartPairConstant()) {
-//                    end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i + 1, temp);
-//                    i++;
-//                }
-//            } else if (i == end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes()-2) {
-//                end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
-//                if (end_effector_pos_.at(end_effector).at(coord).IsEndPairConstant()) {
-//                    end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i + 1, temp);
-//                    i++;
-//                }
-//            } else {
-//                end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
-//                if (i != end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes()-1) {
-//                    end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i + 1, temp);
-//                    i++;
-//                }
-//            }
-//
-//            idx++;
-
-
-//            int num_vars = end_effector_pos_.at(end_effector).at(coord).GetNumPolyVars(i);
-//
-//            std::vector<double> temp(num_vars);
-//            for (int j = 0; j < num_vars; j++) {
-//                temp.at(j) = vars.segment(idx, num_vars)(j);
-//            }
-//            end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i, temp);
-
-//            if (num_vars == 1 && i+1 < end_effector_pos_.at(end_effector).at(coord).GetNumPolyTimes() &&
-//            end_effector_pos_.at(end_effector).at(coord).GetNumPolyVars(i+1) == 1) {
-//                // Set then skip the additional constant term
-//                end_effector_pos_.at(end_effector).at(coord).UpdatePolyVar(i+1, temp);
-//                i++;
-//            }
-//            idx += num_vars;
-//
-//        }
     }
 
     std::pair<int, int> Trajectory::GetPositionSplineIndex(int end_effector, double time, int coord) const {
@@ -211,15 +130,15 @@ namespace mpc {
         return std::make_pair(num_spline_vars_before + idx_into_ee_coord_spline_vars + vars_idx, vars_affecting);
     }
 
-    void Trajectory::SetPositionsForAllTime(int ee, const vector_3t& ee_pos) {
-        for (int coord = 0; coord < 2; coord++) {
-            const std::vector<int> mut_nodes = ee_splines_.at(ee).GetMutableNodes(EndEffectorSplines::Position, coord);
-            for (auto& node : mut_nodes) {
-                vector_2t vars = {ee_pos(coord), 0};
-                ee_splines_.at(ee).SetVars(EndEffectorSplines::Position, coord, node, vars);
-            }
-        }
-    }
+//    void Trajectory::SetPositionsForAllTime(int ee, const vector_3t& ee_pos) {
+//        for (int coord = 0; coord < 2; coord++) {
+//            const std::vector<int> mut_nodes = ee_splines_.at(ee).GetMutableNodes(EndEffectorSplines::Position, coord);
+//            for (auto& node : mut_nodes) {
+//                vector_2t vars = {ee_pos(coord), 0};
+//                ee_splines_.at(ee).SetVars(EndEffectorSplines::Position, coord, node, vars);
+//            }
+//        }
+//    }
 
     // TODO: Fix this
     void Trajectory::PrintTrajectoryToFile(const std::string& file_name) const {
@@ -301,19 +220,6 @@ namespace mpc {
         file.close();
     }
 
-//    int Trajectory::GetTotalPosConstantsZ() const {
-//        int num_constants = 0;
-//        for (const auto& pos: end_effector_pos_) {
-//            num_constants += pos.at(2).GetNumConstant();
-//        }
-//
-//        return num_constants;
-//    }
-
-//    double Trajectory::GetTotalTime() const {
-//        return std::min(end_effector_pos_.at(0).at(0).GetEndTime(), forces_.at(0).at(0).GetEndTime());  // In theory this is redundant
-//    }
-
     void Trajectory::AddPolys(double final_time) {
         for (auto & ee_spline : ee_splines_) {
             while (ee_spline.GetEndTime() < final_time) {
@@ -343,27 +249,13 @@ namespace mpc {
             // Note the coordinates don't matter here because we don't sure the z position
             pos_spline_vars_ += 2*ee_spline.GetTotalPolyVars(EndEffectorSplines::Position, 0);
             force_spline_vars_ += 3*ee_spline.GetTotalPolyVars(EndEffectorSplines::Force, 0);
-        }
-    }
 
-//    void Trajectory::SetEndEffectorSplines(int ee, const Spline& force_spline, const Spline& pos_spline) {
-//        for (int coord = 0; coord < POS_VARS; coord++) {
-//            if (coord == 2) {
-//                std::vector<double> times(pos_spline.GetNumPolyTimes()-1);
-//                for (int i = 0; i < times.size(); i++) {
-//                    times.at(i) = pos_spline.GetPolyTimes().at(i+1);
-//                }
-//                Spline position1(2, times, !pos_spline.IsStartPairConstant(), Spline::Normal);
-//                end_effector_pos_.at(ee).at(coord) = position1;
-//            } else {
-//                end_effector_pos_.at(ee).at(coord) = pos_spline;
-//            }
-//            forces_.at(ee).at(coord) = force_spline;
-//        }
-//
-//        SetSwingPosZ();
-//        UpdateSplineVarsCount();
-//    }
+            assert(ee_spline.GetTotalPolyVars(EndEffectorSplines::Position, 0) == ee_spline.GetTotalPolyVars(EndEffectorSplines::Position, 1));
+            assert(ee_spline.GetTotalPolyVars(EndEffectorSplines::Force, 0) == ee_spline.GetTotalPolyVars(EndEffectorSplines::Force, 1));
+            assert(ee_spline.GetTotalPolyVars(EndEffectorSplines::Force, 1) == ee_spline.GetTotalPolyVars(EndEffectorSplines::Force, 2));
+        }
+
+    }
 
 //    vector_t Trajectory::PositionAsQPVector() const {
 //        vector_t pos_vec = vector_t::Zero(pos_spline_vars_);
@@ -385,15 +277,6 @@ namespace mpc {
         return states_.at(node);
     }
 
-//    Eigen::Vector3d Trajectory::GetPosition(int ee, double time) const {
-//        Eigen::Vector3d position;
-//        for (int coord = 0; coord < POS_VARS; coord++) {
-//            position(coord) = end_effector_pos_.at(ee).at(coord).ValueAt(time);
-//        }
-//
-//        return position;
-//    }
-
     std::vector<bool> Trajectory::GetContacts(double time) const {
         std::vector<bool> in_contact(ee_splines_.size());
         for (int ee = 0; ee < ee_splines_.size(); ee++) {
@@ -410,30 +293,6 @@ namespace mpc {
         return in_contact;
     }
 
-//    bool Trajectory::PosIsConstant(int ee, int coord, double time) const {
-//        return end_effector_pos_.at(ee).at(coord).IsConstant(time);
-//    }
-
-//    int Trajectory::GetTotalPosNonConstantZ() const {
-//        int non_const = 0;
-//        const int coord = 2;
-//        for (const auto& end_effector_pos : end_effector_pos_) {
-//            const auto& poly_vars = end_effector_pos.at(coord).GetPolyVars();
-//            for (int i = 0; i < poly_vars.size(); i++) {
-//                if (poly_vars.size() != 1) {
-//                    non_const++;
-//                }
-//            }
-//        }
-//
-//        return non_const;
-//    }
-
-//    bool Trajectory::IsSplineMutable(int ee, int coord) const {
-//        return mut_flags_.at(ee).at(coord);
-//    }
-
-// TODO: Fix this
     void Trajectory::SetSwingPosZ() {
         const int coord = 2;
         for (auto& ee_spline : ee_splines_) {
@@ -466,28 +325,6 @@ namespace mpc {
         return full_config_.at(node);
     }
 
-//    vector_t Trajectory::GetAcc(int node, double dt) {
-//        return -(full_velocities_.at(node+1) - full_velocities_.at(node))/dt;
-//    }
-
-//    std::vector<std::vector<Eigen::Vector3d>> Trajectory::CreateVizData(const Model* model) {
-//        for (int ee = 0; ee < 5; ee++) {
-//            for (int node = 0; node < states_.size(); node++) {
-//                if (ee == 4) {
-//                    fk_traj_.at(ee).at(node) = model->GetCOMPosition(GetState(node));
-//                } else {
-//                    // TODO: How to deal with this
-//                    fk_traj_.at(ee).at(node) = GetEndEffectorLocation(ee, GetTime(node));
-////                            model.GetEndEffectorLocationCOMFrame(GetState(node),
-////                                                                 model.GetEndEffectorFrame(ee))
-////                            + model->GetCOMPosition(GetState(node));
-//                }
-//            }
-//        }
-//
-//        return fk_traj_;
-//    }
-
     int Trajectory::GetNumContactNodes(int ee) const {
         return ee_splines_.at(ee).GetMutableNodes(EndEffectorSplines::Position, 0).size();
     }
@@ -510,6 +347,9 @@ namespace mpc {
             case SplineTypes::Force:
                 return ee_splines_.at(ee).GetPolyVarsLin(EndEffectorSplines::Force, coord, time);
             case SplineTypes::Position:
+                if (coord == 2) {
+                    throw std::runtime_error("You cannot request spline linearizations for position z axis.");
+                }
                 return ee_splines_.at(ee).GetPolyVarsLin(EndEffectorSplines::Position, coord, time);
             default:
                 throw std::runtime_error("Spline type not implemented.");
@@ -539,9 +379,12 @@ namespace mpc {
             case SplineTypes::Force:
                 return ee_splines_.at(end_effector).GetTotalPolyVars(EndEffectorSplines::Force, coord);
             case SplineTypes::Position:
+                if (coord == 2) {
+                    throw std::runtime_error("You cannot request spline poly vars count for position z axis.");
+                }
                 return ee_splines_.at(end_effector).GetTotalPolyVars(EndEffectorSplines::Position, coord);
             default:
-                throw std::runtime_error("Spline type not impelemented.");
+                throw std::runtime_error("Spline type not implemented.");
         }
     }
 
@@ -575,13 +418,7 @@ namespace mpc {
         return ee_splines_.at(ee).IsForceMutable(time);
     }
 
-//    bool Trajectory::IsForceMutable(int ee, int coord, int idx) const {
-//        return forces_.at(ee).at(coord).IsMutable(idx);
-//    }
-
     int Trajectory::GetTotalVariables() const {
-        // TODO: Account for joint potentially
-        // TODO: Do I want states in here?
         return force_spline_vars_ + pos_spline_vars_ + states_.size()*(states_.at(0).size()-1);
     }
 
@@ -589,7 +426,6 @@ namespace mpc {
         // TODO: DMA
         vector_t qp_vec = vector_t::Zero(GetTotalForceSplineVars() + GetTotalPosSplineVars());
 
-        // Force spline
         int force_idx = 0;
         int pos_idx = GetTotalForceSplineVars();
         for (int ee = 0; ee < ee_splines_.size(); ee++) {
@@ -606,6 +442,8 @@ namespace mpc {
             }
         }
 
+        assert(force_idx == GetTotalForceSplineVars());
+        assert(pos_idx == GetTotalForceSplineVars() + GetTotalPosSplineVars());
         return qp_vec;
     }
 

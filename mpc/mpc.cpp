@@ -160,7 +160,7 @@ namespace mpc {
                             // All the friction constraints are effected by all 3 coordinates of the end effectors
                             data_.constraint_mat_.SetMatrix(friction_pyramid_(fric_con, coord) * vars_lin.transpose(),
                                                             constraint_idx_ + idx + fric_con,
-                                                            force_offset + vars_index - vars_affecting);
+                                                            force_offset + vars_index);
                             data_.friction_cone_ub_(idx + fric_con) = 0;
                             data_.friction_cone_lb_(idx + fric_con) = -qp_solver->GetInfinity(1)(0);
                         }
@@ -192,30 +192,16 @@ namespace mpc {
 
                     data_.constraint_mat_.SetMatrix(vars_lin.transpose(),
                                                     constraint_idx_ + row_idx,
-                                                    force_idx + vars_index - vars_affecting);
-                    if (coord == 2) {
-                        data_.force_box_lb_(row_idx) = 0.0;
-//                        if (row_idx < 10) {
-//                            data_.force_box_lb_(row_idx) = 0.0;
-//                        } else {
-//                            data_.force_box_lb_(row_idx) = -1000.0;
-//                        }
-                    } else {
-                        data_.force_box_lb_(row_idx) = -info_.force_bound;
-                    }
+                                                    force_idx + vars_index);
 
-//                    data_.force_box_ub_(row_idx) = qp_solver->GetInfinity(1)(0);
+                    data_.force_box_lb_(row_idx) = 0.0;
                     data_.force_box_ub_(row_idx) = info_.force_bound;
 
                     row_idx++;
                 }
             }
         }
-        Eigen::SparseMatrix<double> temp;
         assert(row_idx == data_.num_force_box_constraints_);
-        temp.resize(data_.GetTotalNumConstraints(), data_.num_decision_vars);
-        temp.setFromTriplets(data_.constraint_mat_.GetTriplet().begin(), data_.constraint_mat_.GetTriplet().end());
-//        std::cout << temp.toDense().middleRows(constraint_idx_, data_.num_force_box_constraints_) << std::endl;
         constraint_idx_ += row_idx;
     }
 

@@ -3,6 +3,8 @@
 //
 #include <assert.h>
 
+#include <iostream>
+
 #include "end_effector_splines.h"
 
 namespace mpc {
@@ -27,7 +29,6 @@ namespace mpc {
 
         assert(num_times_in_pattern % 2);
 
-        // TODO: Deal with the z-position spline! That spline should only have one FullDeriv between NoDerivs. May need to add Empty to the forces
         for (int i = 0; i < num_times_in_pattern; i++) {
             if (!start_in_contact) {
                 if (i == 0) {
@@ -52,10 +53,6 @@ namespace mpc {
                     force_type_pattern_.push_back(NoDeriv);
                     position_type_pattern_.push_back(NoDeriv);
                     z_position_type_pattern_.push_back(NoDeriv);
-//                } else if (i == std::ceil(static_cast<double>(num_times_in_pattern)/2.0) - 1) {
-//                    z_position_type_pattern_.push_back(FullDeriv);
-//                    force_type_pattern_.push_back(Empty);
-//                    position_type_pattern_.push_back(Empty);
                 } else if (i < num_force_polys) {
                     force_type_pattern_.push_back(FullDeriv);
                     position_type_pattern_.push_back(Empty);
@@ -272,7 +269,7 @@ namespace mpc {
             }
 
             if (lower_node == upper_node) {
-                return std::make_pair(vars_idx, 1);     // TODO: Change index
+                return std::make_pair(vars_idx, 1);
             }
 
             return std::make_pair(vars_idx, 4);
@@ -285,7 +282,7 @@ namespace mpc {
             }
 
             if (lower_node == upper_node) {
-                return std::make_pair(vars_idx, 1);     // TODO: Change index
+                return std::make_pair(vars_idx, 1);
             }
 
             if (coord != 2) {
@@ -322,16 +319,15 @@ namespace mpc {
         const int lower_node = GetLowerNodeIdx(Force, 0, time);
         const int upper_node = GetUpperNodeIdx(Force, 0, time);
         if ((forces_.at(0).at(lower_node).GetType() == NoDeriv && forces_.at(0).at(upper_node).GetType() == NoDeriv)) {
-        //||
-//                (forces_.at(lower_node).GetType() == NoDeriv && time == times_.at(lower_node))) {
             return false;
         } else {
             return true;
         }
     }
 
-    // TODO: Fix to work with the z position spline
     void EndEffectorSplines::AddPoly(double additional_time) {
+        std::cerr << "poly added" << std::endl;
+
         const int num_nodes = GetNumNodes();
         const vector_2t ZERO_VEC = {0, 0};
 
@@ -396,59 +392,6 @@ namespace mpc {
                     times_.push_back(times_.at(times_.size() - 1) + additional_time / num_force_polys_);
                 }
             }
-
-//            int offset = 1;
-//            if (force_type_pattern_.at(0) == NoDeriv && force_type_pattern_.at(1) == NoDeriv) {
-//                offset = 2;
-//            }
-//
-//            const double contact_time = times_.at(times_.size()-1);
-//
-//            int k = 1;
-//            for (int i = offset; i < force_type_pattern_.size(); i++) {
-//                for (int coord = 0; coord < POS_VARS; coord++) {
-//                    forces_.at(coord).emplace_back(force_type_pattern_.at(i),
-//                                                   forces_.at(coord).at(forces_.at(coord).size() - 1).GetNodeIdx() + 1,
-//                                                   ZERO_VEC);
-//                    if (coord < 2) {
-//                        positions_.at(coord).emplace_back(position_type_pattern_.at(i),
-//                                                          positions_.at(coord).at(
-//                                                                  positions_.at(coord).size() - 1).GetNodeIdx() + 1,
-//                                                          ZERO_VEC);
-//                    } else {
-//                        positions_.at(coord).emplace_back(z_position_type_pattern_.at(i),
-//                                                      positions_.at(coord).at(positions_.at(coord).size()-1).GetNodeIdx()+1,
-//                                                      ZERO_VEC);
-//                    }
-//                }
-//
-//                if (force_type_pattern_.at(i) == FullDeriv) {
-//                    times_.push_back(contact_time + k * (additional_time) / (num_force_polys_));
-//                    k++;
-//                } else if (force_type_pattern_.at(i) == Empty) {
-//                    times_.push_back(contact_time + (additional_time) / 2);
-//                }
-//            }
-//
-//            times_.push_back(contact_time + additional_time);
-//            if (offset == 2) {
-//                for (int coord = 0; coord < POS_VARS; coord++) {
-//                    forces_.at(coord).emplace_back(NoDeriv,
-//                                                   forces_.at(coord).at(forces_.at(coord).size() - 1).GetNodeIdx() + 1,
-//                                                   ZERO_VEC);
-//                    if (coord < 2) {
-//                        positions_.at(coord).emplace_back(NoDeriv,
-//                                                          positions_.at(coord).at(
-//                                                                  positions_.at(coord).size() - 1).GetNodeIdx() + 1,
-//                                                          ZERO_VEC);
-//                    } else {
-//                        positions_.at(coord).emplace_back(NoDeriv,
-//                                                          positions_.at(coord).at(
-//                                                                  positions_.at(coord).size() - 1).GetNodeIdx() + 1,
-//                                                          ZERO_VEC);
-//                    }
-//                }
-//            }
         }
     }
 
@@ -465,6 +408,7 @@ namespace mpc {
                             positions_.at(coord).erase(positions_.at(coord).begin());
                         }
                     }
+                    std::cerr << "nodes removed" << std::endl;
                 }
                 mut_nodes = GetMutableNodes(Position, 0);
             }
@@ -726,6 +670,7 @@ namespace mpc {
 
     // TODO: Check
     void EndEffectorSplines::SetContactTimes(const std::vector<double>& contact_times) {
+        throw std::runtime_error("Need to re-do this function! (SetContactTimes)");
         int contact_idx = 0;
         for (int i = 0; i < GetNumNodes(); i++) {
             if (forces_.at(0).at(i).GetType() == NoDeriv) {
@@ -758,7 +703,7 @@ namespace mpc {
         switch (type) {
             case Force:
                 for (int i = 0; i < GetNumNodes(); i++) {
-                    if (forces_.at(coord).at(i).GetType() != NoDeriv && forces_.at(coord).at(i).GetType() != Empty) {
+                    if (forces_.at(coord).at(i).GetType() == FullDeriv) {
                         mutable_nodes.push_back(i);
                     }
                 }

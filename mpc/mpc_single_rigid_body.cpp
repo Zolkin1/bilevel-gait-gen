@@ -142,20 +142,20 @@ namespace mpc {
         prev_qp_sol = ((alpha * p) + prev_qp_sol).eval();
 
         prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, state);
-        if (run_num_ == 50) {
-            std::cout << "ee location: " << prev_traj_.GetEndEffectorLocation(1, init_time).transpose() << std::endl;
-            std::cout << "lin vars: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).transpose() << std::endl;
-            int vars_index, vars_affecting;
-            std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(1, init_time, 0);
-            std::cout << "vars index, affecting: " << vars_index << ", " << vars_affecting << std::endl;
-            std::cout << "qp solve vars: " << sol.segment(GetPosSplineStartIdx() + vars_index - vars_affecting, vars_affecting).transpose() << std::endl;
-            std::cout << "product: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).dot(
-                    sol.segment(GetPosSplineStartIdx() + vars_index - vars_affecting, vars_affecting)) << std::endl;
-            std::cout << "ee start constraints: \n" << data_.sparse_constraint_.bottomRows<8>()*sol - data_.start_ee_constants_ << std::endl;
-            std::cout << "constraint mat: " << data_.sparse_constraint_.block(data_.GetTotalNumConstraints() - data_.num_start_ee_constraints_,
-                                                                              GetPosSplineStartIdx(), data_.num_start_ee_constraints_, prev_traj_.GetTotalPosSplineVars());
-            std::cout << "solution val: " << sol(GetPosSplineStartIdx() + vars_index - vars_affecting) << std::endl;
-        }
+//        if (run_num_ == 50) {
+//            std::cout << "ee location: " << prev_traj_.GetEndEffectorLocation(1, init_time).transpose() << std::endl;
+//            std::cout << "lin vars: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).transpose() << std::endl;
+//            int vars_index, vars_affecting;
+//            std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(1, init_time, 0);
+//            std::cout << "vars index, affecting: " << vars_index << ", " << vars_affecting << std::endl;
+//            std::cout << "qp solve vars: " << sol.segment(GetPosSplineStartIdx() + vars_index - vars_affecting, vars_affecting).transpose() << std::endl;
+//            std::cout << "product: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).dot(
+//                    sol.segment(GetPosSplineStartIdx() + vars_index - vars_affecting, vars_affecting)) << std::endl;
+//            std::cout << "ee start constraints: \n" << data_.sparse_constraint_.bottomRows<8>()*sol - data_.start_ee_constants_ << std::endl;
+//            std::cout << "constraint mat: " << data_.sparse_constraint_.block(data_.GetTotalNumConstraints() - data_.num_start_ee_constraints_,
+//                                                                              GetPosSplineStartIdx(), data_.num_start_ee_constraints_, prev_traj_.GetTotalPosSplineVars());
+//            std::cout << "solution val: " << sol(GetPosSplineStartIdx() + vars_index - vars_affecting) << std::endl;
+//        }
 
 //        std::cout << "ee location ub constraints: \n" << data_.sparse_constraint_.middleRows(
 //                data_.GetTotalNumConstraints() - data_.num_ee_location_constraints_,
@@ -314,6 +314,9 @@ namespace mpc {
                 }
             }
         }
+
+        assert(pos_idx == qp_sol.size());
+        assert(force_idx == GetPosSplineStartIdx());
 
         // Set states and joint vels
         for (int node = 0; node < info_.num_nodes + 1; node++) {
@@ -607,10 +610,11 @@ namespace mpc {
 
             ee_constraint_start += data_.num_ee_location_constraints_;
             idx = 2*ee;
+
 //         TODO: DMA
             matrix_t M(data_.num_start_ee_constraints_, traj.GetTotalPosSplineVars());
             M.setZero();
-
+            idx = 0;
             for (int coord = 0; coord < 2; coord++) {
                 int vars_idx, vars_affecting;
                 std::tie(vars_idx, vars_affecting) =
@@ -625,6 +629,8 @@ namespace mpc {
                         pos_coef_partials.transpose();
                 idx++;
             }
+
+//            assert(idx == data_.num_start_ee_constraints_);
 
             data_.constraint_mat_.SetMatrix(M, constraint_idx_, GetPosSplineStartIdx());
 
