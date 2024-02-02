@@ -14,28 +14,60 @@ namespace mpc {
                                            : num_force_polys_(num_force_polys) {
         const vector_2t ZERO_VARS = vector_2t::Zero();
 
-        std::vector<NodeType> force_type_pattern;
-        std::vector<NodeType> position_type_pattern;
+        if (num_force_polys_ < 2) {
+            throw std::runtime_error("The number of force polynomials between constant sections must be at least 2.");
+        }
+
+        int num_times_in_pattern = num_force_polys + 1;
+        spline_stride_ = num_force_polys;
+        if (num_force_polys % 2) {
+            num_times_in_pattern++;
+            spline_stride_ = num_force_polys;
+        }
+
+        assert(num_times_in_pattern % 2);
+
         // TODO: Deal with the z-position spline! That spline should only have one FullDeriv between NoDerivs. May need to add Empty to the forces
-        for (int i = 0; i < num_force_polys_ + 1; i++) {
+        for (int i = 0; i < num_times_in_pattern; i++) {
             if (!start_in_contact) {
-                if (i < 2) {
-                    force_type_pattern.push_back(NoDeriv);
-                    position_type_pattern.push_back(NoDeriv);
+                if (i == 0) {
+                    force_type_pattern_.push_back(NoDeriv);
+                    position_type_pattern_.push_back(NoDeriv);
+                    z_position_type_pattern_.push_back(NoDeriv);
+                } else if (i == 1) {
+                    force_type_pattern_.push_back(Empty);
+                    position_type_pattern_.push_back(Empty);
+                    z_position_type_pattern_.push_back(FullDeriv);
+                } else if (i == 2) {
+                    force_type_pattern_.push_back(NoDeriv);
+                    position_type_pattern_.push_back(NoDeriv);
+                    z_position_type_pattern_.push_back(NoDeriv);
                 } else {
-                    force_type_pattern.push_back(FullDeriv);
-                    position_type_pattern.push_back(Empty);
+                    force_type_pattern_.push_back(FullDeriv);
+                    position_type_pattern_.push_back(Empty);
+                    z_position_type_pattern_.push_back(Empty);
                 }
             } else {
                 if (i == 0) {
-                    force_type_pattern.push_back(NoDeriv);
-                    position_type_pattern.push_back(NoDeriv);
+                    force_type_pattern_.push_back(NoDeriv);
+                    position_type_pattern_.push_back(NoDeriv);
+                    z_position_type_pattern_.push_back(NoDeriv);
+//                } else if (i == std::ceil(static_cast<double>(num_times_in_pattern)/2.0) - 1) {
+//                    z_position_type_pattern_.push_back(FullDeriv);
+//                    force_type_pattern_.push_back(Empty);
+//                    position_type_pattern_.push_back(Empty);
                 } else if (i < num_force_polys) {
-                    force_type_pattern.push_back(FullDeriv);
-                    position_type_pattern.push_back(Empty);
+                    force_type_pattern_.push_back(FullDeriv);
+                    position_type_pattern_.push_back(Empty);
+                    z_position_type_pattern_.push_back(Empty);
+                } else if ( i == num_times_in_pattern - 1) {
+                    force_type_pattern_.push_back(Empty);
+                    position_type_pattern_.push_back(Empty);
+                    z_position_type_pattern_.push_back(FullDeriv);
                 } else {
-                    force_type_pattern.push_back(NoDeriv);
-                    position_type_pattern.push_back(NoDeriv);
+                    force_type_pattern_.push_back(NoDeriv);
+                    position_type_pattern_.push_back(NoDeriv);
+                    z_position_type_pattern_.push_back(NoDeriv);
                 }
             }
         }
@@ -44,22 +76,45 @@ namespace mpc {
         for (int coord = 0; coord < POS_VARS; coord++) {
             int i = 0;
             int j = 0;
-            while (i < num_contacts) {
-                    forces_.at(coord).emplace_back(force_type_pattern.at(j % force_type_pattern.size()), j, ZERO_VARS);
-                positions_.at(coord).emplace_back(position_type_pattern.at(j % position_type_pattern.size()), j, ZERO_VARS);
+            int k = 1;
+            if (coord < 2) {
+                while (i < num_contacts) {
+                    forces_.at(coord).emplace_back(force_type_pattern_.at(j % force_type_pattern_.size()), j, ZERO_VARS);
+                    positions_.at(coord).emplace_back(position_type_pattern_.at(j % position_type_pattern_.size()), j,
+                                                      ZERO_VARS);
 
-                if (force_type_pattern.at(j % position_type_pattern.size()) == FullDeriv) {
-                    if (coord == 0) {
-                        times_.push_back(
-                                times_.at(times_.size() - 1) + (times.at(i) - times.at(i - 1)) / num_force_polys);
+                    if (force_type_pattern_.at(j % position_type_pattern_.size()) == FullDeriv) {
+                        if (coord == 0) {
+                            times_.push_back(
+                                    times.at(i-1) + k * (times.at(i) - times.at(i - 1)) / (num_force_polys));
+                            k++;
+                        }
+                    } else if (force_type_pattern_.at(j % position_type_pattern_.size()) == Empty) {
+                        if (coord == 0) {
+                            times_.push_back(times.at(i - 1) + (times.at(i) - times.at(i - 1)) / 2);
+                        }
+                    } else {
+                        if (coord == 0) {
+                            times_.push_back(times.at(i));
+                        }
+                        i++;
+                        k = 1;
                     }
-                } else {
-                    if (coord == 0) {
-                        times_.push_back(times.at(i));
-                    }
-                    i++;
+                    j++;
                 }
-                j++;
+            } else {
+                while (i < num_contacts) {
+                    forces_.at(coord).emplace_back(force_type_pattern_.at(j % force_type_pattern_.size()), j, ZERO_VARS);
+                    positions_.at(coord).emplace_back(z_position_type_pattern_.at(j % z_position_type_pattern_.size()), j,
+                                                      ZERO_VARS);
+
+                    if (force_type_pattern_.at(j % position_type_pattern_.size()) == FullDeriv ||
+                        force_type_pattern_.at(j % position_type_pattern_.size()) == Empty) {
+                    } else {
+                        i++;
+                    }
+                    j++;
+                }
             }
         }
 
@@ -76,14 +131,15 @@ namespace mpc {
         this->forces_ = ee_spline.forces_;
         this->positions_ = ee_spline.positions_;
         this->num_force_polys_ = ee_spline.num_force_polys_;
+        this->spline_stride_ = ee_spline.spline_stride_;
 
         return *this;
     }
 
     double EndEffectorSplines::ValueAt(SplineType type, int coord, double time) const {
         const node_v& spline = SelectSpline(type, coord);
-        const int lower_node = GetLowerNodeIdx(type, time);
-        const int upper_node = GetUpperNodeIdx(type, time);
+        const int lower_node = GetLowerNodeIdx(type, coord, time);
+        const int upper_node = GetUpperNodeIdx(type, coord, time);
 
         if (upper_node == lower_node) {
             return spline.at(lower_node).GetVars()(0);
@@ -109,8 +165,8 @@ namespace mpc {
 
     vector_t EndEffectorSplines::GetPolyVarsLin(SplineType type, int coord, double time) const {
         const node_v& spline = SelectSpline(type, coord);
-        const int lower_node = GetLowerNodeIdx(type, time);
-        const int upper_node = GetUpperNodeIdx(type, time);
+        const int lower_node = GetLowerNodeIdx(type, coord, time);
+        const int upper_node = GetUpperNodeIdx(type, coord, time);
 
         if (lower_node == upper_node) {
             vector_t vars_lin(1);
@@ -151,17 +207,41 @@ namespace mpc {
 
             return vars_lin;
         } else {
-            if (forces_.at(coord).at(lower_node).GetType() == NoDeriv &&
-                    forces_.at(coord).at(lower_node+1).GetType() == NoDeriv) {
-                vars_lin.resize(2);
-                vars_lin(0) = Getx0Coef(poly_time, deltat);
-                vars_lin(1) = Getx1Coef(poly_time, deltat);
+            if (coord != 2) {
+                if (forces_.at(coord).at(lower_node).GetType() == NoDeriv &&
+                    forces_.at(coord).at(lower_node + 2).GetType() == NoDeriv) {
+                    vars_lin.resize(2);
+                    vars_lin(0) = Getx0Coef(poly_time, deltat);
+                    vars_lin(1) = Getx1Coef(poly_time, deltat);
 
-                return vars_lin;
+                    return vars_lin;
+                } else {
+                    vars_lin.resize(1);
+                    vars_lin << 1;
+                    return vars_lin;
+                }
             } else {
-                vars_lin.resize(1);
-                vars_lin << 1;
-                return vars_lin;
+                if (positions_.at(coord).at(lower_node).GetType() == NoDeriv &&
+                    positions_.at(coord).at(upper_node).GetType() == FullDeriv) {
+                    vars_lin.resize(3);
+                    vars_lin(0) = Getx0Coef(poly_time, deltat);
+                    vars_lin(1) = Getx1Coef(poly_time, deltat);
+                    vars_lin(2) = Getx1dotCoef(poly_time, deltat);
+
+                    return vars_lin;
+                } else if (positions_.at(coord).at(lower_node).GetType() == FullDeriv &&
+                            positions_.at(coord).at(upper_node).GetType() == NoDeriv) {
+                    vars_lin.resize(3);
+                    vars_lin(0) = Getx0Coef(poly_time, deltat);
+                    vars_lin(1) = Getx0dotCoef(poly_time, deltat);
+                    vars_lin(2) = Getx1Coef(poly_time, deltat);
+
+                    return vars_lin;
+                } else {
+                    vars_lin.resize(1);
+                    vars_lin << 1;
+                    return vars_lin;
+                }
             }
         }
     }
@@ -169,10 +249,10 @@ namespace mpc {
     std::pair<int, int> EndEffectorSplines::GetVarsIdx(SplineType type, int coord, double time) const {
         const node_v& spline = SelectSpline(type, coord);
 
-        const int lower_node = GetLowerNodeIdx(type, time);
-        const int upper_node = GetUpperNodeIdx(type, time);
+        const int lower_node = GetLowerNodeIdx(type, coord, time);
+        const int upper_node = GetUpperNodeIdx(type, coord, time);
 
-        const std::vector<int> mut_nodes = GetMutableNodes(type);
+        const std::vector<int> mut_nodes = GetMutableNodes(type, coord);
 
         int vars_idx = 0;
         if (type == Force) {
@@ -208,19 +288,39 @@ namespace mpc {
                 return std::make_pair(vars_idx, 1);     // TODO: Change index
             }
 
-            if (forces_.at(coord).at(lower_node).GetType() == NoDeriv &&
-                    forces_.at(coord).at(lower_node+1).GetType() == NoDeriv) {
-                return std::make_pair(vars_idx, 2);
+            if (coord != 2) {
+                if (forces_.at(coord).at(lower_node).GetType() == NoDeriv &&
+                    forces_.at(coord).at(lower_node + 2).GetType() == NoDeriv) {
+                    return std::make_pair(vars_idx, 2);
+                } else {
+                    return std::make_pair(vars_idx, 1);
+                }
             } else {
-                return std::make_pair(vars_idx, 1);
+                for (int i = 0; i < mut_nodes.size(); i++) {
+                    if (positions_.at(coord).at(mut_nodes.at(i)).GetType() == FullDeriv && mut_nodes.at(i) < lower_node) {
+                        vars_idx++;
+                    }
+                }
+
+                if ((positions_.at(coord).at(lower_node).GetType() == NoDeriv &&
+                    positions_.at(coord).at(upper_node).GetType() == FullDeriv) ||
+                        (positions_.at(coord).at(lower_node).GetType() == FullDeriv &&
+                         positions_.at(coord).at(upper_node).GetType() == NoDeriv)) {
+                    return std::make_pair(vars_idx, 3);
+                } else if (forces_.at(coord).at(lower_node).GetType() == NoDeriv &&
+                           forces_.at(coord).at(lower_node + 2).GetType() == NoDeriv) {
+                    return std::make_pair(vars_idx, 2);
+                } else {
+                    return std::make_pair(vars_idx, 1);
+                }
             }
         }
 
     }
 
     bool EndEffectorSplines::IsForceMutable(double time) const {
-        const int lower_node = GetLowerNodeIdx(Force, time);
-        const int upper_node = GetUpperNodeIdx(Force, time);
+        const int lower_node = GetLowerNodeIdx(Force, 0, time);
+        const int upper_node = GetUpperNodeIdx(Force, 0, time);
         if ((forces_.at(0).at(lower_node).GetType() == NoDeriv && forces_.at(0).at(upper_node).GetType() == NoDeriv)) {
         //||
 //                (forces_.at(lower_node).GetType() == NoDeriv && time == times_.at(lower_node))) {
@@ -230,62 +330,161 @@ namespace mpc {
         }
     }
 
+    // TODO: Fix to work with the z position spline
     void EndEffectorSplines::AddPoly(double additional_time) {
         const int num_nodes = GetNumNodes();
         const vector_2t ZERO_VEC = {0, 0};
 
-        if (forces_.at(0).at(num_nodes-1).GetType() == NoDeriv && forces_.at(0).at(num_nodes-2).GetType() != NoDeriv) {
-            times_.push_back(times_.at(times_.size()-1) + additional_time);
+        if (forces_.at(0).at(num_nodes-1).GetType() == NoDeriv && forces_.at(0).at(num_nodes-2).GetType() == FullDeriv) {
+            for (int i = 0; i < 2; i++) {
+                times_.push_back(times_.at(times_.size() - 1) + additional_time / 2);
 
-            for (int coord = 0; coord < POS_VARS; coord++) {
-                forces_.at(coord).emplace_back(NoDeriv,
-                                               forces_.at(coord).at(num_nodes-1).GetNodeIdx()+1, ZERO_VEC);
-                positions_.at(coord).emplace_back(NoDeriv,
-                                                  positions_.at(coord).at(num_nodes-1).GetNodeIdx()+1,
-                                                  positions_.at(coord).at(num_nodes-1).GetVars());
-            }
-
-        } else {
-            for (int i = 0; i < num_force_polys_; i++) {
-                if (i < num_force_polys_ - 1) {
-                    times_.push_back(times_.at(times_.size() - 1) + additional_time / num_force_polys_);
-
-                    for (int coord = 0; coord < POS_VARS; coord++) {
-                        forces_.at(coord).emplace_back(FullDeriv,
-                                                       forces_.at(coord).at(num_nodes - 1).GetNodeIdx() + 1,
+                for (int coord = 0; coord < POS_VARS; coord++) {
+                    if (i == 0) {
+                        forces_.at(coord).emplace_back(Empty,
+                                                       forces_.at(coord).at(forces_.at(coord).size() - 1).GetNodeIdx() +
+                                                       1,
                                                        ZERO_VEC);
-                        positions_.at(coord).emplace_back(Empty,
-                                                          positions_.at(coord).at(num_nodes - 1).GetNodeIdx() + 1,
-                                                          ZERO_VEC);
-                    }
-                } else {
-                    times_.push_back(times_.at(times_.size() - 1) + additional_time / num_force_polys_);
+                        if (coord == 2) {
+                            positions_.at(coord).emplace_back(FullDeriv,
+                                                              positions_.at(coord).at(
+                                                                      positions_.at(coord).size() - 1).GetNodeIdx() + 1,
+                                                              ZERO_VEC);
+                        } else {
+                            positions_.at(coord).emplace_back(Empty,
+                                                              positions_.at(coord).at(
+                                                                      positions_.at(coord).size() - 1).GetNodeIdx() + 1,
+                                                              ZERO_VEC);
+                        }
 
-                    for (int coord = 0; coord < POS_VARS; coord++) {
+                    } else {
                         forces_.at(coord).emplace_back(NoDeriv,
-                                                       forces_.at(coord).at(num_nodes - 1).GetNodeIdx() + 1,
+                                                       forces_.at(coord).at(forces_.at(coord).size() - 1).GetNodeIdx() +
+                                                       1,
                                                        ZERO_VEC);
                         positions_.at(coord).emplace_back(NoDeriv,
-                                                      positions_.at(coord).at(num_nodes - 1).GetNodeIdx() + 1,
-                                                        positions_.at(coord).at(num_nodes - 1).GetVars());
+                                                          positions_.at(coord).at(
+                                                                  positions_.at(coord).size() - 1).GetNodeIdx() + 1,
+                                                          ZERO_VEC);
                     }
                 }
             }
+
+        } else {
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                for (int i = 0; i < num_force_polys_-1; i++) {
+                    forces_.at(coord).emplace_back(FullDeriv,
+                                                   forces_.at(coord).at(forces_.at(coord).size() - 1).GetNodeIdx() +
+                                                   1,
+                                                   ZERO_VEC);
+                    positions_.at(coord).emplace_back(Empty,
+                                                      positions_.at(coord).at(positions_.at(coord).size() - 1).GetNodeIdx() + 1,
+                                                          ZERO_VEC);
+
+                    if (coord == 0) {
+                        times_.push_back(times_.at(times_.size()-1) + additional_time/num_force_polys_);
+                    }
+                }
+                forces_.at(coord).emplace_back(NoDeriv,
+                                               forces_.at(coord).at(forces_.at(coord).size() - 1).GetNodeIdx() +
+                                               1,
+                                               ZERO_VEC);
+                positions_.at(coord).emplace_back(NoDeriv,
+                                                  positions_.at(coord).at(positions_.at(coord).size() - 1).GetNodeIdx() + 1,
+                                                  ZERO_VEC);
+                if (coord == 0) {
+                    times_.push_back(times_.at(times_.size() - 1) + additional_time / num_force_polys_);
+                }
+            }
+
+//            int offset = 1;
+//            if (force_type_pattern_.at(0) == NoDeriv && force_type_pattern_.at(1) == NoDeriv) {
+//                offset = 2;
+//            }
+//
+//            const double contact_time = times_.at(times_.size()-1);
+//
+//            int k = 1;
+//            for (int i = offset; i < force_type_pattern_.size(); i++) {
+//                for (int coord = 0; coord < POS_VARS; coord++) {
+//                    forces_.at(coord).emplace_back(force_type_pattern_.at(i),
+//                                                   forces_.at(coord).at(forces_.at(coord).size() - 1).GetNodeIdx() + 1,
+//                                                   ZERO_VEC);
+//                    if (coord < 2) {
+//                        positions_.at(coord).emplace_back(position_type_pattern_.at(i),
+//                                                          positions_.at(coord).at(
+//                                                                  positions_.at(coord).size() - 1).GetNodeIdx() + 1,
+//                                                          ZERO_VEC);
+//                    } else {
+//                        positions_.at(coord).emplace_back(z_position_type_pattern_.at(i),
+//                                                      positions_.at(coord).at(positions_.at(coord).size()-1).GetNodeIdx()+1,
+//                                                      ZERO_VEC);
+//                    }
+//                }
+//
+//                if (force_type_pattern_.at(i) == FullDeriv) {
+//                    times_.push_back(contact_time + k * (additional_time) / (num_force_polys_));
+//                    k++;
+//                } else if (force_type_pattern_.at(i) == Empty) {
+//                    times_.push_back(contact_time + (additional_time) / 2);
+//                }
+//            }
+//
+//            times_.push_back(contact_time + additional_time);
+//            if (offset == 2) {
+//                for (int coord = 0; coord < POS_VARS; coord++) {
+//                    forces_.at(coord).emplace_back(NoDeriv,
+//                                                   forces_.at(coord).at(forces_.at(coord).size() - 1).GetNodeIdx() + 1,
+//                                                   ZERO_VEC);
+//                    if (coord < 2) {
+//                        positions_.at(coord).emplace_back(NoDeriv,
+//                                                          positions_.at(coord).at(
+//                                                                  positions_.at(coord).size() - 1).GetNodeIdx() + 1,
+//                                                          ZERO_VEC);
+//                    } else {
+//                        positions_.at(coord).emplace_back(NoDeriv,
+//                                                          positions_.at(coord).at(
+//                                                                  positions_.at(coord).size() - 1).GetNodeIdx() + 1,
+//                                                          ZERO_VEC);
+//                    }
+//                }
+//            }
         }
     }
 
     void EndEffectorSplines::RemovePoly(double start_time) {
-        const std::vector<int> mut_nodes = GetMutableNodes(Position);
-        for (int node = 1; node < mut_nodes.size(); node++) {
-            if (times_.at(mut_nodes.at(node-1)) < start_time && times_.at(mut_nodes.at(node)) < start_time) {
-                times_.erase(times_.begin() + node-1);
-                for (int coord = 0; coord < POS_VARS; coord++) {
-                    forces_.at(coord).erase(forces_.at(coord).begin() + node - 1);
-                    positions_.at(coord).erase(positions_.at(coord).begin() + node - 1);
+        for (int i = 0; i < times_.size(); i++) {
+            std::vector<int> mut_nodes = GetMutableNodes(Position, 0);
+
+            for (int node = 1; node < mut_nodes.size(); node++) {
+                if (times_.at(mut_nodes.at(node)) < start_time) {
+                    for (int j = 0; j < mut_nodes.at(node); j++) {
+                        times_.erase(times_.begin());
+                        for (int coord = 0; coord < POS_VARS; coord++) {
+                            forces_.at(coord).erase(forces_.at(coord).begin());
+                            positions_.at(coord).erase(positions_.at(coord).begin());
+                        }
+                    }
                 }
-//                node--;
+                mut_nodes = GetMutableNodes(Position, 0);
             }
         }
+
+        for (int coord = 0; coord < POS_VARS; coord++) {
+            assert(forces_.at(coord).at(0).GetType() != Empty);
+            assert(positions_.at(coord).at(0).GetType() != Empty);
+        }
+
+//        for (int node = 1; node < mut_nodes.size(); node++) {
+//            if (times_.at(mut_nodes.at(node-1)) < start_time && times_.at(mut_nodes.at(node)) < start_time) {
+//                times_.erase(times_.begin() + node-1);
+//                for (int coord = 0; coord < POS_VARS; coord++) {
+//                    forces_.at(coord).erase(forces_.at(coord).begin() + node - 1);
+//                    positions_.at(coord).erase(positions_.at(coord).begin() + node - 1);
+//                }
+//                node--;
+//            }
+//        }
 
 //        for (int i = 1; i < times_.size(); i++) {
 //            if (times_.at(i-1) < start_time && times_.at(i) < start_time) {
@@ -301,8 +500,8 @@ namespace mpc {
 
     double EndEffectorSplines::ComputePartialWrtTime(SplineType type, int coord, double time, int time_idx) const {
         const node_v& spline = SelectSpline(type, coord);
-        const int upper_node = GetUpperNodeIdx(type, time);
-        const int lower_node = GetLowerNodeIdx(type, time);
+        const int upper_node = GetUpperNodeIdx(type, coord, time);
+        const int lower_node = GetLowerNodeIdx(type, coord, time);
 
         const double deltat = times_.at(upper_node) - times_.at(lower_node);
         const double time_spline = time - times_.at(lower_node);
@@ -423,8 +622,8 @@ namespace mpc {
 
     vector_t EndEffectorSplines::ComputeCoefPartialWrtTime(SplineType type, int coord, double time, int time_idx) const {
         const node_v& spline = SelectSpline(type, coord);
-        const int upper_node = GetUpperNodeIdx(type, time);
-        const int lower_node = GetLowerNodeIdx(type, time);
+        const int upper_node = GetUpperNodeIdx(type, coord, time);
+        const int lower_node = GetLowerNodeIdx(type, coord, time);
 
         const double deltat = times_.at(upper_node) - times_.at(lower_node);
         const double time_spline = time - times_.at(lower_node);
@@ -493,14 +692,28 @@ namespace mpc {
             throw std::runtime_error("Force spline cannot be changed at that node. Always set to 0.");
         }
 
-        if (type == Position) {
-            if ((node_idx < spline.size()-1 && forces_.at(coord).at(node_idx+1).GetType() != NoDeriv)) {
+        if (type == Position && coord != 2) {
+            if ((node_idx < spline.size()-1 && forces_.at(coord).at(node_idx+1).GetType() == FullDeriv)) {
                 spline.at(node_idx).SetVars(vars);
-                spline.at(node_idx+num_force_polys_).SetVars(vars);
-            } else if(node_idx > 0 && forces_.at(coord).at(node_idx-1).GetType() != NoDeriv) {
+                spline.at(node_idx+spline_stride_).SetVars(vars);
+            } else if(node_idx > 0 && forces_.at(coord).at(node_idx-1).GetType() == FullDeriv) {
                 spline.at(node_idx).SetVars(vars);
-                if (node_idx >= num_force_polys_) {
-                    spline.at(node_idx - num_force_polys_).SetVars(vars);
+                if (node_idx >= spline_stride_) {
+                    spline.at(node_idx - spline_stride_).SetVars(vars);
+                }
+            } else {
+                spline.at(node_idx).SetVars(vars);
+            }
+        } else if (type == Position) {
+            if ((node_idx < spline.size()-1 && positions_.at(coord).at(node_idx).GetType() != FullDeriv &&
+                    forces_.at(coord).at(node_idx+1).GetType() == FullDeriv)) {
+                spline.at(node_idx).SetVars(vars);
+                spline.at(node_idx+spline_stride_).SetVars(vars);
+            } else if(node_idx > 0 && positions_.at(coord).at(node_idx).GetType() != FullDeriv &&
+                    forces_.at(coord).at(node_idx-1).GetType() == FullDeriv) {
+                spline.at(node_idx).SetVars(vars);
+                if (node_idx >= spline_stride_) {
+                    spline.at(node_idx - spline_stride_).SetVars(vars);
                 }
             } else {
                 spline.at(node_idx).SetVars(vars);
@@ -529,8 +742,8 @@ namespace mpc {
         }
     }
 
-    NodeType EndEffectorSplines::GetNodeType(SplineType type, int node_idx) const {
-        const node_v& spline = SelectSpline(type, 0);
+    NodeType EndEffectorSplines::GetNodeType(SplineType type, int coord, int node_idx) const {
+        const node_v& spline = SelectSpline(type, coord);
         return spline.at(node_idx).GetType();
     }
 
@@ -540,22 +753,34 @@ namespace mpc {
         return times_.size();
     }
 
-    std::vector<int> EndEffectorSplines::GetMutableNodes(SplineType type) const {
+    std::vector<int> EndEffectorSplines::GetMutableNodes(SplineType type, int coord) const {
         std::vector<int> mutable_nodes;
         switch (type) {
             case Force:
                 for (int i = 0; i < GetNumNodes(); i++) {
-                    if (forces_.at(0).at(i).GetType() != NoDeriv) {
+                    if (forces_.at(coord).at(i).GetType() != NoDeriv && forces_.at(coord).at(i).GetType() != Empty) {
                         mutable_nodes.push_back(i);
                     }
                 }
                 return mutable_nodes;
             case Position:
                 for (int i = 0; i < GetNumNodes(); i++) {
-                    if (positions_.at(0).at(i).GetType() != Empty) {
-                        mutable_nodes.push_back(i);
-                        if (i + num_force_polys_ < GetNumNodes() && positions_.at(0).at(i+num_force_polys_).GetType() == NoDeriv) {
-                            i += num_force_polys_;
+                    if (positions_.at(coord).at(i).GetType() != Empty) {
+                        if (coord != 2) {
+                            mutable_nodes.push_back(i);
+                            if (i + spline_stride_ < GetNumNodes() &&
+                                positions_.at(coord).at(i + spline_stride_).GetType() == NoDeriv) {
+                                i += spline_stride_;
+                            }
+                        } else {
+                            mutable_nodes.push_back(i);
+//                            if (!(i - spline_stride_ >= 0 && positions_.at(coord).at(i - spline_stride_).GetType() == NoDeriv)) {
+//
+//                            } else
+                            if (i + spline_stride_ < GetNumNodes() &&
+                                    positions_.at(coord).at(i + spline_stride_).GetType() == NoDeriv) {
+                                    i += spline_stride_;
+                            }
                         }
                     }
                 }
@@ -571,7 +796,7 @@ namespace mpc {
 
     vector_t EndEffectorSplines::GetSplineAsQPVec(SplineType type, int coord) const {
         const node_v& spline = SelectSpline(type, coord);
-        const std::vector<int> mut_nodes = GetMutableNodes(type);
+        const std::vector<int> mut_nodes = GetMutableNodes(type, coord);
 
         int vec_size = 0;
         for (auto& it : mut_nodes) {
@@ -609,16 +834,16 @@ namespace mpc {
         return times_.at(0);
     }
 
-    int EndEffectorSplines::GetTotalPolyVars(SplineType type) const {
+    int EndEffectorSplines::GetTotalPolyVars(SplineType type, int coord) const {
         const node_v& spline = SelectSpline(type, 0);
         if (type == Force) {
-            return 2*GetMutableNodes(type).size();
+            return 2*GetMutableNodes(type, coord).size();
         } else {
-            return GetMutableNodes(type).size();
+            return GetMutableNodes(type, coord).size();
         }
     }
 
-    int EndEffectorSplines::GetLowerNodeIdx(SplineType type, double time) const {
+    int EndEffectorSplines::GetLowerNodeIdx(SplineType type, int coord, double time) const {
         if (time < times_.at(0)) {
             throw std::runtime_error("Time requested is too small.");
         }
@@ -627,7 +852,7 @@ namespace mpc {
             throw std::runtime_error("Time requested is too large.");
         }
 
-        const node_v& spline = SelectSpline(type, 0);
+        const node_v& spline = SelectSpline(type, coord);
 
         for (int i = times_.size() - 1; i >= 0 ; i--) {
             if (time >= times_.at(i) && spline.at(i).GetType() != Empty) {
@@ -638,7 +863,7 @@ namespace mpc {
         throw std::runtime_error("Invalid time.");
     }
 
-    int EndEffectorSplines::GetUpperNodeIdx(SplineType type, double time) const {
+    int EndEffectorSplines::GetUpperNodeIdx(SplineType type, int coord, double time) const {
         if (time < times_.at(0)) {
             throw std::runtime_error("Time requested is too small.");
         }
@@ -647,7 +872,7 @@ namespace mpc {
             throw std::runtime_error("Time requested is too large.");
         }
 
-        const node_v& spline = SelectSpline(type, 0);
+        const node_v& spline = SelectSpline(type, coord);
 
         for (int i = 0; i < times_.size(); i++) {
             if (time < times_.at(i) && spline.at(i).GetType() != Empty) {

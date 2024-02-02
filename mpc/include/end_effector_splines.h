@@ -23,7 +23,6 @@ namespace mpc {
                            bool start_in_contact,
                            int num_force_polys);
 
-        // TODO: Write copy/assignment operator
         EndEffectorSplines& operator=(const EndEffectorSplines& ee_spline);
 
 
@@ -49,11 +48,11 @@ namespace mpc {
         void SetContactTimes(const std::vector<double>& contact_times);
 
         // ------------------ Getters ------------------ //
-        NodeType GetNodeType(SplineType type, int node_idx) const;
+        NodeType GetNodeType(SplineType type, int coord, int node_idx) const;
 
         int GetNumNodes() const;        // Nodes (includes intermediate nodes)
 
-        std::vector<int> GetMutableNodes(SplineType type) const;    // Should return compressed view nodes (i.e. no double counts)
+        std::vector<int> GetMutableNodes(SplineType type, int coord) const;    // Should return compressed view nodes (i.e. no double counts)
 
         std::vector<double> GetTimes() const;
 
@@ -63,7 +62,7 @@ namespace mpc {
 
         double GetStartTime() const;
 
-        int GetTotalPolyVars(SplineType type) const;
+        int GetTotalPolyVars(SplineType type, int coord) const;
 
         // Function list:
         // - Spline Value
@@ -77,8 +76,8 @@ namespace mpc {
 
     protected:
     private:
-        int GetLowerNodeIdx(SplineType type, double time) const;
-        int GetUpperNodeIdx(SplineType type, double time) const;
+        int GetLowerNodeIdx(SplineType type, int coord, double time) const;
+        int GetUpperNodeIdx(SplineType type, int coord, double time) const;
 
         int ConvertContactNodeToSplineNode(int contact_idx) const;
 
@@ -103,6 +102,10 @@ namespace mpc {
         std::array<node_v, 3> positions_;
         time_v times_;
         int num_force_polys_;
+        int spline_stride_;
+        std::vector<NodeType> force_type_pattern_;
+        std::vector<NodeType> position_type_pattern_;
+        std::vector<NodeType> z_position_type_pattern_;
         static constexpr int POS_VARS = 3;
     };
 } // mpc
