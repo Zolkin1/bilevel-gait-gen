@@ -8,9 +8,31 @@
 #include "spline_node.h"
 
 namespace mpc {
+    enum TimeType {
+        LiftOff = 0,
+        TouchDown = 1,
+        Inter = 2
+    };
+
+    class SplineTimes {
+    public:
+        SplineTimes(double time, TimeType type);
+        SplineTimes();
+
+        double GetTime() const;
+        TimeType GetType() const;
+
+        void SetTime(double time);
+    protected:
+    private:
+        double time_;
+        TimeType type_;
+    };
+
+    using time_v = std::vector<SplineTimes>;
+
     class EndEffectorSplines {
         using node_v = std::vector<SplineNode>;
-        using time_v = std::vector<double>;
         using vector_4t = Eigen::Vector4d;
     public:
         enum SplineType {
@@ -45,7 +67,7 @@ namespace mpc {
         // ------------------ Setters ------------------ //
         void SetVars(SplineType type, int coord, int node_idx, const vector_2t& vars);
 
-        void SetContactTimes(const std::vector<double>& contact_times);
+        void SetContactTimes(const time_v& contact_times);
 
         // ------------------ Getters ------------------ //
         NodeType GetNodeType(SplineType type, int coord, int node_idx) const;
@@ -66,7 +88,9 @@ namespace mpc {
 
         int GetNumContacts() const;
 
-        std::vector<double> GetContactTimes() const;
+        std::vector<double> GetContactTimeValues() const;
+
+        time_v GetContactTimes() const;
 
         // Function list:
         // - Spline Value
@@ -110,6 +134,7 @@ namespace mpc {
         std::vector<NodeType> force_type_pattern_;
         std::vector<NodeType> position_type_pattern_;
         std::vector<NodeType> z_position_type_pattern_;
+        std::vector<TimeType> time_type_pattern_;
         static constexpr int POS_VARS = 3;
     };
 } // mpc

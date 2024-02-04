@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+#include <iomanip>
 #include <cassert>
 
 #include "gait_optimizer.h"
@@ -26,7 +27,7 @@ namespace mpc {
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
-        qp_solver_.settings()->setAbsoluteTolerance(1e-4);
+        qp_solver_.settings()->setAbsoluteTolerance(1e-5);
         qp_solver_.settings()->setRelativeTolerance(1e-5);
         qp_solver_.settings()->setScaledTerimination(false);
         qp_solver_.settings()->setMaxIteration(1000);
@@ -91,29 +92,54 @@ namespace mpc {
                 const QPPartials& param_partial = param_partials_.at(ee).at(idx);
 //                assert(!param_partial.dA.toDense().array().isNaN());
 
-                std::cout << "max param partial dA: " << param_partial.dA.coeffs().maxCoeff() << std::endl;
+//                std::cout << "max param partial dA: " << param_partial.dA.coeffs().maxCoeff() << std::endl;
 
 //                std::cout << "qp partial dA: \n" << qp_partials_.dA.toDense().topLeftCorner<48+24,48+24>() << std::endl;
 
                 dldAth = qp_partials_.dA.cwiseProduct(param_partial.dA);
                 dldPth = qp_partials_.dP.cwiseProduct(param_partial.dP);
+
+                matrix_t A = dldAth.toDense();
+                matrix_t P = param_partial.dP.toDense();
+
+                for (int i = 0; i < param_partial.dl.size(); i++) {
+                    assert(!isnanl(param_partial.dl(i)));
+                    assert(!isnanl(param_partial.du(i)));
+                    for (int j = 0; j < param_partial.dA.cols(); j++) {
+                        if(isnanl(A(i, j))) {
+                            std::cout << "qp partials: " << qp_partials_.dA.toDense()(i,j) << std::endl;
+                            std::cout << "param partials: " << param_partial.dA.toDense()(i,j) << std::endl;
+                            throw;
+                        }
+                    }
+                }
+
+                for (int i = 0; i < param_partial.dq.size(); i++) {
+                    assert(!isnanl(param_partial.dq(i)));
+                    for (int j = 0; j < param_partial.dP.cols(); j++) {
+                        assert(!isnanl(P(i, j)));
+                    }
+                }
+
                 // TODO: Fix du nans
-                dHdth(GetNumTimeNodes(ee) + idx) = dldAth.sum() + dldPth.sum() +
+                dHdth(GetNumTimeNodes(ee) + idx) = dldPth.sum() + dldAth.sum() +
                                                      qp_partials_.dl.dot(param_partial.dl) + qp_partials_.du.dot(param_partial.du) +
                                                      qp_partials_.dq.dot(param_partial.dq);
+                assert(!isnanl(dHdth(GetNumTimeNodes(ee) + idx)));
             }
         }
-        std::cout << "max qp partial dA: " << qp_partials_.dA.coeffs().maxCoeff() << std::endl;
-        std::cout << "gradient term: \n" << dHdth << std::endl;
+
+//        std::cout << "max qp partial dA: " << qp_partials_.dA.coeffs().maxCoeff() << std::endl;
+//        std::cout << "gradient term: \n" << dHdth << std::endl;
 
 //        dHdth.normalize();
     }
 
     void GaitOptimizer::OptimizeContactTimes() {
         const int num_decision_vars = GetNumTimeNodes(num_ee_);
-        const int num_constraints = num_ee_ + num_decision_vars + num_decision_vars;
+        const int num_constraints = num_decision_vars + num_decision_vars;
 
-        A_builder_.Reserve(20);
+        A_builder_.Reserve(30);
 
         qp_solver_.data()->setNumberOfVariables(num_decision_vars);
         qp_solver_.data()->setNumberOfConstraints(num_constraints);
@@ -136,9 +162,18 @@ namespace mpc {
         Eigen::SparseMatrix<double> A(num_constraints, num_decision_vars);
         A.setFromTriplets(A_builder_.GetTriplet().begin(), A_builder_.GetTriplet().end());
 
-        std::cout << "A: \n" << A.toDense() << std::endl;
-        std::cout << "lb: \n" << lb_ << std::endl;
-        std::cout << "ub: \n" << ub_ << std::endl;
+        // TODO: Print these all in the same rows so they can be more easily compared
+//        std::cout << "A: \n" << A.toDense() << std::endl;
+//        std::cout << "lb: \n" << lb_ << std::endl;
+//        std::cout << "ub: \n" << ub_ << std::endl;
+
+        PrintConstraints(A.toDense(), lb_, ub_);
+
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int i = 1; i < contact_times_.at(ee).size(); i++) {
+                assert(contact_times_.at(ee).at(i-1).GetTime() <= contact_times_.at(ee).at(i).GetTime());
+            }
+        }
 
         if (!(qp_solver_.data()->setLinearConstraintsMatrix(A) &&
               qp_solver_.data()->setBounds(lb_, ub_))) {
@@ -160,40 +195,34 @@ namespace mpc {
             throw std::runtime_error("Could not solve QP.");
         }
 
+        if (qp_solver_.getStatus() != OsqpEigen::Status::Solved) {
+            std::cerr << "Could not solve the gait optimization problem." << std::endl;
+            std::cerr << "Solve type: " << GetSolveQualityAsString() << std::endl;
+            throw std::runtime_error("Bad gait optimization solve");
+        }
+
         vector_t qp_sol = qp_solver_.getSolution();
+
+        for (int i = 0; i < qp_sol.size(); i++) {
+            assert(!isnanl(qp_sol(i)));
+        }
 
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int idx = 0; idx < contact_times_.at(ee).size(); idx++) {
-                contact_times_.at(ee).at(idx) = qp_sol(GetNumTimeNodes(ee) + idx);
+                contact_times_.at(ee).at(idx).SetTime(qp_sol(GetNumTimeNodes(ee) + idx));
 
-                // TODO: Min time not respected at the end of the time frame (i.e. at the upper bound)
-                if (idx == 0) {
-                    if (contact_times_.at(ee).at(idx) <= 0) {
-                        contact_times_.at(ee).at(idx) = 0;
-                    } else if (contact_times_.at(ee).at(idx) >= contact_time_ub_) {
-                        contact_times_.at(ee).at(idx) = contact_time_ub_;
+                if (idx > 0) {
+                    if (contact_times_.at(ee).at(idx-1).GetTime() - contact_times_.at(ee).at(idx).GetTime() <= 1e-3
+                    && contact_times_.at(ee).at(idx-1).GetTime() - contact_times_.at(ee).at(idx).GetTime() > 0) {
+                        contact_times_.at(ee).at(idx) = contact_times_.at(ee).at(idx-1);
                     }
-                } else {
-                    if (contact_times_.at(ee).at(idx) <= contact_times_.at(ee).at(idx - 1)) {
-                        contact_times_.at(ee).at(idx) = contact_times_.at(ee).at(idx-1) + min_time_;
-                    } else if (contact_times_.at(ee).at(idx) >= contact_time_ub_) {
-                        contact_times_.at(ee).at(idx) = contact_time_ub_;
-                    }
+                    assert(contact_times_.at(ee).at(idx-1).GetTime() <= contact_times_.at(ee).at(idx).GetTime());
                 }
-
-                // Project the times back onto the polytope
-//                if (contact_times_.at(ee).at(idx) >= contact_times_ub_.at(ee).at(idx)) {
-//                    contact_times_.at(ee).at(idx) = contact_times_ub_.at(ee).at(idx);
-//                }
-//
-//                if (contact_times_.at(ee).at(idx) <= contact_times_lb_.at(ee).at(idx)) {
-//                    contact_times_.at(ee).at(idx) = contact_times_lb_.at(ee).at(idx);
-//                }
             }
         }
     }
 
-    std::vector<std::vector<double>> GaitOptimizer::GetContactTimes() {
+    std::vector<time_v> GaitOptimizer::GetContactTimes() {
         return contact_times_;
     }
 
@@ -222,7 +251,7 @@ namespace mpc {
         return num_nodes;
     }
 
-    void GaitOptimizer::SetContactTimes(std::vector<std::vector<double>> contact_times) {
+    void GaitOptimizer::SetContactTimes(std::vector<time_v> contact_times) {
         contact_times_ = contact_times;
     }
 
@@ -231,29 +260,30 @@ namespace mpc {
         int end_row = start_row;
         for (int ee = 0; ee < num_ee_; ee++) {
             const int nodes = contact_times_.at(ee).size();
-            matrix_t A = matrix_t::Zero(nodes+1, nodes);
-            A(0,0) = 1;
+            matrix_t A = matrix_t::Zero(nodes, nodes);
+//            A(0,0) = 1;
             for (int i = 1; i < nodes; i++) {
-                A(i,i-1) = 1;
-                A(i,i) = -1;
+                A(i-1,i-1) = 1;
+                A(i-1,i) = -1;
             }
-            A(nodes,nodes-1) = 1;
+            A(nodes-1,nodes-1) = 1;
 
-            vector_t lb = vector_t::Constant(nodes+1, -2);
-            lb(0) = 0;
-            lb(nodes) = 0.5;   // TODO: Make this not hard coded and time horizon - might not need this
-            lb_.segment(start_row + GetNumTimeNodes(ee) + ee, nodes+1) = lb;
-            vector_t ub = vector_t::Zero(nodes+1);
-            ub(0) = 1;
-            ub(nodes) = 1;
-            ub_.segment(start_row + GetNumTimeNodes(ee) + ee, nodes+1) = ub;
+            vector_t lb = vector_t::Constant(nodes, -2);
+//            lb(0) = contact_times_.at(ee).at(0);
+            lb(nodes-1) = 0.5 + contact_times_.at(ee).at(0).GetTime();   // TODO: Make this not hard coded and time horizon - might not need this
+            lb_.segment(start_row + GetNumTimeNodes(ee), nodes) = lb;
+            vector_t ub = vector_t::Zero(nodes);
+//            ub(0) = 0.2 + contact_times_.at(ee).at(contact_times_.at(ee).size()-1);
+            // TODO: May want to make this a bound from the inital rather than from the final. when its from the final then it can run off to infinity over mutliple solves
+            ub(nodes-1) = 0.2 + contact_times_.at(ee).at(contact_times_.at(ee).size()-1).GetTime();
+            ub_.segment(start_row + GetNumTimeNodes(ee), nodes) = ub;
 
             if (ee > 0) {
-                A_builder_.SetMatrix(A, start_row + GetNumTimeNodes(ee)+ee, GetNumTimeNodes(ee));
+                A_builder_.SetMatrix(A, start_row + GetNumTimeNodes(ee), GetNumTimeNodes(ee));
             } else {
                 A_builder_.SetMatrix(A, start_row + GetNumTimeNodes(ee), GetNumTimeNodes(ee));
             }
-            end_row += nodes + 1;
+            end_row += nodes;
         }
         return end_row;
     }
@@ -268,11 +298,11 @@ namespace mpc {
                 if (node == 0) {
                     // TODO: This constraint ensures the first contact time never moves.
                     // TODO: The problem is that there will always be a node at 0 then.
-                    ub_(start_row + idx) = contact_times_.at(ee).at(node);
-                    lb_(start_row + idx) = contact_times_.at(ee).at(node);
+                    ub_(start_row + idx) = contact_times_.at(ee).at(node).GetTime();
+                    lb_(start_row + idx) = contact_times_.at(ee).at(node).GetTime();
                 } else {
-                    ub_(start_row + idx) = 1e30; //bound + contact_times_.at(ee).at(node);
-                    lb_(start_row + idx) = -1e30; //-bound + contact_times_.at(ee).at(node);
+                    ub_(start_row + idx) = bound + contact_times_.at(ee).at(node).GetTime();
+                    lb_(start_row + idx) = -bound + contact_times_.at(ee).at(node).GetTime();
                 }
                 idx++;
             }
@@ -284,5 +314,39 @@ namespace mpc {
     void GaitOptimizer::ModifyQPPartials(const vector_t& xstar) {
         qp_partials_.dP = qp_partials_.dP + 0.5*xstar*xstar.transpose();
         qp_partials_.dq += xstar;
+    }
+
+    void GaitOptimizer::PrintConstraints(const matrix_t& A, const vector_t& lb, const vector_t& ub) {
+        using std::setw;
+        for (int row = 0; row < A.rows(); row++) {
+            std::cout << setw(8) << std::setprecision(4) << lb(row) << " | ";
+            for (int col = 0; col < A.cols(); col++) {
+                std::cout << setw(3) << A(row, col) << " ";
+            }
+            std::cout << "| " << setw(8) << std::setprecision(4) << ub(row) << std::endl;
+        }
+    }
+
+    std::string GaitOptimizer::GetSolveQualityAsString() const {
+        switch (qp_solver_.getStatus()) {
+            case OsqpEigen::Status::Solved:
+                return "Solved";
+            case OsqpEigen::Status::SolvedInaccurate:
+                return "Solved Inaccurate";
+            case OsqpEigen::Status::PrimalInfeasible:
+                return "Primal Infeasible";
+            case OsqpEigen::Status::DualInfeasible:
+                return "Dual Infeasible";
+            case OsqpEigen::Status::PrimalInfeasibleInaccurate:
+                return "Primal Infeasible Inaccurate";
+            case OsqpEigen::Status::DualInfeasibleInaccurate:
+                return "Dual Infeasible Inaccurate";
+            case OsqpEigen::Status::MaxIterReached:
+                return "Max Iter Reached";
+            case OsqpEigen::Status::Unsolved:
+                return "Unsolved";
+            default:
+                return "Other";
+        }
     }
 }

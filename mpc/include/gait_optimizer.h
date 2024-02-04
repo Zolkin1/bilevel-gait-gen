@@ -11,6 +11,7 @@
 
 #include "OsqpEigen/OsqpEigen.h"
 #include "sparse_matrix_builder.h"
+#include "end_effector_splines.h"
 
 namespace mpc {
     using matrix_t = Eigen::MatrixXd;
@@ -76,13 +77,13 @@ namespace mpc {
         /**
          * @return the current computed contact times
          */
-        std::vector<std::vector<double>> GetContactTimes();
+        std::vector<time_v> GetContactTimes();
 
         void SetNumContactTimes(int ee, int num_times);
 
         void UpdateSizes(int num_decision_vars, int num_constraints);
 
-        void SetContactTimes(std::vector<std::vector<double>> contact_times);
+        void SetContactTimes(std::vector<time_v> contact_times);
 
         void ModifyQPPartials(const vector_t& xstar);
 
@@ -94,7 +95,11 @@ namespace mpc {
 
         int CreateStepBoundConstraint(int start_row);
 
-        std::vector<std::vector<double>> contact_times_;
+        void PrintConstraints(const matrix_t& A, const vector_t& lb, const vector_t& ub);
+
+        std::string GetSolveQualityAsString() const;
+
+        std::vector<time_v> contact_times_;
         std::vector<std::vector<double>> contact_times_lb_, contact_times_ub_;
 
         vector_t dHdth;

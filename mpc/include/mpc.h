@@ -135,7 +135,7 @@ namespace mpc {
 
         virtual std::vector<std::vector<Eigen::Vector3d>> CreateVizData() = 0;
 
-        void UpdateContactTimes(const std::vector<std::vector<double>>& contact_times);
+        void UpdateContactTimes(const std::vector<time_v>& contact_times);
 
     protected:
         // ---------------- Protected Member Functions ---------------- //
@@ -178,8 +178,8 @@ namespace mpc {
 
         double GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state);
 
-        void RecordStats(double alpha, const vector_t& direction, const std::string& solve_type,
-                         const vector_t& ref_state, double solve_time);
+        void RecordStats(double alpha, const vector_t& direction, const OSQPInterface::SolveQuality& solve_type,
+                         const vector_t& ref_state, double solve_time, double cost);
 
         int GetNodeIntersectMutableForces() const;
 
@@ -250,9 +250,10 @@ namespace mpc {
         std::vector<double> cost_result_;
         std::vector<double> merit_result_;
         std::vector<double> merit_directional_deriv_;
-        std::vector<std::string> solve_type_;
+        std::vector<OSQPInterface::SolveQuality> solve_type_;
         std::vector<vector_t> ref_state_;
         std::vector<double> solve_time_;
+        std::vector<double> cost_;
 
         bool in_real_time_;
 

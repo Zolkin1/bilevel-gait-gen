@@ -83,7 +83,7 @@ namespace mpc {
 
         int GetNumContactNodes(int ee) const;
 
-        std::vector<std::vector<double>> GetContactTimes() const;
+        std::vector<time_v> GetContactTimes() const;
 
         int GetTotalForceSplineVars() const; // TODO: impelement
 
@@ -117,7 +117,7 @@ namespace mpc {
 
         vector_t GetPositionCoefPartialsWrtContactTime(int end_effector, int coord, double time, int contact_idx) const;
 
-        void UpdateContactTimes(const std::vector<std::vector<double>>& contact_times);
+        void UpdateContactTimes(const std::vector<time_v>& contact_times);
 
     protected:
     private:

@@ -57,9 +57,9 @@ namespace mpc {
         Phi_ = matrix_t::Zero(num_states_, num_states_);
         Phi_w_ = vector_t::Zero(num_states_);
 
-        prev_qp_sol = vector_t::Zero(data_.num_decision_vars);
+//        prev_qp_sol = vector_t::Zero(data_.num_decision_vars);
 
-        line_search_res_ = vector_t::Zero(data_.num_decision_vars);
+//        line_search_res_ = vector_t::Zero(data_.num_decision_vars);
         mu_ = 5000;
         run_num_ = 0;
         constraint_idx_ = 0;
@@ -438,8 +438,8 @@ namespace mpc {
         }
     }
 
-    void MPC::RecordStats(double alpha, const vector_t& direction, const std::string& solve_type,
-                          const vector_t& ref_state, double solve_time) {
+    void MPC::RecordStats(double alpha, const vector_t& direction, const OSQPInterface::SolveQuality& solve_type,
+                          const vector_t& ref_state, double solve_time, double cost) {
         equality_constraint_violations_.push_back(GetEqualityConstraintValues(prev_traj_, ref_state).lpNorm<1>());
         step_norm_.push_back(direction.norm());
         alpha_.push_back(alpha);
@@ -449,6 +449,7 @@ namespace mpc {
         solve_type_.push_back(solve_type);
         ref_state_.push_back(ref_state);
         solve_time_.push_back(solve_time);
+        cost_.push_back(cost);
     }
 
     void MPC::PrintStats() {
@@ -456,7 +457,7 @@ namespace mpc {
         using std::setfill;
 
         const int col_width = 15;
-        const int table_width = 9*col_width;
+        const int table_width = 10*col_width;
 
         std::cout << setfill('-') << setw(table_width) << "" << std::endl;
         std::cout << std::left << setfill(' ') << setw(table_width/2 - 7) << "" << "MPC Statistics" << std::endl;
@@ -471,10 +472,41 @@ namespace mpc {
                 << setw(col_width) << "Cost"
                 << setw(col_width) << "Merit"
                 << setw(col_width) << "Merit dd"
-                << setw(col_width) << "Solve Type" << std::endl;
+                << setw(col_width) << "Solve Type"
+                << setw(col_width) << "QP Cost" << std::endl;
         std::cout << std::setfill('-') << setw(table_width) << "" << std::endl;
         std::cout << setfill(' ');
         for (int i = 0; i < alpha_.size(); i++) {
+            std::string solve_type;
+            switch (solve_type_.at(i)) {
+                case OSQPInterface::Solved:
+                    solve_type = "Solved";
+                    break;
+                case OSQPInterface::SolvedInacc:
+                    solve_type = "Solved Inacc";
+                    break;
+                case OSQPInterface::PrimalInfeasible:
+                    solve_type = "P - Infeasible";
+                    break;
+                case OSQPInterface::DualInfeasible:
+                    solve_type = "D - Infeasible";
+                    break;
+                case OSQPInterface::PrimalInfeasibleInacc:
+                    solve_type = "P - Infeasible Inacc";
+                    break;
+                case OSQPInterface::DualInfeasibleInacc:
+                    solve_type = "D - Infeasible Inacc";
+                    break;
+                case OSQPInterface::MaxIter:
+                    solve_type = "Max Iter";
+                    break;
+                case OSQPInterface::Unsolved:
+                    solve_type = "Unsolved";
+                    break;
+                default:
+                    solve_type = "Other";
+            }
+
             std::cout << setw(col_width) << i
                       << setw(col_width) << solve_time_.at(i)
                       << setw(col_width) << equality_constraint_violations_.at(i)
@@ -483,7 +515,8 @@ namespace mpc {
                       << setw(col_width) << cost_result_.at(i)
                       << setw(col_width) << merit_result_.at(i)
                       << setw(col_width) << merit_directional_deriv_.at(i)
-                      << setw(col_width) << solve_type_.at(i) << std::endl;
+                      << setw(col_width) << solve_type
+                      << setw(col_width) << cost_.at(i) << std::endl;
         }
         std::cout << std::endl;
     }
@@ -528,7 +561,7 @@ namespace mpc {
     }
 
     vector_t MPC::Getdx() {
-        if (solve_type_.at(solve_type_.size()-1) == "Solved") { // TODO: Change to not be text based
+        if (solve_type_.at(solve_type_.size()-1) == OSQPInterface::Solved) { // TODO: Change to not be text based
             return qp_solver->Getdx();
         } else {
             return vector_t::Zero(data_.num_decision_vars); // TODO: Change this return
@@ -536,7 +569,7 @@ namespace mpc {
     }
 
     bool MPC::ComputeDerivativeTerms() {
-        if (solve_type_.at(solve_type_.size()-1) == "Solved") { // TODO: Change to not be text based
+        if (solve_type_.at(solve_type_.size()-1) == OSQPInterface::Solved) { // TODO: Change to not be text based
            qp_solver->Computedx(data_.sparse_cost_, data_.cost_linear, prev_qp_sol);
            vector_t dx = qp_solver->Getdx();
            vector_t dy_lu = vector_t::Zero(data_.GetTotalNumConstraints());
@@ -548,7 +581,7 @@ namespace mpc {
     }
 
     bool MPC::GetQPPartials(QPPartials& partials) const {
-        if (solve_type_.at(solve_type_.size()-1) == "Solved") {
+        if (solve_type_.at(solve_type_.size()-1) == OSQPInterface::Solved) {
             partials.dP.setZero();
             partials.dA.setZero();
             partials.dq.setZero();
@@ -578,7 +611,7 @@ namespace mpc {
         return num_inputs_;
     }
 
-    void MPC::UpdateContactTimes(const std::vector<std::vector<double>>& contact_times) {
+    void MPC::UpdateContactTimes(const std::vector<time_v >& contact_times) {
         prev_traj_.UpdateContactTimes(contact_times);
     }
 

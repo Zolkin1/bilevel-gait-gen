@@ -329,8 +329,8 @@ namespace mpc {
         return ee_splines_.at(ee).GetNumContacts();
     }
 
-    std::vector<std::vector<double>> Trajectory::GetContactTimes() const {
-        std::vector<std::vector<double>> contact_times(ee_splines_.size());
+    std::vector<time_v > Trajectory::GetContactTimes() const {
+        std::vector<time_v> contact_times(ee_splines_.size());
         for (int ee = 0; ee < ee_splines_.size(); ee++) {
             contact_times.at(ee) = ee_splines_.at(ee).GetContactTimes();
         }
@@ -497,7 +497,7 @@ namespace mpc {
                                                                       coord, time, contact_idx);
     }
 
-    void Trajectory::UpdateContactTimes(const std::vector<std::vector<double>>& contact_times) {
+    void Trajectory::UpdateContactTimes(const std::vector<time_v>& contact_times) {
         for (int ee = 0; ee < ee_splines_.size(); ee++) {
             ee_splines_.at(ee).SetContactTimes(contact_times.at(ee));
         }

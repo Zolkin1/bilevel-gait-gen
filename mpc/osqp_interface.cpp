@@ -14,7 +14,7 @@ namespace mpc {
         verbose_ = verbose;
 
         // Set solver settings
-        qp_solver_.settings()->setVerbosity(false);
+        qp_solver_.settings()->setVerbosity(true);
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-4); // 1e-6
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-4); // 1e-6
@@ -22,7 +22,7 @@ namespace mpc {
         qp_solver_.settings()->setRelativeTolerance(1e-4);
         qp_solver_.settings()->setScaledTerimination(false);
         qp_solver_.settings()->setMaxIteration(1000);
-        qp_solver_.settings()->setRho(.001);   // @Note: This makes a HUGE difference
+        qp_solver_.settings()->setRho(.001);   // @Note: This makes a HUGE difference, 0.001
         qp_solver_.settings()->setAlpha(1.6);
         qp_solver_.settings()->setSigma(1e-6);
         qp_solver_.settings()->setWarmStart(true);
@@ -197,36 +197,59 @@ namespace mpc {
         return infty;
     }
 
-    std::string OSQPInterface::GetSolveQuality() const {
+    std::string OSQPInterface::GetSolveQualityAsString() const {
         switch (qp_solver_.getStatus()) {
             case OsqpEigen::Status::Solved:
                 return "Solved";
-                break;
             case OsqpEigen::Status::SolvedInaccurate:
                 return "Solved Inaccurate";
-                break;
             case OsqpEigen::Status::PrimalInfeasible:
                 return "Primal Infeasible";
-                break;
             case OsqpEigen::Status::DualInfeasible:
                 return "Dual Infeasible";
-                break;
             case OsqpEigen::Status::PrimalInfeasibleInaccurate:
                 return "Primal Infeasible Inaccurate";
-                break;
             case OsqpEigen::Status::DualInfeasibleInaccurate:
                 return "Dual Infeasible Inaccurate";
-                break;
             case OsqpEigen::Status::MaxIterReached:
                 return "Max Iter Reached";
-                break;
             case OsqpEigen::Status::Unsolved:
                 return "Unsolved";
-                break;
             default:
                 return "Other";
+        }
+    }
+
+    OSQPInterface::SolveQuality OSQPInterface::GetSolveQuality() const {
+        switch (qp_solver_.getStatus()) {
+            case OsqpEigen::Status::Solved:
+                return Solved;
                 break;
-        } 
+            case OsqpEigen::Status::SolvedInaccurate:
+                return SolvedInacc;
+                break;
+            case OsqpEigen::Status::PrimalInfeasible:
+                return PrimalInfeasible;
+                break;
+            case OsqpEigen::Status::DualInfeasible:
+                return DualInfeasible;
+                break;
+            case OsqpEigen::Status::PrimalInfeasibleInaccurate:
+                return PrimalInfeasibleInacc;
+                break;
+            case OsqpEigen::Status::DualInfeasibleInaccurate:
+                return DualInfeasibleInacc;
+                break;
+            case OsqpEigen::Status::MaxIterReached:
+                return MaxIter;
+                break;
+            case OsqpEigen::Status::Unsolved:
+                return Unsolved;
+                break;
+            default:
+                return Other;
+                break;
+        }
     }
 
     vector_t OSQPInterface::GetDualSolution() const {
@@ -243,7 +266,7 @@ namespace mpc {
     void OSQPInterface::ConfigureForRealTime(double run_time_iters) const {
         qp_solver_.settings()->setPolish(false);
         qp_solver_.settings()->setAbsoluteTolerance(1e-4);
-        qp_solver_.settings()->setRelativeTolerance(5e-4);      // 1e-3 works well to actually solve the problem. 5e-4 also works
+        qp_solver_.settings()->setRelativeTolerance(3e-4);      // 1e-3 works well to actually solve the problem. 5e-4 also works
         qp_solver_.settings()->setMaxIteration(run_time_iters);
     }
 

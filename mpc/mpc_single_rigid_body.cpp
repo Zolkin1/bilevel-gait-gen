@@ -18,6 +18,9 @@ namespace mpc {
         InitalizeQPData();
         qp_solver = std::make_unique<OSQPInterface>(data_, false);
         num_run_ = 0;
+
+        prev_qp_sol = vector_t::Zero(data_.num_decision_vars);
+        line_search_res_ = vector_t::Zero(data_.num_decision_vars);
     }
 
     Trajectory MPCSingleRigidBody::Solve(const mpc::vector_t& state, double init_time,
@@ -99,9 +102,9 @@ namespace mpc {
         const vector_t sol = qp_solver->Solve(data_);
         qp_solve_timer.StopTimer();
 
-        if (qp_solver->GetSolveQuality() != "Solved Inaccurate" && qp_solver->GetSolveQuality() != "Solved"
-            && qp_solver->GetSolveQuality() != "Max Iter Reached") {
-            std::cerr << "Warning: " << qp_solver->GetSolveQuality() << std::endl;
+        if (qp_solver->GetSolveQuality() != OSQPInterface::SolvedInacc && qp_solver->GetSolveQuality() != OSQPInterface::Solved
+            && qp_solver->GetSolveQuality() != OSQPInterface::MaxIter) {
+            std::cerr << "Warning: " << qp_solver->GetSolveQualityAsString() << std::endl;
             throw std::runtime_error("Bad solve.");
         }
 
@@ -109,7 +112,7 @@ namespace mpc {
 //            std::cout << "ee start constraints: \n" << data_.sparse_constraint_.bottomRows<8>()*sol - data_.start_ee_constants_ << std::endl;
 //        }
 
-        std::cout << "Solve type: " << qp_solver->GetSolveQuality() << std::endl;
+        std::cout << "Solve type: " << qp_solver->GetSolveQualityAsString() << std::endl;
 
         // TODO: DMA
         const vector_t p = sol - prev_qp_sol;
@@ -206,7 +209,7 @@ namespace mpc {
         utils::Timer stats_timer("recording stats");
         stats_timer.StartTimer();
         RecordStats(alpha, p, qp_solver->GetSolveQuality(), state,
-                    solve_timer.GetElapsedTimeMilliseconds());
+                    solve_timer.GetElapsedTimeMilliseconds(), GetCostValue(sol));
         stats_timer.StopTimer();
 
         run_num_++;
@@ -521,7 +524,7 @@ namespace mpc {
     }
 
     bool MPCSingleRigidBody::ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int contact_time_idx) {
-        if (solve_type_.at(solve_type_.size()-1) == "Solved") {
+        if (solve_type_.at(solve_type_.size()-1) == OSQPInterface::Solved) {
             QPData partial_data = data_;
             partial_data.InitQPMats();
 

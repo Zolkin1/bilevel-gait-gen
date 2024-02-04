@@ -279,9 +279,9 @@ namespace mpc {
 // TODO: This is adding an additional shift
         vector_3t temp = -pin_data_->oMi[com_joint_id].translation() + pin_data_->oMi[hip_joint_id].translation();
         if (temp(1) >= 0) {
-            temp(1) += 0.1;
+            temp(1) += 0.13;
         } else {
-            temp(1) -= 0.1;
+            temp(1) -= 0.13;
         }
 
         return temp;
