@@ -137,7 +137,7 @@ namespace mpc {
 
     void GaitOptimizer::OptimizeContactTimes() {
         const int num_decision_vars = GetNumTimeNodes(num_ee_);
-        const int num_constraints = num_decision_vars + num_decision_vars;
+        const int num_constraints = num_decision_vars + num_decision_vars + num_ee_;
 
         A_builder_.Reserve(30);
 
@@ -157,7 +157,8 @@ namespace mpc {
         ub_.setZero();
 
         int next_row = CreatePolytopeConstraint(0);
-        CreateStepBoundConstraint(next_row);
+        next_row = CreateStepBoundConstraint(next_row);
+        CreateNextNodeConstraints(next_row);
 
         Eigen::SparseMatrix<double> A(num_constraints, num_decision_vars);
         A.setFromTriplets(A_builder_.GetTriplet().begin(), A_builder_.GetTriplet().end());
@@ -308,6 +309,20 @@ namespace mpc {
             }
         }
         A_builder_.SetDiagonalMatrix(1, start_row, 0, idx);
+        return start_row + idx;
+    }
+
+    int GaitOptimizer::CreateNextNodeConstraints(int start_row) {
+        int idx = 0;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            if (contact_times_.at(ee).at(1).GetType() == TouchDown) {
+                ub_(start_row + idx) = contact_times_.at(ee).at(1).GetTime();
+                lb_(start_row + idx) = contact_times_.at(ee).at(1).GetTime();
+                A_builder_.SetDiagonalMatrix(1, start_row + idx, GetNumTimeNodes(ee) + 1, 1);
+                idx++;
+            }
+        }
+
         return start_row + idx;
     }
 

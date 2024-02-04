@@ -95,6 +95,8 @@ namespace mpc {
 
         int CreateStepBoundConstraint(int start_row);
 
+        int CreateNextNodeConstraints(int start_row);
+
         void PrintConstraints(const matrix_t& A, const vector_t& lb, const vector_t& ub);
 
         std::string GetSolveQualityAsString() const;
