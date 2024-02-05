@@ -82,7 +82,14 @@ namespace mpc {
     }
 
     Trajectory MPC::GetRealTimeUpdate(const vector_t& state, double init_time,
-                                      const std::vector<vector_3t>& ee_start_locations) {
+                                      const std::vector<vector_3t>& ee_start_locations,
+                                      bool high_quality) {
+        if (high_quality) {
+            qp_solver->SetSolveTolerances(1e-4, 1e-4);
+        } else {
+            qp_solver->SetSolveTolerances(1e-4, 4e-4);
+        }
+
         if (in_real_time_) {
             return Solve(state, init_time, ee_start_locations);
         } else {
@@ -250,6 +257,7 @@ namespace mpc {
                 times.push_back(0.4);
                 times.push_back(0.6);
                 times.push_back(0.8);
+                times.push_back(1);
 //            }
 
             switching_times.push_back(times);

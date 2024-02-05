@@ -309,6 +309,11 @@ namespace mpc {
 //        std::cout << "reconstructed cost: " << 0.5*xstar.transpose()*P*xstar + q.dot(xstar) << std::endl;
     }
 
+    void OSQPInterface::SetSolveTolerances(double abs_tol, double rel_tol) {
+        qp_solver_.settings()->setAbsoluteTolerance(abs_tol);
+        qp_solver_.settings()->setRelativeTolerance(rel_tol);
+    }
+
     vector_t OSQPInterface::Getdx() const {
         return dldx;
     }

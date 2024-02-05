@@ -131,7 +131,7 @@ int main() {
     simulation::Visualizer viz(config.ParseString("robot_xml"));
     robot->SetSimModel(viz.GetModel());
     vector_t state = standing;
-    for (int i = 0; i < info.num_nodes + 200; i++) {
+    for (int i = 0; i < info.num_nodes + 300; i++) {
         // Get full state through IK
         state = mpc.GetFullTargetState(i*info.integrator_dt, state);
 
@@ -146,16 +146,18 @@ int main() {
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
 
         // Gait optimization
-        if (i % 10) {
+        if (!(i % 10)) {
+            // TODO: May want to adjust solve tolerances on the fly. i.e. higher tolerance except the solve before the optimization
+
             gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
 
             // TODO: Is this being performed with linearizations from the new trajectory and/or is that messing up the calcs?
             gait_optimizer.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
             if (mpc.ComputeDerivativeTerms()) {
+                std::cout << "optimization at: " << i << std::endl;
                 mpc.GetQPPartials(gait_optimizer.GetPartials());
                 for (int ee = 0; ee < 4; ee++) {
                     gait_optimizer.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
-                    // TODO: Make sure derivatives and indexing are all for contact times only
                     for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {
                         mpc.ComputeParamPartials(prev_traj, gait_optimizer.GetParameterPartials(ee, idx), ee, idx);
                     }
@@ -164,16 +166,16 @@ int main() {
                 gait_optimizer.ModifyQPPartials(mpc.GetQPSolution());
                 gait_optimizer.ComputeCostFcnDerivWrtContactTimes();
 
-                gait_optimizer.OptimizeContactTimes();
+                gait_optimizer.OptimizeContactTimes(i * info.integrator_dt);
 
                 mpc.UpdateContactTimes(gait_optimizer.GetContactTimes());
             }
             std::cout << "[--------- Gait Optimization ---------]" << std::endl;
-            mpc.GetRealTimeUpdate(prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
+//            mpc.GetRealTimeUpdate(prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
         }
 
         // Run next MPC
-        prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), i*info.integrator_dt, ee_locations);
+        prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), i*info.integrator_dt, ee_locations, false);
     }
 
     // Print the final trajectory to a file for viewing

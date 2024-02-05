@@ -54,6 +54,8 @@ namespace mpc {
 
         void Computedx(const Eigen::SparseMatrix<double>& P, const vector_t& q, const vector_t& xstar);
 
+        void SetSolveTolerances(double abs_tol, double rel_tol);
+
         /**
          * Calculates the partial of the quadratic cost fcn wrt the decision variables, x.
          * Cost fcn of the form (1/2)*x^T*P*x + q^T*x

@@ -65,7 +65,8 @@ namespace mpc {
         Trajectory CreateInitialRun(const vector_t& state, const std::vector<vector_3t>& ee_start_locations);
 
         Trajectory GetRealTimeUpdate(const vector_t& state, double init_time,
-                                     const std::vector<vector_3t>& ee_start_locations);
+                                     const std::vector<vector_3t>& ee_start_locations,
+                                     bool high_quality);
 
         virtual Trajectory Solve(const vector_t& state, double init_time,
                                  const std::vector<vector_3t>& ee_start_locations) = 0;

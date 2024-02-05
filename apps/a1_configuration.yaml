@@ -96,7 +96,7 @@ force_tracking_weight: 0
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
 num_nodes: 50 # 50
-integrator_dt: 0.015  # 0.015
+integrator_dt: 0.02  # 0.015
 num_qp: 1
 #vel_bounds: [3, 3, 3,
 #             3, 3, 3,
@@ -136,7 +136,7 @@ xdot_des: 10
 ydot_des: 0
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
-ee_box_size: [0.15, 0.1]
+ee_box_size: [0.15, 0.05]
 
 run_time_iterations: 1000 # 150 works well
 
@@ -171,4 +171,4 @@ Q_srbd_diag: [0, 0, 5000, 1, 1, 0, 3000, 3000, 3000, 0, 0, 0]  # Convergence see
 #         1000, 500, 10]
 
 ## --- Temp --- ##
-viz_rate: 0.015
+viz_rate: 0.02

@@ -925,11 +925,15 @@ namespace mpc {
     }
 
     int EndEffectorSplines::GetLowerNodeIdx(SplineType type, int coord, double time) const {
-        if (time < times_.at(0).GetTime()) {
+        if (time < times_.at(0).GetTime() && time - times_.at(0).GetTime() >= -1e-4) {
+            time = times_.at(0).GetTime();
+        } else if (time < times_.at(0).GetTime()){
             throw std::runtime_error("Time requested is too small.");
         }
 
-        if (time > times_.at(times_.size()-1).GetTime()) {
+        if (time > times_.at(times_.size()-1).GetTime() && time - times_.at(times_.size()-1).GetTime() <= 1e4) {
+            time = times_.at(times_.size() - 1).GetTime();
+        } else if (time > times_.at(times_.size()-1).GetTime()) {
             throw std::runtime_error("Time requested is too large.");
         }
 
@@ -945,11 +949,15 @@ namespace mpc {
     }
 
     int EndEffectorSplines::GetUpperNodeIdx(SplineType type, int coord, double time) const {
-        if (time < times_.at(0).GetTime()) {
+        if (time < times_.at(0).GetTime() && time - times_.at(0).GetTime() >= -1e-4) {
+            time = times_.at(0).GetTime();
+        } else if (time < times_.at(0).GetTime()){
             throw std::runtime_error("Time requested is too small.");
         }
 
-        if (time > times_.at(times_.size()-1).GetTime()) {
+        if (time > times_.at(times_.size()-1).GetTime() && time - times_.at(times_.size()-1).GetTime() <= 1e4) {
+            time = times_.at(times_.size() - 1).GetTime();
+        } else if (time > times_.at(times_.size()-1).GetTime()) {
             throw std::runtime_error("Time requested is too large.");
         }
 

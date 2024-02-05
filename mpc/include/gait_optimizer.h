@@ -72,7 +72,7 @@ namespace mpc {
          *
          * @note ComputeCostFcnDerivWrtContactTimes MUST be called prior to this function.
          */
-        void OptimizeContactTimes();
+        void OptimizeContactTimes(double time);
 
         /**
          * @return the current computed contact times
@@ -95,7 +95,7 @@ namespace mpc {
 
         int CreateStepBoundConstraint(int start_row);
 
-        int CreateNextNodeConstraints(int start_row);
+        int CreateNextNodeConstraints(int start_row, double time);
 
         void PrintConstraints(const matrix_t& A, const vector_t& lb, const vector_t& ub);
 

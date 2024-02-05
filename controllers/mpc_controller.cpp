@@ -220,7 +220,7 @@ namespace controller {
                 ee_locations = ee_locations_;
                 state_time_mut_.unlock();
 
-                mpc::Trajectory traj = mpc_.GetRealTimeUpdate(state, time, ee_locations);
+                mpc::Trajectory traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
 
                 // ----------------------- IK On Trajectory ----------------------- //
                 FullBodyTrajUpdate(traj);

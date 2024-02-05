@@ -135,9 +135,9 @@ namespace mpc {
 //        dHdth.normalize();
     }
 
-    void GaitOptimizer::OptimizeContactTimes() {
+    void GaitOptimizer::OptimizeContactTimes(double time) {
         const int num_decision_vars = GetNumTimeNodes(num_ee_);
-        const int num_constraints = num_decision_vars + num_decision_vars + num_ee_;
+        const int num_constraints = num_decision_vars + num_decision_vars + 2*num_ee_;
 
         A_builder_.Reserve(30);
 
@@ -158,15 +158,13 @@ namespace mpc {
 
         int next_row = CreatePolytopeConstraint(0);
         next_row = CreateStepBoundConstraint(next_row);
-        CreateNextNodeConstraints(next_row);
+        CreateNextNodeConstraints(next_row, time);
 
         Eigen::SparseMatrix<double> A(num_constraints, num_decision_vars);
         A.setFromTriplets(A_builder_.GetTriplet().begin(), A_builder_.GetTriplet().end());
 
-        // TODO: Print these all in the same rows so they can be more easily compared
-//        std::cout << "A: \n" << A.toDense() << std::endl;
-//        std::cout << "lb: \n" << lb_ << std::endl;
-//        std::cout << "ub: \n" << ub_ << std::endl;
+
+        // TODO: next touchdown constraints are still being moved
 
         PrintConstraints(A.toDense(), lb_, ub_);
 
@@ -290,6 +288,8 @@ namespace mpc {
     }
 
     int GaitOptimizer::CreateStepBoundConstraint(int start_row) {
+        // TODO: Make this bound update with each step
+        // TODO: Consider changing this infinity norm bound to an L1 norm bound
         const double bound = 0.05; // TODO: Make not hard coded
 
         // Note: The first contact time node can never be changed.
@@ -312,14 +312,25 @@ namespace mpc {
         return start_row + idx;
     }
 
-    int GaitOptimizer::CreateNextNodeConstraints(int start_row) {
+    int GaitOptimizer::CreateNextNodeConstraints(int start_row, double time) {
+
         int idx = 0;
         for (int ee = 0; ee < num_ee_; ee++) {
-            if (contact_times_.at(ee).at(1).GetType() == TouchDown) {
-                ub_(start_row + idx) = contact_times_.at(ee).at(1).GetTime();
-                lb_(start_row + idx) = contact_times_.at(ee).at(1).GetTime();
-                A_builder_.SetDiagonalMatrix(1, start_row + idx, GetNumTimeNodes(ee) + 1, 1);
-                idx++;
+            int next_node = -1;
+            for (int i = 1; i < contact_times_.at(ee).size(); i++) {
+                if (contact_times_.at(ee).at(i).GetTime() > time) {
+                    next_node = i;
+                    break;
+                }
+            }
+
+            if (contact_times_.at(ee).at(next_node).GetType() == TouchDown) {
+                ub_(start_row + idx + 1) = contact_times_.at(ee).at(next_node).GetTime();
+                lb_(start_row + idx + 1) = contact_times_.at(ee).at(next_node).GetTime();
+                ub_(start_row + idx) = contact_times_.at(ee).at(next_node-1).GetTime();
+                lb_(start_row + idx) = contact_times_.at(ee).at(next_node-1).GetTime();
+                A_builder_.SetDiagonalMatrix(1, start_row + idx, GetNumTimeNodes(ee) + next_node - 1, 2);
+                idx+=2;
             }
         }
 
