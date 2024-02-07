@@ -437,6 +437,7 @@ namespace mpc {
         - mu * GetEqualityConstraintValues(temp_traj, init_state).lpNorm<1>();
     }
 
+
     // TODO: Make this weight only on force values, so we don't hit the derivatives
     void MPC::AddForceCost(double weight) {
         const int num_forces = prev_traj_.GetTotalForceSplineVars();

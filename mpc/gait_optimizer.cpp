@@ -20,7 +20,7 @@ namespace mpc {
                                  double contact_time_ub, double min_time) :
     num_ee_(num_ee), num_decision_vars_(num_decision_vars),
     num_constraints_(num_constraints), contact_time_ub_(contact_time_ub), min_time_(min_time),
-    max_trust_region_(0.05) {
+    max_trust_region_(0.075) {
         UpdateSizes(num_decision_vars, num_constraints);
         dHdth.resize(num_ee_*10);   // TODO: Don't hard code
 
@@ -116,7 +116,7 @@ namespace mpc {
                         if(isnanl(A(i, j))) {
                             std::cout << "qp partials: " << qp_partials_.dA.toDense()(i,j) << std::endl;
                             std::cout << "param partials: " << param_partial.dA.toDense()(i,j) << std::endl;
-                            throw;
+                            throw std::runtime_error("A partials have a NaN.");
                         }
                     }
                 }
@@ -214,18 +214,18 @@ namespace mpc {
 
         UpdateLagrangianGradients(A);
 
-        if (past_decision_vars_ == num_decision_vars) {
-            AdjustBSize(num_decision_vars);
-
-            DampedBFGSUpdate();
-
-            const auto ldlt = Bk_.ldlt();
-            if (ldlt.info() == Eigen::NumericalIssue) {
-                std::cerr << "Bk is not PSD." << std::endl;
-            }
-        } else {
-            Bk_ = matrix_t::Identity(num_decision_vars, num_decision_vars);
-        }
+//        if (past_decision_vars_ == num_decision_vars) {
+//            AdjustBSize(num_decision_vars);
+//
+//            DampedBFGSUpdate();
+//
+//            const auto ldlt = Bk_.ldlt();
+//            if (ldlt.info() == Eigen::NumericalIssue) {
+//                std::cerr << "Bk is not PSD." << std::endl;
+//            }
+//        } else {
+//            Bk_ = matrix_t::Identity(num_decision_vars, num_decision_vars);
+//        }
 
 
         Bk_ = matrix_t::Zero(num_decision_vars, num_decision_vars);
@@ -262,10 +262,15 @@ namespace mpc {
             throw std::runtime_error("Could not solve QP.");
         }
 
-        if (qp_solver_.getStatus() != OsqpEigen::Status::Solved && qp_solver_.getStatus() != OsqpEigen::Status::SolvedInaccurate) {
+        if (qp_solver_.getStatus() != OsqpEigen::Status::Solved && qp_solver_.getStatus() != OsqpEigen::Status::SolvedInaccurate
+            && qp_solver_.getStatus() != OsqpEigen::Status::MaxIterReached) {
             std::cerr << "Could not solve the gait optimization problem." << std::endl;
             std::cerr << "Solve type: " << GetSolveQualityAsString() << std::endl;
             throw std::runtime_error("Bad gait optimization solve");
+        }
+
+        if (qp_solver_.getStatus() == OsqpEigen::Status::MaxIterReached) {
+            std::cerr << "Max iterations reached on the gait optimization." << std::endl;
         }
 
         step_ = qp_solver_.getSolution();
@@ -355,6 +360,8 @@ namespace mpc {
 
     int GaitOptimizer::CreatePolytopeConstraint(int start_row) {
         // Each node is constrained to be between the node before and after it. At the ends there are constant bounds
+        double constexpr MIN_TIME = 0.1;
+
         int end_row = start_row;
         for (int ee = 0; ee < num_ee_; ee++) {
             const int nodes = contact_times_.at(ee).size();
@@ -363,7 +370,7 @@ namespace mpc {
                 A(i-1,i-1) = 1;
                 A(i-1,i) = -1;
                 ub_(start_row + GetNumTimeNodes(ee) + i-1) = contact_times_.at(ee).at(i).GetTime()
-                        - contact_times_.at(ee).at(i-1).GetTime();
+                        - contact_times_.at(ee).at(i-1).GetTime() - MIN_TIME;
                 lb_(start_row + GetNumTimeNodes(ee) + i-1) = -2;
             }
             A(nodes-1,nodes-1) = 1;

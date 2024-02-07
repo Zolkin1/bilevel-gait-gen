@@ -97,8 +97,8 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
 
         // Gait optimization
         if (run_gait_opt) {
-            if (!(i % 10)) {
-                RunGaitOpt(mpc, gait_opt, prev_traj, cost_red, time);
+            if (!(i % 5)) {
+                prev_cost = RunGaitOpt(mpc, gait_opt, prev_traj, cost_red, time);
             }
         }
 
@@ -253,8 +253,8 @@ int main() {
     robot->SetSimModel(viz.GetModel());
 
     // MPC w/ fixed position
-//    MPCWithFixedPosition(mpc1, gait_optimizer1, init_state, ee_locations, config.ParseString("robot_xml"), standing,
-//                         robot, info, config.ParseNumber<double>("viz_rate"), false, viz);
+    MPCWithFixedPosition(mpc1, gait_optimizer1, init_state, ee_locations, config.ParseString("robot_xml"), standing,
+                         robot, info, config.ParseNumber<double>("viz_rate"), false, viz);
 
 
     MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,

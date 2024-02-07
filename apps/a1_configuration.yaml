@@ -136,13 +136,13 @@ xdot_des: 10
 ydot_des: 0
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
-ee_box_size: [0.15, 0.05]
+ee_box_size: [0.1, 0.15]
 
-run_time_iterations: 3000 # 150 works well
+run_time_iterations: 5000 # 150 works well
 
 foot_offset: 0.02
 
-force_cost: 0.005
+force_cost: 0.0 # 0.01 - makes the solve much harder
 
 Q_diag: [1, 1, 1,          # linear momentum
          1, 1, 1,           # angular momentum

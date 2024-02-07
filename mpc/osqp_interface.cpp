@@ -27,7 +27,7 @@ namespace mpc {
         qp_solver_.settings()->setSigma(1e-6);
         qp_solver_.settings()->setWarmStart(true);
         // Scaling 10 seems to respect the ee box constraint WORSE (than scaling 0)
-        qp_solver_.settings()->setScaling(10);  // @Note: This has a pretty big effect on the timing and the solution quality
+        qp_solver_.settings()->setScaling(100);  // @Note: This has a pretty big effect on the timing and the solution quality
         qp_solver_.settings()->setLinearSystemSolver(1);
 
         prev_dual_sol_ = vector_t::Zero(data.GetTotalNumConstraints());
