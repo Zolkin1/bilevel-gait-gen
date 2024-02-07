@@ -34,3 +34,11 @@ add_custom_command(TARGET mpc_test POST_BUILD
         ${CMAKE_CURRENT_SOURCE_DIR}/a1_configuration_test.yaml
         $<TARGET_FILE_DIR:sim_test>
 )
+
+add_executable(gait_opt_playground gait_opt_playground.cpp)
+target_link_libraries(gait_opt_playground utils)
+target_link_libraries(gait_opt_playground mpc)
+target_link_libraries(gait_opt_playground simulator)
+#target_link_libraries(spline_test PRIVATE Catch2::Catch2WithMain)
+
+#catch_discover_tests(gait_opt_playground.cpp)

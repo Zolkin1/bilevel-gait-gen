@@ -131,13 +131,18 @@ int main() {
     simulation::Visualizer viz(config.ParseString("robot_xml"));
     robot->SetSimModel(viz.GetModel());
     vector_t state = standing;
+    double prev_cost = mpc.GetCost();
+    double cost_red = 0; // TODO: Pick a better number
+
     for (int i = 0; i < info.num_nodes + 300; i++) {
+        double time = i*info.integrator_dt;
+
         // Get full state through IK
-        state = mpc.GetFullTargetState(i*info.integrator_dt, state);
+        state = mpc.GetFullTargetState(time, state);
 
         // Get end effector locations from trajectory
         for (int j = 0; j < ee_locations.size(); j++) {
-            ee_locations.at(j) = prev_traj.GetEndEffectorLocation(j, (i)*info.integrator_dt);
+            ee_locations.at(j) = prev_traj.GetEndEffectorLocation(j, time);
         }
 
         // Update Viz
@@ -146,7 +151,7 @@ int main() {
         viz.UpdateViz(config.ParseNumber<double>("viz_rate"));
 
         // Gait optimization
-        if (!(i % 10)) {
+        if (!(i % 1)) {
             // TODO: May want to adjust solve tolerances on the fly. i.e. higher tolerance except the solve before the optimization
 
             gait_optimizer.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
@@ -166,7 +171,9 @@ int main() {
                 gait_optimizer.ModifyQPPartials(mpc.GetQPSolution());
                 gait_optimizer.ComputeCostFcnDerivWrtContactTimes();
 
-                gait_optimizer.OptimizeContactTimes(i * info.integrator_dt);
+                gait_optimizer.OptimizeContactTimes(time, cost_red);
+
+                prev_cost = mpc.GetCost();
 
                 mpc.UpdateContactTimes(gait_optimizer.GetContactTimes());
             }
@@ -175,7 +182,8 @@ int main() {
         }
 
         // Run next MPC
-        prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), i*info.integrator_dt, ee_locations, false);
+        prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false); // TODO: Change back to 1
+        cost_red = prev_cost - mpc.GetCost();
     }
 
     // Print the final trajectory to a file for viewing

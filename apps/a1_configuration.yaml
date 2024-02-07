@@ -19,8 +19,8 @@ foot_type: "POINT_FEET"
 init_config: [0., 0., 0.361, 0, 0, 0, 1.0, # -0.0004, 0.004, 0.0001,
               -0.02, 0.2, -0.977,       # front left
               0.02, 0.2, -0.977,        # front right
-              0.08, 0.45, -1.03,        # rear left
-              -0.08, 0.45, -1.03]       # rear right
+              0.02, 0.45, -1.03,        # rear left
+              -0.02, 0.45, -1.03]       # rear right
 #  [0., 0., 0.3341, 1., 0, 0, 0,
 #              -0.02, 1.5, -1.75, # -0.976,     # front right
 #              0.02, 0.2, -1.25, # -0.977,      # front left
@@ -138,11 +138,11 @@ ydot_des: 0
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
 ee_box_size: [0.15, 0.05]
 
-run_time_iterations: 1000 # 150 works well
+run_time_iterations: 3000 # 150 works well
 
 foot_offset: 0.02
 
-force_cost: 0.000000
+force_cost: 0.005
 
 Q_diag: [1, 1, 1,          # linear momentum
          1, 1, 1,           # angular momentum
@@ -169,6 +169,8 @@ Q_srbd_diag: [0, 0, 5000, 1, 1, 0, 3000, 3000, 3000, 0, 0, 0]  # Convergence see
 #         1000, 500, 10,       # FR leg
 #         1000, 500, 10,       # RL leg
 #         1000, 500, 10]
+
+mpc_verbosity: 0
 
 ## --- Temp --- ##
 viz_rate: 0.02

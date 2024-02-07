@@ -19,11 +19,12 @@ namespace mpc {
     GaitOptimizer::GaitOptimizer(int num_ee, int num_contact_nodes, int num_decision_vars, int num_constraints,
                                  double contact_time_ub, double min_time) :
     num_ee_(num_ee), num_decision_vars_(num_decision_vars),
-    num_constraints_(num_constraints), contact_time_ub_(contact_time_ub), min_time_(min_time) {
+    num_constraints_(num_constraints), contact_time_ub_(contact_time_ub), min_time_(min_time),
+    max_trust_region_(0.05) {
         UpdateSizes(num_decision_vars, num_constraints);
         dHdth.resize(num_ee_*10);   // TODO: Don't hard code
 
-        qp_solver_.settings()->setVerbosity(true);
+        qp_solver_.settings()->setVerbosity(false);
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
@@ -36,6 +37,12 @@ namespace mpc {
         qp_solver_.settings()->setScaling(10);
         qp_solver_.settings()->setLinearSystemSolver(1);
 
+        gamma_ = 0.5;
+        eta_ = 0.75;
+        Delta_ = 0.005;
+
+        run_num_ = 0;
+        past_decision_vars_ = 0;
     }
 
     void GaitOptimizer::UpdateSizes(int num_decision_vars, int num_constraints) {
@@ -121,7 +128,6 @@ namespace mpc {
                     }
                 }
 
-                // TODO: Fix du nans
                 dHdth(GetNumTimeNodes(ee) + idx) = dldPth.sum() + dldAth.sum() +
                                                      qp_partials_.dl.dot(param_partial.dl) + qp_partials_.du.dot(param_partial.du) +
                                                      qp_partials_.dq.dot(param_partial.dq);
@@ -135,11 +141,31 @@ namespace mpc {
 //        dHdth.normalize();
     }
 
-    void GaitOptimizer::OptimizeContactTimes(double time) {
-        const int num_decision_vars = GetNumTimeNodes(num_ee_);
-        const int num_constraints = num_decision_vars + num_decision_vars + 2*num_ee_;
+    void GaitOptimizer::OptimizeContactTimes(double time, double actual_red_cost) {
+        // ------------------- Setup ------------------- //
+        int num_decision_vars = GetNumTimeNodes(num_ee_);
+        int num_constraints = num_decision_vars + num_decision_vars + 3*num_ee_;
 
         A_builder_.Reserve(30);
+
+        // ------------------- Trust Region Modification and Step Acceptance ------------------- //
+        // Note: constraints are linear and thus always fully satisfied after the QP solve
+        //       so acceptance and trust region sizes are based only on the cost function
+        // Note: this happens here (rather than after the QP solve) because we can't get the new cost
+        //       until after an MPC solve. So we update the trust region here.
+        if (run_num_ > 0) {
+            double rho = actual_red_cost / pred_red_cost_;
+            std::cout << "rho: " << rho << std::endl;
+            if (rho > eta_) {
+                IncreaseTrustRegion(rho);
+                old_contact_times_ = contact_times_;
+            } else {
+                DecreaseTrustRegion(step_);
+//                contact_times_ = old_contact_times_;
+//                num_decision_vars = GetNumTimeNodes(num_ee_);
+//                num_constraints = num_decision_vars + num_decision_vars + 3*num_ee_;
+            }
+        }
 
         qp_solver_.data()->setNumberOfVariables(num_decision_vars);
         qp_solver_.data()->setNumberOfConstraints(num_constraints);
@@ -148,25 +174,67 @@ namespace mpc {
         qp_solver_.data()->clearHessianMatrix();
         qp_solver_.clearSolver();
 
-        Eigen::SparseMatrix<double> P(num_decision_vars, num_decision_vars);    // TODO: Try BFGS
-        P.setZero();
-
+        // ------------------- Create Constraints ------------------- //
         lb_.resize(num_constraints);
         lb_.setZero();
         ub_.resize(num_constraints);
         ub_.setZero();
 
         int next_row = CreatePolytopeConstraint(0);
-        next_row = CreateStepBoundConstraint(next_row);
+//        next_row = CreateStepBoundConstraint(next_row);
+        next_row = CreateStartConstraint(next_row);
+        next_row = CreateTrustRegionConstraint(next_row);
         CreateNextNodeConstraints(next_row, time);
 
-        Eigen::SparseMatrix<double> A(num_constraints, num_decision_vars);
+        sp_matrix_t A(num_constraints, num_decision_vars);
         A.setFromTriplets(A_builder_.GetTriplet().begin(), A_builder_.GetTriplet().end());
 
 
-        // TODO: next touchdown constraints are still being moved
+        // ------------------- BFGS ------------------- //
+        // TODO: Deal with changing size of decision variables
+        if (dual_.size() != num_constraints) {
+            dual_ = vector_t::Zero(num_constraints);
+        }
+        if (gradkp1_.size() != num_decision_vars) {
+            gradkp1_ = vector_t::Zero(num_decision_vars);
+        }
 
-        PrintConstraints(A.toDense(), lb_, ub_);
+        if (xk_.size() != num_decision_vars) {
+            xk_ = vector_t::Zero(num_decision_vars);
+        }
+
+//        if (run_num_ == 0) {
+//            old_grad_ = dHdth;
+//        }
+
+        // TODO: Fix
+//        if (dHdth.size() != num_decision_vars) {
+//            dHdth = old_grad_;  // TODO: Will this stick me in a loop somehow?
+//        }
+
+        UpdateLagrangianGradients(A);
+
+        if (past_decision_vars_ == num_decision_vars) {
+            AdjustBSize(num_decision_vars);
+
+            DampedBFGSUpdate();
+
+            const auto ldlt = Bk_.ldlt();
+            if (ldlt.info() == Eigen::NumericalIssue) {
+                std::cerr << "Bk is not PSD." << std::endl;
+            }
+        } else {
+            Bk_ = matrix_t::Identity(num_decision_vars, num_decision_vars);
+        }
+
+
+        Bk_ = matrix_t::Zero(num_decision_vars, num_decision_vars);
+
+        // TODO: Consider building a sparse matrix in the first place
+        sp_matrix_t P = Bk_.sparseView();
+
+        // ------------------- Run Solver ------------------- //
+//        PrintConstraints(A.toDense(), lb_, ub_);
 
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int i = 1; i < contact_times_.at(ee).size(); i++) {
@@ -194,31 +262,51 @@ namespace mpc {
             throw std::runtime_error("Could not solve QP.");
         }
 
-        if (qp_solver_.getStatus() != OsqpEigen::Status::Solved) {
+        if (qp_solver_.getStatus() != OsqpEigen::Status::Solved && qp_solver_.getStatus() != OsqpEigen::Status::SolvedInaccurate) {
             std::cerr << "Could not solve the gait optimization problem." << std::endl;
             std::cerr << "Solve type: " << GetSolveQualityAsString() << std::endl;
             throw std::runtime_error("Bad gait optimization solve");
         }
 
-        vector_t qp_sol = qp_solver_.getSolution();
+        step_ = qp_solver_.getSolution();
+        dual_ = qp_solver_.getDualSolution();
 
-        for (int i = 0; i < qp_sol.size(); i++) {
-            assert(!isnanl(qp_sol(i)));
+        // ------------------- Numerical Conditioning ------------------- //
+        for (int i = 0; i < step_.size(); i++) {
+            assert(!isnanl(step_(i)));
         }
+
+
+        // Note: the step is always accepted since I can't get the actual cost reduction without an MPC solve.
+        //      so for now we should just start with a small trust region and expand out because when the region
+        //      is small enough we guaruntee to have some reduction.
+
+        xk_ = xkp1_;
+        xkp1_ = xk_ + step_;
 
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int idx = 0; idx < contact_times_.at(ee).size(); idx++) {
-                contact_times_.at(ee).at(idx).SetTime(qp_sol(GetNumTimeNodes(ee) + idx));
+                contact_times_.at(ee).at(idx).SetTime(xkp1_(GetNumTimeNodes(ee) + idx));
 
                 if (idx > 0) {
                     if (contact_times_.at(ee).at(idx-1).GetTime() - contact_times_.at(ee).at(idx).GetTime() <= 1e-3
-                    && contact_times_.at(ee).at(idx-1).GetTime() - contact_times_.at(ee).at(idx).GetTime() > 0) {
+                        && contact_times_.at(ee).at(idx-1).GetTime() - contact_times_.at(ee).at(idx).GetTime() > 0) {
                         contact_times_.at(ee).at(idx) = contact_times_.at(ee).at(idx-1);
                     }
                     assert(contact_times_.at(ee).at(idx-1).GetTime() <= contact_times_.at(ee).at(idx).GetTime());
                 }
             }
         }
+
+        pred_red_cost_ = -dHdth.dot(step_) - 0.5*step_.transpose()*Bk_*step_;
+
+        past_decision_vars_ = num_decision_vars;
+
+//        old_grad_ = dHdth;
+
+        std::cout << "trust region size: " << Delta_ << std::endl;
+
+        run_num_++;
     }
 
     std::vector<time_v> GaitOptimizer::GetContactTimes() {
@@ -250,8 +338,19 @@ namespace mpc {
         return num_nodes;
     }
 
-    void GaitOptimizer::SetContactTimes(std::vector<time_v> contact_times) {
+    void GaitOptimizer::SetContactTimes(const std::vector<time_v>& contact_times) {
+        if (old_contact_times_.size() != 0) {
+            for (int ee = 0; ee < num_ee_; ee++) {
+                for (int node = old_contact_times_.at(ee).size(); node < contact_times.at(ee).size(); node++) {
+                    old_contact_times_.at(ee).push_back(contact_times.at(ee).at(node));
+                }
+            }
+        } else {
+            old_contact_times_ = contact_times;
+        }
+
         contact_times_ = contact_times;
+        xkp1_ = ContactTimesToQPVec();    // TODO: Is this the vector I want to assign to?
     }
 
     int GaitOptimizer::CreatePolytopeConstraint(int start_row) {
@@ -260,28 +359,21 @@ namespace mpc {
         for (int ee = 0; ee < num_ee_; ee++) {
             const int nodes = contact_times_.at(ee).size();
             matrix_t A = matrix_t::Zero(nodes, nodes);
-//            A(0,0) = 1;
             for (int i = 1; i < nodes; i++) {
                 A(i-1,i-1) = 1;
                 A(i-1,i) = -1;
+                ub_(start_row + GetNumTimeNodes(ee) + i-1) = contact_times_.at(ee).at(i).GetTime()
+                        - contact_times_.at(ee).at(i-1).GetTime();
+                lb_(start_row + GetNumTimeNodes(ee) + i-1) = -2;
             }
             A(nodes-1,nodes-1) = 1;
 
-            vector_t lb = vector_t::Constant(nodes, -2);
-//            lb(0) = contact_times_.at(ee).at(0);
-            lb(nodes-1) = 0.5 + contact_times_.at(ee).at(0).GetTime();   // TODO: Make this not hard coded and time horizon - might not need this
-            lb_.segment(start_row + GetNumTimeNodes(ee), nodes) = lb;
-            vector_t ub = vector_t::Zero(nodes);
-//            ub(0) = 0.2 + contact_times_.at(ee).at(contact_times_.at(ee).size()-1);
-            // TODO: May want to make this a bound from the inital rather than from the final. when its from the final then it can run off to infinity over mutliple solves
-            ub(nodes-1) = 0.2 + contact_times_.at(ee).at(contact_times_.at(ee).size()-1).GetTime();
-            ub_.segment(start_row + GetNumTimeNodes(ee), nodes) = ub;
+            lb_(start_row + GetNumTimeNodes(ee) + nodes - 1) = -0.2; // TODO: Check this
+            ub_(start_row + GetNumTimeNodes(ee) + nodes - 1) = 0.2;
 
-            if (ee > 0) {
-                A_builder_.SetMatrix(A, start_row + GetNumTimeNodes(ee), GetNumTimeNodes(ee));
-            } else {
-                A_builder_.SetMatrix(A, start_row + GetNumTimeNodes(ee), GetNumTimeNodes(ee));
-            }
+            assert(GetNumTimeNodes(ee) + nodes <= GetNumTimeNodes(num_ee_));
+
+            A_builder_.SetMatrix(A, start_row + GetNumTimeNodes(ee), GetNumTimeNodes(ee));
             end_row += nodes;
         }
         return end_row;
@@ -312,6 +404,26 @@ namespace mpc {
         return start_row + idx;
     }
 
+    int GaitOptimizer::CreateStartConstraint(int start_row) {
+        for (int ee = 0; ee < num_ee_; ee++) {
+            lb_(start_row + ee) = 0; //contact_times_.at(ee).at(0).GetTime();
+            ub_(start_row + ee) = 0; //contact_times_.at(ee).at(0).GetTime();
+            A_builder_.SetDiagonalMatrix(1, start_row + ee, GetNumTimeNodes(ee), 1);
+        }
+
+        return start_row + num_ee_;
+    }
+
+    int GaitOptimizer::CreateTrustRegionConstraint(int start_row) {
+        const int num_decision_vars = GetNumTimeNodes(num_ee_);
+        // Note: this is an infinity norm trust region
+        lb_.segment(start_row, num_decision_vars) = vector_t::Constant(num_decision_vars, -Delta_);
+        ub_.segment(start_row, num_decision_vars) = vector_t::Constant(num_decision_vars, Delta_);
+        A_builder_.SetDiagonalMatrix(1, start_row, 0, num_decision_vars);
+
+        return start_row + num_decision_vars;
+    }
+
     int GaitOptimizer::CreateNextNodeConstraints(int start_row, double time) {
 
         int idx = 0;
@@ -325,10 +437,10 @@ namespace mpc {
             }
 
             if (contact_times_.at(ee).at(next_node).GetType() == TouchDown) {
-                ub_(start_row + idx + 1) = contact_times_.at(ee).at(next_node).GetTime();
-                lb_(start_row + idx + 1) = contact_times_.at(ee).at(next_node).GetTime();
-                ub_(start_row + idx) = contact_times_.at(ee).at(next_node-1).GetTime();
-                lb_(start_row + idx) = contact_times_.at(ee).at(next_node-1).GetTime();
+                ub_(start_row + idx + 1) = 0; //contact_times_.at(ee).at(next_node).GetTime();
+                lb_(start_row + idx + 1) = 0; //contact_times_.at(ee).at(next_node).GetTime();
+                ub_(start_row + idx) = 0; //contact_times_.at(ee).at(next_node-1).GetTime();
+                lb_(start_row + idx) = 0; //contact_times_.at(ee).at(next_node-1).GetTime();
                 A_builder_.SetDiagonalMatrix(1, start_row + idx, GetNumTimeNodes(ee) + next_node - 1, 2);
                 idx+=2;
             }
@@ -340,6 +452,46 @@ namespace mpc {
     void GaitOptimizer::ModifyQPPartials(const vector_t& xstar) {
         qp_partials_.dP = qp_partials_.dP + 0.5*xstar*xstar.transpose();
         qp_partials_.dq += xstar;
+    }
+
+    void GaitOptimizer::DampedBFGSUpdate() {
+        // sk = xkp1 - xk
+        const vector_t sk = xkp1_ - xk_;
+
+        // yk = GLkp1 - GLk
+        const vector_t yk = gradkp1_ - gradk_;
+
+        // thetak = option
+        double thetak;
+        if (sk.dot(yk) >=  0.2*sk.transpose()*Bk_*sk) {
+            thetak = 1;
+        } else {
+            thetak = static_cast<double>((0.8*sk.transpose()*Bk_*sk))/(sk.transpose()*Bk_*sk - sk.dot(yk));
+        }
+
+        // rk = thetak*yk + (1-thetak)*Bk*sk
+        const vector_t rk = thetak*yk + (1 - thetak)*Bk_*sk;
+
+        // Bkp1 = Bk - (Bk*sk*sk^T*Bk)/(sk^T*Bk*sk) + (rk*rk^T)/sk^T*rk;
+        Bk_ = Bk_ - (Bk_*sk*sk.transpose()*Bk_)/static_cast<double>(sk.transpose()*Bk_*sk) + (rk*rk.transpose())/(sk.dot(rk));
+    }
+
+    void GaitOptimizer::UpdateLagrangianGradients(const sp_matrix_t& A) {
+        gradk_ = gradkp1_;
+        gradkp1_ = dHdth + A.transpose()*dual_;
+    }
+
+    void GaitOptimizer::IncreaseTrustRegion(double rho) {
+        if (rho > 0.75 && step_.lpNorm<Eigen::Infinity>() == Delta_) {
+            Delta_ = std::min(2*Delta_, max_trust_region_);
+        }
+    }
+
+    void GaitOptimizer::DecreaseTrustRegion(const vector_t& step) {
+        Delta_ = gamma_*step.lpNorm<Eigen::Infinity>();
+        if (Delta_ <= 1e-6) {
+            Delta_ = 1e-6;
+        }
     }
 
     void GaitOptimizer::PrintConstraints(const matrix_t& A, const vector_t& lb, const vector_t& ub) {
@@ -375,4 +527,27 @@ namespace mpc {
                 return "Other";
         }
     }
+
+    vector_t GaitOptimizer::ContactTimesToQPVec() const {
+        vector_t x(GetNumTimeNodes(num_ee_));
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int node = 0; node < contact_times_.at(ee).size(); node++) {
+                x(GetNumTimeNodes(ee) + node) = contact_times_.at(ee).at(node).GetTime();
+            }
+        }
+
+        return x;
+    }
+
+    void GaitOptimizer::AdjustBSize(int num_decision_vars) {
+        if (run_num_ == 1) {
+            Bk_ = matrix_t::Identity(num_decision_vars, num_decision_vars);
+        }
+
+        // TODO: Do something smarter where we keep the curvature for the parts that we know
+        if (Bk_.rows() != num_decision_vars || Bk_.cols() != num_decision_vars) {
+            Bk_ = matrix_t::Identity(num_decision_vars, num_decision_vars);
+        }
+    }
+
 }

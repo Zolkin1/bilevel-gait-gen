@@ -31,6 +31,7 @@ namespace mpc {
         nom_state = info.nom_state;
         ee_box_size = info.ee_box_size;
         real_time_iters = info.real_time_iters;
+        verbose = info.verbose;
     }
 
     MPC::MPC(const MPCInfo& info, const std::string& robot_urdf) :
@@ -84,11 +85,11 @@ namespace mpc {
     Trajectory MPC::GetRealTimeUpdate(const vector_t& state, double init_time,
                                       const std::vector<vector_3t>& ee_start_locations,
                                       bool high_quality) {
-        if (high_quality) {
-            qp_solver->SetSolveTolerances(1e-4, 1e-4);
-        } else {
-            qp_solver->SetSolveTolerances(1e-4, 4e-4);
-        }
+//        if (high_quality) {
+//            qp_solver->SetSolveTolerances(1e-4, 1e-4);
+//        } else {
+//            qp_solver->SetSolveTolerances(1e-4, 4e-4);
+//        }
 
         if (in_real_time_) {
             return Solve(state, init_time, ee_start_locations);
@@ -485,6 +486,13 @@ namespace mpc {
         std::cout << std::setfill('-') << setw(table_width) << "" << std::endl;
         std::cout << setfill(' ');
         for (int i = 0; i < alpha_.size(); i++) {
+
+            for (int j = 0; j < contact_sched_change_.size(); j++) {
+                if (i == contact_sched_change_.at(j)) {
+                    std::cout << "Contact schedule changed " << setw(table_width - 25) << std::endl;
+                }
+            }
+
             std::string solve_type;
             switch (solve_type_.at(i)) {
                 case OSQPInterface::Solved:
@@ -619,8 +627,9 @@ namespace mpc {
         return num_inputs_;
     }
 
-    void MPC::UpdateContactTimes(const std::vector<time_v >& contact_times) {
+    void MPC::UpdateContactTimes(const std::vector<time_v>& contact_times) {
         prev_traj_.UpdateContactTimes(contact_times);
+        contact_sched_change_.push_back(run_num_);
     }
 
 } // mpc

@@ -16,7 +16,11 @@ namespace mpc {
     MPCSingleRigidBody::MPCSingleRigidBody(const mpc::MPCInfo& info, const std::string& robot_urdf) :
     MPC(info, robot_urdf) {
         InitalizeQPData();
-        qp_solver = std::make_unique<OSQPInterface>(data_, false);
+        if (info_.verbose == Optimization || info_.verbose == All) {
+            qp_solver = std::make_unique<OSQPInterface>(data_, true);
+        } else {
+            qp_solver = std::make_unique<OSQPInterface>(data_, false);
+        }
         num_run_ = 0;
 
         prev_qp_sol = vector_t::Zero(data_.num_decision_vars);
@@ -40,8 +44,10 @@ namespace mpc {
         poly_update_timer.StopTimer();
         UpdateNumInputs();
 
-        std::cout << "run num: " << num_run_ << ", force vars: " << prev_traj_.GetTotalForceSplineVars() <<
-                  ", position vars: " << prev_traj_.GetTotalPosSplineVars() << std::endl;
+        if (info_.verbose == All) {
+            std::cout << "run num: " << num_run_ << ", force vars: " << prev_traj_.GetTotalForceSplineVars() <<
+                      ", position vars: " << prev_traj_.GetTotalPosSplineVars() << std::endl;
+        }
 
         utils::Timer data_update_timer("data update");
         data_update_timer.StartTimer();
@@ -108,11 +114,9 @@ namespace mpc {
             throw std::runtime_error("Bad solve.");
         }
 
-//        if (num_run_ == 50) {
-//            std::cout << "ee start constraints: \n" << data_.sparse_constraint_.bottomRows<8>()*sol - data_.start_ee_constants_ << std::endl;
-//        }
-
-        std::cout << "Solve type: " << qp_solver->GetSolveQualityAsString() << std::endl;
+        if (info_.verbose == All) {
+            std::cout << "Solve type: " << qp_solver->GetSolveQualityAsString() << std::endl;
+        }
 
         // TODO: DMA
         const vector_t p = sol - prev_qp_sol;
@@ -209,19 +213,21 @@ namespace mpc {
         utils::Timer stats_timer("recording stats");
         stats_timer.StartTimer();
         RecordStats(alpha, p, qp_solver->GetSolveQuality(), state,
-                    solve_timer.GetElapsedTimeMilliseconds(), GetCostValue(sol));
+                    solve_timer.GetElapsedTimeMilliseconds(), GetCostValue(prev_qp_sol)); //GetCostValue(sol));
         stats_timer.StopTimer();
 
         run_num_++;
 
-        constraint_costs_timer.PrintElapsedTime();
-        line_search_timer.PrintElapsedTime();
-        poly_update_timer.PrintElapsedTime();
-        data_update_timer.PrintElapsedTime();
-        qp_solve_timer.PrintElapsedTime();
-//        stats_timer.PrintElapsedTime();
-        solve_timer.PrintElapsedTime();
-        std::cout << "-----------" << std::endl;
+
+        if (info_.verbose == Timing || info_.verbose == All) {
+            constraint_costs_timer.PrintElapsedTime();
+            line_search_timer.PrintElapsedTime();
+            poly_update_timer.PrintElapsedTime();
+            data_update_timer.PrintElapsedTime();
+            qp_solve_timer.PrintElapsedTime();
+            solve_timer.PrintElapsedTime();
+            std::cout << "-----------" << std::endl;
+        }
 
 //        for (int i = 0; i < info_.num_nodes; i++) {
 //            vector_3t net_force;
@@ -648,5 +654,9 @@ namespace mpc {
         } else {
             return false;
         }
+    }
+
+    double MPCSingleRigidBody::GetCost() const {
+        return GetCostValue(prev_qp_sol);
     }
 } // mpc

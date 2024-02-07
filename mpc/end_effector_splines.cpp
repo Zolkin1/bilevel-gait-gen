@@ -618,6 +618,8 @@ namespace mpc {
         const int upper_node = GetUpperNodeIdx(type, coord, time);
         const int lower_node = GetLowerNodeIdx(type, coord, time);
 
+        assert(!(type == Position && coord == 2));
+
         double deltat = times_.at(upper_node).GetTime() - times_.at(lower_node).GetTime();
         if (deltat == 0) {
             deltat = times_.at(upper_node).GetTime() - times_.at(GetLowerNodeIdx(type, coord, time - 1e-4)).GetTime();
@@ -632,82 +634,79 @@ namespace mpc {
         coef_partials.setZero();
 
         // check for direct dependence
-        bool direct_dep = false;
-        bool wrt_lower = false;
+        const int node = ConvertContactNodeToSplineNode(time_idx);
+        assert(times_.at(node).GetType() == LiftOff || times_.at(node).GetType() == TouchDown);
 
-        if (type == Position) {
-            direct_dep = true;
 
-            const int node = ConvertContactNodeToSplineNode(time_idx);
-            if (node == lower_node) {
-                wrt_lower = true;
-            }
-        } else {
-            const int node = ConvertContactNodeToSplineNode(time_idx);
-            if (forces_.at(coord).at(node).GetType() == NoDeriv) {
-                direct_dep = true;
-            }
+        bool direct_dep = (node == lower_node || node == upper_node);
+        bool wrt_lower = (node == lower_node);
 
-            if (direct_dep && node == lower_node) {
-                wrt_lower = true;
-            }
-        }
 
         if (type == Force) {
             if (direct_dep) {
-                if (spline.at(lower_node).GetType() == FullDeriv) {
-                    assert(vars_affecting >= 2);
-                    coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower);
-                    coef_partials(1) = Getx0dotCoefPartial(time_spline, deltat, wrt_lower);
-                    if (spline.at(upper_node).GetType() == FullDeriv) {
-                        assert(vars_affecting == 4);
-                        coef_partials(2) = Getx1CoefPartial(time_spline, deltat, !wrt_lower);
-                        coef_partials(3) = Getx1dotCoefPartial(time_spline, deltat, !wrt_lower);
-                    }
+                if (wrt_lower) {
+                    assert(vars_affecting == 2);
+                    coef_partials(0) = Getx1CoefPartial(time_spline, deltat, wrt_lower);
+                    coef_partials(1) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower);
                 } else {
                     assert(vars_affecting == 2);
-                    coef_partials(0) = Getx1CoefPartial(time_spline, deltat, !wrt_lower);
-                    coef_partials(1) = Getx1dotCoefPartial(time_spline, deltat, !wrt_lower);
+                    coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower);
+                    coef_partials(1) = Getx0dotCoefPartial(time_spline, deltat, wrt_lower);
                 }
-
-//                coef_partials(0) = Getx0CoefPartial(time, deltat, wrt_lower);
-//                const int node = ConvertContactNodeToSplineNode(time_idx);
-//                // Now need to determine if it is x0dot, or x1 next
-//                if (spline.at(lower_node).GetType() == FullDeriv) {
-//                    coef_partials(1) = Getx0dotCoefPartial(time, deltat, wrt_lower);
-//                    coef_partials(2) = Getx1CoefPartial(time, deltat, !wrt_lower);
-//                    if (spline.at(upper_node).GetType() == FullDeriv) {
-//                        coef_partials(3) = Getx1dotCoefPartial(time, deltat, !wrt_lower);
-//                    }
-//                } else {
-//                    coef_partials(1) = Getx1CoefPartial(time, deltat, !wrt_lower);
-//                    if (spline.at(upper_node).GetType() == FullDeriv) {
-//                        coef_partials(2) = Getx1dotCoefPartial(time, deltat, !wrt_lower);
-//                    }
-//                }
             } else {
-                // TODO: Implement
+                // Checks that we are moving something above AND that we are within the next contact
+                if (node > upper_node && node <= GetUpperNodeIdx(Position, 0, time)) {
+                    wrt_lower = false;
+                    if (spline.at(lower_node).GetType() == FullDeriv) {
+                        assert(vars_affecting >= 2);
+                        coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                        coef_partials(1) = Getx0dotCoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                        if (spline.at(upper_node).GetType() == FullDeriv) {
+                            assert(vars_affecting == 4);
+                            coef_partials(2) = Getx1CoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                            coef_partials(3) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                        }
+                    } else if (spline.at(upper_node).GetType() == FullDeriv) {
+                        assert(vars_affecting == 2);
+                        coef_partials(0) = Getx1CoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                        coef_partials(1) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                    }
+
+                } else if (node < lower_node && node >= GetLowerNodeIdx(Position, 0, time)) {
+                    wrt_lower = true;
+                    if (spline.at(lower_node).GetType() == FullDeriv) {
+                        assert(vars_affecting >= 2);
+                        coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                        coef_partials(1) = Getx0dotCoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                        if (spline.at(upper_node).GetType() == FullDeriv) {
+                            assert(vars_affecting == 4);
+                            coef_partials(2) = Getx1CoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                            coef_partials(3) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                        }
+                    } else if (spline.at(upper_node).GetType() == FullDeriv) {
+                        assert(vars_affecting == 2);
+                        coef_partials(0) = Getx1CoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                        coef_partials(1) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/num_force_polys_;
+                    }
+                }
             }
         } else {
+            // Positions only have direct dependence
             if (direct_dep) {
-                if (spline.at(lower_node).GetType() == FullDeriv) {
-                    assert(vars_affecting >= 2);
-                    coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower);
-                    coef_partials(1) = Getx0dotCoefPartial(time_spline, deltat, wrt_lower);
-                    if (spline.at(upper_node).GetType() == NoDeriv) {
-                        assert(vars_affecting == 4);
-                        coef_partials(2) = Getx1CoefPartial(time_spline, deltat, !wrt_lower);
-                        coef_partials(3) = Getx1dotCoefPartial(time_spline, deltat, !wrt_lower);
+                if (wrt_lower) {
+                    if (lower_node == upper_node) {
+                        assert(vars_affecting == 1);
+                        coef_partials(0) = 0;
+                    } else if (positions_.at(2).at(lower_node + 1).GetType() == FullDeriv) {
+                        // We are NOT on a constant segment
+                        assert(vars_affecting == 2);
+                        coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower);
+                        coef_partials(1) = Getx1CoefPartial(time_spline, deltat, wrt_lower);
+                    } else {
+                        assert(vars_affecting == 1);
+                        coef_partials(0) = 0;
                     }
-                } else if (vars_affecting == 1) {
-                    coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower);
-                } else {
-                    assert(vars_affecting == 2);
-                    coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower);
-                    coef_partials(1) = Getx1CoefPartial(time_spline, deltat, wrt_lower);
                 }
-            } else {
-                // TODO: Implement
             }
         }
 
@@ -979,13 +978,15 @@ namespace mpc {
     int EndEffectorSplines::ConvertContactNodeToSplineNode(int contact_idx) const {
         int contacts = 0;
         for (int i = 0; i < times_.size(); i++) {
-            if (contacts == contact_idx) {
+            if (contacts == contact_idx && times_.at(i).GetType() != Inter) {
                 return i;
             }
-            if (forces_.at(0).at(i).GetType() == NoDeriv) {
+            if (times_.at(i).GetType() == LiftOff || times_.at(i).GetType() == TouchDown) {
                 contacts++;
             }
         }
+
+        throw std::runtime_error("not a valid contact index.");
 
         return -1;
     }
@@ -1042,9 +1043,9 @@ namespace mpc {
     double EndEffectorSplines::Getx0CoefPartial(double time, double DeltaT, bool wrt_t1) const {
         if (wrt_t1) {
             return -6*pow(DeltaT, -3)* pow(time, 2) + 6*pow(DeltaT, -2)*time
-                   - 6*pow(DeltaT, 2)*pow(time,3) - 6*pow(DeltaT, 3)* pow(time, 2);
+                   + 6*pow(DeltaT, -4)*pow(time,3) - 6*pow(DeltaT, -3)*pow(time, 2);
         } else {
-            return 6*pow(DeltaT, -3)* pow(time, 2) + 6* pow(DeltaT, 2)* pow(time, 3);
+            return 6*pow(DeltaT, -3)*pow(time, 2) - 6*pow(DeltaT, -4)*pow(time, 3);
         }
     }
 
@@ -1071,7 +1072,7 @@ namespace mpc {
             return -pow(DeltaT, -2)* pow(time, 2) + 2*pow(DeltaT, -1)*time
                    + 2*pow(DeltaT,-3)*pow(time, 3) - 3*pow(DeltaT, -2)*pow(time, 2);
         } else {
-            return -pow(DeltaT, -2)* pow(time, 2) - 2*pow(DeltaT, -3)*pow(time, 3);
+            return pow(DeltaT, -2)* pow(time, 2) - 2*pow(DeltaT, -3)*pow(time, 3);
         }
     }
 

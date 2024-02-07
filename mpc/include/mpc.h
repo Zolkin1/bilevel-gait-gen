@@ -28,6 +28,13 @@ namespace mpc {
     using vector_t = Eigen::VectorXd;
     using matrix_t =  Eigen::MatrixXd;
 
+    enum MPCVerbosityLevel {
+        Nothing = 0,
+        Timing = 1,
+        Optimization = 2,
+        All = 3
+    };
+
     struct MPCInfo {
         int num_nodes;
         int num_qp_iterations;
@@ -46,6 +53,7 @@ namespace mpc {
         vector_t nom_state;
         Eigen::Vector2d ee_box_size;
         int real_time_iters;
+        MPCVerbosityLevel verbose;
 
         MPCInfo();
         MPCInfo(const MPCInfo& info);
@@ -255,6 +263,7 @@ namespace mpc {
         std::vector<vector_t> ref_state_;
         std::vector<double> solve_time_;
         std::vector<double> cost_;
+        std::vector<int> contact_sched_change_;
 
         bool in_real_time_;
 

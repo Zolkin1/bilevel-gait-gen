@@ -14,7 +14,7 @@ namespace mpc {
         verbose_ = verbose;
 
         // Set solver settings
-        qp_solver_.settings()->setVerbosity(true);
+        qp_solver_.settings()->setVerbosity(verbose);
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-4); // 1e-6
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-4); // 1e-6
@@ -103,7 +103,9 @@ namespace mpc {
 
         osqp_interface_timer_.StopTimer();
 //        std::cout << std::endl;
-        osqp_interface_timer_.PrintElapsedTime();
+        if (verbose_) {
+            osqp_interface_timer_.PrintElapsedTime();
+        }
 //        sparse_conversion_timer_.PrintElapsedTime();
 //        matrix_gather_timer_.PrintElapsedTime();
     }
@@ -266,7 +268,7 @@ namespace mpc {
     void OSQPInterface::ConfigureForRealTime(double run_time_iters) const {
         qp_solver_.settings()->setPolish(false);
         qp_solver_.settings()->setAbsoluteTolerance(1e-4);
-        qp_solver_.settings()->setRelativeTolerance(3e-4);      // 1e-3 works well to actually solve the problem. 5e-4 also works
+        qp_solver_.settings()->setRelativeTolerance(5e-4);      // 1e-3 works well to actually solve the problem. 5e-4 also works
         qp_solver_.settings()->setMaxIteration(run_time_iters);
     }
 

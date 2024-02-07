@@ -223,7 +223,7 @@ namespace mpc {
     void Trajectory::AddPolys(double final_time) {
         for (auto & ee_spline : ee_splines_) {
             while (ee_spline.GetEndTime() < final_time) {
-                ee_spline.AddPoly(0.2);    // TODO: Make not hard coded
+                ee_spline.AddPoly(0.2);    // TODO: Make not hard coded, 0.2
             }
         }
         SetSwingPosZ();
@@ -329,7 +329,7 @@ namespace mpc {
         return ee_splines_.at(ee).GetNumContacts();
     }
 
-    std::vector<time_v > Trajectory::GetContactTimes() const {
+    std::vector<time_v> Trajectory::GetContactTimes() const {
         std::vector<time_v> contact_times(ee_splines_.size());
         for (int ee = 0; ee < ee_splines_.size(); ee++) {
             contact_times.at(ee) = ee_splines_.at(ee).GetContactTimes();

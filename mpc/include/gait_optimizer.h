@@ -72,7 +72,7 @@ namespace mpc {
          *
          * @note ComputeCostFcnDerivWrtContactTimes MUST be called prior to this function.
          */
-        void OptimizeContactTimes(double time);
+        void OptimizeContactTimes(double time, double actual_red_cost);
 
         /**
          * @return the current computed contact times
@@ -83,7 +83,7 @@ namespace mpc {
 
         void UpdateSizes(int num_decision_vars, int num_constraints);
 
-        void SetContactTimes(std::vector<time_v> contact_times);
+        void SetContactTimes(const std::vector<time_v>& contact_times);
 
         void ModifyQPPartials(const vector_t& xstar);
 
@@ -95,13 +95,30 @@ namespace mpc {
 
         int CreateStepBoundConstraint(int start_row);
 
+        int CreateStartConstraint(int start_row);
+
+        int CreateTrustRegionConstraint(int start_row);
+
+        void UpdateLagrangianGradients(const sp_matrix_t& A);
+
+        void AdjustBSize(int num_decision_vars);
+
+        void IncreaseTrustRegion(double rho);
+
+        void DecreaseTrustRegion(const vector_t& step);
+
         int CreateNextNodeConstraints(int start_row, double time);
+
+        void DampedBFGSUpdate();
+
+        vector_t ContactTimesToQPVec() const;
 
         void PrintConstraints(const matrix_t& A, const vector_t& lb, const vector_t& ub);
 
         std::string GetSolveQualityAsString() const;
 
         std::vector<time_v> contact_times_;
+        std::vector<time_v> old_contact_times_;
         std::vector<std::vector<double>> contact_times_lb_, contact_times_ub_;
 
         vector_t dHdth;
@@ -129,13 +146,30 @@ namespace mpc {
         int num_decision_vars_; // TODO: I want to make this const
         int num_constraints_;   // TODO: I want to make this const
 
+        int past_decision_vars_;
+//        vector_t old_grad_;
+
         double contact_time_ub_;
         double min_time_;
+
+        int run_num_;
 
         OsqpEigen::Solver qp_solver_;
 
         utils::SparseMatrixBuilder A_builder_;
         vector_t lb_, ub_;
+
+        vector_t xk_, xkp1_;
+        vector_t gradk_, gradkp1_;
+        vector_t dual_;
+        matrix_t Bk_;
+        vector_t step_;
+
+        double pred_red_cost_;
+        double gamma_; // Trust region shrinking scalar
+        double eta_;    // Reduction threshold
+        double Delta_;  // Trust region size
+        const double max_trust_region_;
     };
 }
 
