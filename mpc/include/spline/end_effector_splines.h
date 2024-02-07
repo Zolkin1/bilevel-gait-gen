@@ -5,7 +5,7 @@
 #ifndef BILEVEL_GAIT_GEN_END_EFFECTOR_SPLINES_H
 #define BILEVEL_GAIT_GEN_END_EFFECTOR_SPLINES_H
 
-#include "spline_node.h"
+#include "spline/spline_node.h"
 
 namespace mpc {
     enum TimeType {

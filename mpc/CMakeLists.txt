@@ -1,39 +1,39 @@
 
 set(MPC_HEADER_LIST "include/mpc.h"
-        "include/qp_interface.h"
-        "include/centroidal_model.h"
+        "include/qp/qp_interface.h"
+        "include/models/centroidal_model.h"
         "include/integrator.h"
         "include/trajectory.h"
-        "include/spline.h"
+        "include/spline/spline.h"
         "include/euler_integrator.h"
-        "include/qp_data.h"
-        "include/osqp_interface.h"
+        "include/qp/qp_data.h"
+        "include/qp/osqp_interface.h"
         "include/rk_integrator.h"
         "include/gait_optimizer.h"
-        "include/single_rigid_body_model.h"
-        "include/model.h"
+        "include/models/single_rigid_body_model.h"
+        "include/models/model.h"
         "include/mpc_single_rigid_body.h"
         "include/mpc_centroidal.h"
-        "include/spline_node.h"
-        "include/end_effector_splines.h")
+        "include/spline/spline_node.h"
+        "include/spline/end_effector_splines.h")
 
 add_library(mpc mpc.cpp
-        qp_interface.cpp
-        centroidal_model.cpp
+        qp/qp_interface.cpp
+        models/centroidal_model.cpp
         integrator.cpp
         trajectory.cpp
-        spline.cpp
+        spline/spline.cpp
         euler_integrator.cpp
-        osqp_interface.cpp
+        qp/osqp_interface.cpp
         rk_integrator.cpp
-        qp_data.cpp
+        qp/qp_data.cpp
         gait_optimizer.cpp
-        single_rigid_body_model.cpp
-        model.cpp
+        models/single_rigid_body_model.cpp
+        models/model.cpp
         mpc_single_rigid_body.cpp
         mpc_centroidal.cpp
-        spline_node.cpp
-        end_effector_splines.cpp
+        spline/spline_node.cpp
+        spline/end_effector_splines.cpp
         ${MPC_HEADER_LIST})
 target_include_directories(mpc PUBLIC include)
 

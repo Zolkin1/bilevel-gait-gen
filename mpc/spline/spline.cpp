@@ -6,7 +6,7 @@
 #include <cassert>
 #include <iostream>
 
-#include "spline.h"
+#include "spline/spline.h"
 
 namespace mpc {
     Spline::Spline(int num_polys, const std::vector<double> &times, bool start_on_poly,

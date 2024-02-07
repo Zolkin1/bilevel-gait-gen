@@ -8,7 +8,7 @@
 #include "pinocchio/algorithm/crba.hpp"
 #include "pinocchio/algorithm/rnea.hpp"
 
-#include "model.h"
+#include "models/model.h"
 
 namespace mpc {
     Model::Model(const std::string& robot_urdf, const std::vector<std::string>& frames, int discretization_steps,

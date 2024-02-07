@@ -4,7 +4,7 @@
 
 #include "config_parser.h"
 #include "mpc.h"
-#include "spline.h"
+#include "spline/spline.h"
 #include "mpc_controller.h"
 #include "simulator.h"
 #include "simulation_robot.h"

@@ -12,7 +12,7 @@
 #include "pinocchio/parsers/urdf.hpp"
 
 //#include "rk_integrator.h"
-#include "qp_data.h"
+#include "qp/qp_data.h"
 
 namespace mpc {
     using vector_t = Eigen::VectorXd;

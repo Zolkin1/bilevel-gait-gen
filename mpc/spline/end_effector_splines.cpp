@@ -5,7 +5,7 @@
 
 #include <iostream>
 
-#include "end_effector_splines.h"
+#include "spline/end_effector_splines.h"
 
 namespace mpc {
 

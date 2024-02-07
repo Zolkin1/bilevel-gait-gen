@@ -7,9 +7,9 @@
 
 #include <Eigen/Core>
 
-#include "spline.h"
+#include "spline/spline.h"
 #include "controller.h"
-#include "end_effector_splines.h"
+#include "spline/end_effector_splines.h"
 //#include "model.h"
 
 namespace mpc {

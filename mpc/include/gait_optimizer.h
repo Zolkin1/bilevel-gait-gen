@@ -11,7 +11,7 @@
 
 #include "OsqpEigen/OsqpEigen.h"
 #include "sparse_matrix_builder.h"
-#include "end_effector_splines.h"
+#include "spline/end_effector_splines.h"
 
 namespace mpc {
     using matrix_t = Eigen::MatrixXd;

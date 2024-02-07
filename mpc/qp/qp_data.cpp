@@ -4,7 +4,7 @@
 
 #include <Eigen/Core>
 #include <Eigen/QR>
-#include "qp_data.h"
+#include "qp/qp_data.h"
 
 namespace mpc {
     QPSettings::QPSettings(bool constraint_projection, int constraint_mat_nnz, int cost_mat_nnz)

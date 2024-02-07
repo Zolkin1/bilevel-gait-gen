@@ -7,7 +7,7 @@
 #include <Eigen/SparseCore>
 
 #include "mpc.h"
-#include "osqp_interface.h"
+#include "qp/osqp_interface.h"
 #include "mpc_centroidal.h"
 
 namespace mpc {

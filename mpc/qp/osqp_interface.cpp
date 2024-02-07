@@ -1,7 +1,7 @@
 //
 // Copyright (c) 2023 Zachary Olkin. All rights reserved.
 //
-#include "osqp_interface.h"
+#include "qp/osqp_interface.h"
 
 namespace mpc {
     OSQPInterface::OSQPInterface(const QPData& data, bool verbose)

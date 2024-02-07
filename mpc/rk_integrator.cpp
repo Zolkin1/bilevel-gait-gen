@@ -3,8 +3,8 @@
 //
 
 #include "rk_integrator.h"
-#include "centroidal_model.h"
-#include "single_rigid_body_model.h"
+#include "models/centroidal_model.h"
+#include "models/single_rigid_body_model.h"
 
 namespace mpc {
     RKIntegrator::RKIntegrator(double dt) : dt_(dt) {

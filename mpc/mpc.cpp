@@ -6,7 +6,7 @@
 #include <Eigen/SparseCore>
 
 #include "mpc.h"
-#include "osqp_interface.h"
+#include "qp/osqp_interface.h"
 
 namespace mpc {
 

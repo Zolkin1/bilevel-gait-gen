@@ -4,7 +4,7 @@
 #include <iostream>
 
 #include "euler_integrator.h"
-#include "centroidal_model.h"
+#include "models/centroidal_model.h"
 
 namespace mpc {
     EulerIntegrator::EulerIntegrator(double dt) : Integrator(dt) {}

@@ -8,7 +8,7 @@
 #include <Eigen/Core>
 #include <iostream>
 
-#include "end_effector_splines.h"
+#include "spline/end_effector_splines.h"
 
 TEST_CASE("End Effector Splines", "[splines]") {
     constexpr double MARGIN = 1e-3;

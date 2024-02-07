@@ -9,14 +9,14 @@
 
 #include <Eigen/Core>
 
-#include "centroidal_model.h"
-#include "osqp_interface.h"
+#include "models/centroidal_model.h"
+#include "qp/osqp_interface.h"
 #include "trajectory.h"
-#include "qp_data.h"
+#include "qp/qp_data.h"
 #include "controller.h"
 #include "timer.h"
 #include "gait_optimizer.h"
-#include "single_rigid_body_model.h"
+#include "models/single_rigid_body_model.h"
 #include "rk_integrator.h"
 
 namespace mpc {

@@ -2,7 +2,7 @@
 // Created by zolkin on 1/30/24.
 //
 
-#include "spline_node.h"
+#include "spline/spline_node.h"
 
 namespace mpc {
     SplineNode::SplineNode(mpc::NodeType type, int node_idx, const vector_2t& vars)

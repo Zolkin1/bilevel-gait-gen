@@ -8,7 +8,7 @@
 #include <Eigen/Core>
 
 //#include "trajectory.h"
-#include "single_rigid_body_model.h"
+#include "models/single_rigid_body_model.h"
 
 namespace mpc {
     using vector_t = Eigen::VectorXd;

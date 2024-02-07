@@ -5,7 +5,7 @@
 #include <fstream>
 
 #include "trajectory.h"
-#include "model.h"
+#include "models/model.h"
 
 namespace mpc {
     Trajectory::Trajectory(int len, int state_size, bool using_joints,

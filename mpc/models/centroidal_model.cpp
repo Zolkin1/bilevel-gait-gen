@@ -13,7 +13,7 @@
 #include "pinocchio/spatial/explog-quaternion.hpp"
 #include "pinocchio/algorithm/center-of-mass.hpp"
 
-#include "centroidal_model.h"
+#include "models/centroidal_model.h"
 #include "euler_integrator.h"
 #include "rk_integrator.h"
 

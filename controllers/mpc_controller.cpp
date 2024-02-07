@@ -3,7 +3,7 @@
 //
 
 #include "mpc_controller.h"
-#include "single_rigid_body_model.h"
+#include "models/single_rigid_body_model.h"
 
 namespace controller {
     MPCController::MPCController(double control_rate, std::string robot_urdf, const std::string &foot_type, int nv,

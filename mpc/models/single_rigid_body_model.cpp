@@ -10,7 +10,7 @@
 #include "pinocchio/algorithm/joint-configuration.hpp"
 #include "pinocchio/algorithm/frames.hpp"
 
-#include "single_rigid_body_model.h"
+#include "models/single_rigid_body_model.h"
 #include "timer.h"
 
 namespace mpc {

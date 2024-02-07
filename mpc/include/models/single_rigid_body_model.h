@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "model.h"
+#include "models/model.h"
 #include "trajectory.h"
 
 namespace mpc {

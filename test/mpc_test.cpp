@@ -8,8 +8,8 @@
 #include <Eigen/Core>
 
 #include "config_parser.h"
-#include "spline.h"
-#include "centroidal_model.h"
+#include "spline/spline.h"
+#include "models/centroidal_model.h"
 #include "mpc_single_rigid_body.h"
 
 TEST_CASE("Basic MPC", "[mpc]") {
