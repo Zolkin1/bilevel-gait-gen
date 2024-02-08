@@ -49,15 +49,15 @@ namespace mpc {
         num_decision_vars_ = num_decision_vars;
         num_constraints_ = num_constraints;
 
-        qp_partials_.dA.resize(num_constraints_, num_decision_vars_);
-        qp_partials_.dP.resize(num_decision_vars_, num_decision_vars_);
-        qp_partials_.dq.resize(num_decision_vars_);
-        qp_partials_.dl.resize(num_constraints_);
-        qp_partials_.du.resize(num_constraints_);
-
-        contact_times_.resize(num_ee_);
-        contact_times_lb_.resize(num_ee_);
-        contact_times_ub_.resize(num_ee_);
+//        qp_partials_.dA.resize(num_constraints_, num_decision_vars_);
+//        qp_partials_.dP.resize(num_decision_vars_, num_decision_vars_);
+//        qp_partials_.dq.resize(num_decision_vars_);
+//        qp_partials_.dl.resize(num_constraints_);
+//        qp_partials_.du.resize(num_constraints_);
+//
+//        contact_times_.resize(num_ee_);
+//        contact_times_lb_.resize(num_ee_);
+//        contact_times_ub_.resize(num_ee_);
 
         for (int ee = 0; ee < num_ee_; ee++) {
 //            std::vector<sp_matrix_t> dA_temp;
@@ -89,7 +89,8 @@ namespace mpc {
 
     void GaitOptimizer::ComputeCostFcnDerivWrtContactTimes() {
 
-        sp_matrix_t dldAth(num_constraints_, num_decision_vars_);
+        sp_matrix_t dldAth;
+        sp_matrix_t dldGth;
         sp_matrix_t dldPth(num_decision_vars_, num_decision_vars_);
         dHdth = vector_t::Zero(GetNumTimeNodes(num_ee_));
 
@@ -104,6 +105,7 @@ namespace mpc {
 //                std::cout << "qp partial dA: \n" << qp_partials_.dA.toDense().topLeftCorner<48+24,48+24>() << std::endl;
 
                 dldAth = qp_partials_.dA.cwiseProduct(param_partial.dA);
+                dldGth = qp_partials_.dG.cwiseProduct(param_partial.dG);
                 dldPth = qp_partials_.dP.cwiseProduct(param_partial.dP);
 
                 matrix_t A = dldAth.toDense();
@@ -128,7 +130,7 @@ namespace mpc {
                     }
                 }
 
-                dHdth(GetNumTimeNodes(ee) + idx) = dldPth.sum() + dldAth.sum() +
+                dHdth(GetNumTimeNodes(ee) + idx) = dldPth.sum() + dldAth.sum() + dldGth.sum() +
                                                      qp_partials_.dl.dot(param_partial.dl) + qp_partials_.du.dot(param_partial.du) +
                                                      qp_partials_.dq.dot(param_partial.dq);
                 assert(!isnanl(dHdth(GetNumTimeNodes(ee) + idx)));
@@ -328,8 +330,8 @@ namespace mpc {
 
     void GaitOptimizer::SetNumContactTimes(int ee, int num_times) {
         contact_times_.at(ee).resize(num_times);
-        contact_times_lb_.at(ee).resize(num_times);
-        contact_times_ub_.at(ee).resize(num_times);
+//        contact_times_lb_.at(ee).resize(num_times);
+//        contact_times_ub_.at(ee).resize(num_times);
 
         param_partials_.at(ee).resize(num_times);
     }

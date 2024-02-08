@@ -36,7 +36,7 @@ double RunGaitOpt(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt, co
         for (int ee = 0; ee < 4; ee++) {
             gait_opt.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
             for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {
-                mpc.ComputeParamPartials(prev_traj, gait_opt.GetParameterPartials(ee, idx), ee, idx);
+                mpc.ComputeParamPartialsClarabel(prev_traj, gait_opt.GetParameterPartials(ee, idx), ee, idx);
             }
         }
 
@@ -260,8 +260,8 @@ int main() {
                          robot, info, config.ParseNumber<double>("viz_rate"), false, viz);
 
 
-//    MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
-//                         robot, info, config.ParseNumber<double>("viz_rate"), true, viz);
+    MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
+                         robot, info, config.ParseNumber<double>("viz_rate"), true, viz);
 
     // MPC w/ fixed position + line search
 

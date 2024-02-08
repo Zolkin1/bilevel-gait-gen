@@ -180,6 +180,8 @@ namespace mpc {
 
     void QPData::ConstructVectors() {
         int idx = 0;
+        num_inequality_ = 0;
+        num_equality_ = 0;
         for (int i = 0; i < constraints_.size(); i++) {
             switch (constraints_.at(i)) {
                 case Constraints::Dynamics:
@@ -190,6 +192,7 @@ namespace mpc {
                         ub_.segment(idx, num_dynamics_constraints) = dynamics_constants;
                     }
                     idx += num_dynamics_constraints;
+                    num_equality_ += num_dynamics_constraints;
                     break;
                 case Constraints::JointForwardKinematics:
                     if (!settings_.constraint_projection_) {
@@ -204,6 +207,7 @@ namespace mpc {
                         ub_.segment(idx, num_fk_ineq_constraints_) = fk_ub_;
                         idx += num_fk_ineq_constraints_;
                     }
+                    // TODO: inequality/equality
                     break;
                 case Constraints::EndEffectorLocation:
                     if (!using_clarabel_) {
@@ -219,6 +223,8 @@ namespace mpc {
                         ub_.segment(idx, num_start_ee_constraints_) = start_ee_constants_;
                         idx += num_start_ee_constraints_;
                     }
+                    num_inequality_ += num_ee_location_constraints_;
+                    num_equality_ += num_start_ee_constraints_;
                     break;
                 case Constraints::ForceBox:
                     if (!using_clarabel_) {
@@ -229,11 +235,13 @@ namespace mpc {
                         ub_.segment(idx, num_force_box_constraints_) << force_box_ub_, -force_box_lb_;
                         idx += num_force_box_constraints_;
                     }
+                    num_inequality_ += num_force_box_constraints_;
                     break;
                 case Constraints::JointBox:
                     lb_.segment(idx, num_box_constraints_) = box_lb_;
                     ub_.segment(idx, num_box_constraints_) = box_ub_;
                     idx += num_box_constraints_;
+                    num_inequality_ += num_box_constraints_;
                     break;
                 case Constraints::FrictionCone:
                     if (!using_clarabel_) {
@@ -243,6 +251,7 @@ namespace mpc {
                         ub_.segment(idx, num_cone_constraints_) = friction_cone_ub_;
                     }
                     idx += num_cone_constraints_;
+                    num_inequality_ += num_cone_constraints_;
                     break;
             }
         }

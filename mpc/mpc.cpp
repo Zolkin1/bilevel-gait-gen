@@ -599,7 +599,7 @@ namespace mpc {
     }
 
     vector_t MPC::Getdx() {
-        if (solve_type_.at(solve_type_.size()-1) == Solved) { // TODO: Change to not be text based
+        if (solve_type_.at(solve_type_.size()-1) == Solved) {
             return qp_solver->Getdx();
         } else {
             return vector_t::Zero(data_.num_decision_vars); // TODO: Change this return
@@ -607,11 +607,10 @@ namespace mpc {
     }
 
     bool MPC::ComputeDerivativeTerms() {
-        if (solve_type_.at(solve_type_.size()-1) == Solved) { // TODO: Change to not be text based
-           qp_solver->Computedx(data_.sparse_cost_, data_.cost_linear, prev_qp_sol);
-           vector_t dx = qp_solver->Getdx();
-           vector_t dy_lu = vector_t::Zero(data_.GetTotalNumConstraints());
-           qp_solver->SetupDerivativeCalcs(dx, dy_lu, dy_lu);
+        if (solve_type_.at(solve_type_.size()-1) == Solved) {
+            vector_t dx = qp_solver->Computedx(data_.sparse_cost_, data_.cost_linear, prev_qp_sol);
+            vector_t dy_lu = vector_t::Zero(data_.GetTotalNumConstraints());
+            qp_solver->SetupDerivativeCalcs(dx, dy_lu, dy_lu, data_);
             return true;
         } else {
             return false;
@@ -620,14 +619,10 @@ namespace mpc {
 
     bool MPC::GetQPPartials(QPPartials& partials) const {
         if (solve_type_.at(solve_type_.size()-1) == Solved) {
-            partials.dP.setZero();
-            partials.dA.setZero();
-            partials.dq.setZero();
-            partials.dl.setZero();
-            partials.du.setZero();
+            partials.SetZero();
 
-            qp_solver->CalcDerivativeWrtMats(partials.dP, partials.dA);
-            qp_solver->CalcDerivativeWrtVecs(partials.dq, partials.dl, partials.du);
+            qp_solver->CalcDerivativeWrtMats(partials.dP, partials.dA, partials.dG);
+            qp_solver->CalcDerivativeWrtVecs(partials.dq, partials.db, partials.dh);
 
             return true;
         } else {

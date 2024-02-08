@@ -94,6 +94,9 @@ namespace mpc {
 
         bool using_clarabel_;
 
+        int num_equality_;
+        int num_inequality_;
+
         QPData();
         QPData(bool constraint_projection, int constraint_mat_nnz, int cost_mat_nnz,
                std::vector<Constraints> constraints);

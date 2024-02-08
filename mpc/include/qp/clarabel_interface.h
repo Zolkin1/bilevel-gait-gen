@@ -58,13 +58,15 @@ namespace mpc {
 
         vector_t GetDualSolution() const override;
 
-        void SetupDerivativeCalcs(vector_t& dx, vector_t& dy_l, vector_t& dy_u);
+        // TODO: Clean up these functions
+        void SetupDerivativeCalcs(vector_t& dx, vector_t& dy_l, vector_t& dy_u,
+                                  const QPData& data);
 
-        void CalcDerivativeWrtMats(Eigen::SparseMatrix<double>& dP, Eigen::SparseMatrix<double>& dA);
+        void CalcDerivativeWrtMats(sp_matrix_t& dP, sp_matrix_t& dA, sp_matrix_t& dG);
 
-        void CalcDerivativeWrtVecs(vector_t& dq, vector_t dl, vector_t du);
+        void CalcDerivativeWrtVecs(vector_t& dq, vector_t& db, vector_t& dh);
 
-        void Computedx(const Eigen::SparseMatrix<double>& P, const vector_t& q, const vector_t& xstar);
+        vector_t Computedx(const Eigen::SparseMatrix<double>& P, const vector_t& q, const vector_t& xstar);
 
         vector_t Getdx() const;
 
@@ -80,7 +82,16 @@ namespace mpc {
 
         SolveQuality solve_quality_;
 
+        int num_equality_constraints_;
+        int num_inequality_constraints_;
+
         vector_t dual_;
+        vector_t primal_;
+
+        vector_t d_;
+        vector_t dx_;
+        vector_t lam_;
+        vector_t nu_;
     };
 }
 

@@ -25,7 +25,10 @@ namespace mpc {
 
         void UpdateWholeBodyTrajectory(Trajectory& traj);
 
-        bool ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) override;
+        // TODO: Merge and/or clean up these functions
+        bool ComputeParamPartialsOSQP(const Trajectory& traj, QPPartials& partials, int ee, int idx);
+
+        bool ComputeParamPartialsClarabel(const Trajectory& traj, QPPartials& partials, int ee, int idx);
 
         double GetCost() const;
 

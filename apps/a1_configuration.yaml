@@ -133,7 +133,7 @@ num_polys: 3
 x_des: 0
 y_des: 0
 xdot_des: 10
-ydot_des: 10
+ydot_des: 0
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
 ee_box_size: [0.15, 0.15]

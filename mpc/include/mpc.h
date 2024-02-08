@@ -139,7 +139,7 @@ namespace mpc {
          * @param ee
          * @param idx
          */
-        virtual bool ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) = 0;
+//        virtual bool ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int idx) = 0;
 
         vector_t GetQPSolution() const;
 

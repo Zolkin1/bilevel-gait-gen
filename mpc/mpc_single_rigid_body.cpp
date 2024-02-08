@@ -552,7 +552,8 @@ namespace mpc {
         }
     }
 
-    bool MPCSingleRigidBody::ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int contact_time_idx) {
+    // TODO: Make this cleaner
+    bool MPCSingleRigidBody::ComputeParamPartialsOSQP(const Trajectory& traj, QPPartials& partials, int ee, int contact_time_idx) {
         if (solve_type_.at(solve_type_.size()-1) == Solved) {
             QPData partial_data = data_;
             partial_data.InitQPMats();
@@ -569,22 +570,16 @@ namespace mpc {
             partials.dP.setZero();
             partials.dq.setZero();
 
-
             // Force box constraints have no effect
             // Cone constraints have on effect
 
-            // Dynamics constraints have an effect
+            // -------------- Dynamics constraints have an effect -------------- //
             partial_data.constraint_mat_.Reserve(data_.sparse_constraint_.nonZeros());
 
             matrix_t Adyn_deriv, Bdyn_deriv;
             vector_t Cdyn_deriv;
 
             for (int node = 0; node < info_.num_nodes; node++) {
-//                matrix_t A, B;
-//                vector_t C;
-//                model_.GetLinearDiscreteDynamics(traj.GetState(node), traj.GetState(0), traj,
-//                                                 GetTime(node), A, B, C);
-
                 model_.ComputeLinearizationPartialWrtContactTimes(Adyn_deriv, Bdyn_deriv, Cdyn_deriv,
                                                                   traj.GetState(node),
                                                                   traj, GetTime(node),
@@ -592,11 +587,6 @@ namespace mpc {
                 Adyn_deriv = integrator_.GetDt()*Adyn_deriv;
                 Bdyn_deriv = integrator_.GetDt()*Bdyn_deriv;
                 Cdyn_deriv = integrator_.GetDt()*Cdyn_deriv;
-
-                // TODO: Is this sparsity pattern legit?
-//                std::cout << "A: \n" << A << std::endl;
-//                std::cout << "ee: " << ee << ", idx: " << idx << " Adyn_deriv: \n" << Adyn_deriv << std::endl;
-//                std::cout << "ee: " << ee << ", idx: " << idx << " Bdyn_deriv: \n" << Bdyn_deriv << std::endl;
 
 
                 partial_data.constraint_mat_.SetMatrix(Adyn_deriv, (node + 1) * num_states_, node * num_states_);
@@ -608,31 +598,26 @@ namespace mpc {
             }
 
 
-            // EE Box constraints have an effect
+            // -------------- EE Box constraints have an effect -------------- //
             const int spline_offset = GetPosSplineStartIdx();
             int ee_constraint_start = data_.num_dynamics_constraints + data_.num_force_box_constraints_
                                             + data_.num_cone_constraints_;
             int idx = ee*(data_.num_ee_location_constraints_/num_ee_);
 
             for (int node = 0; node < info_.num_nodes+1; node++) {
-
                 const double time = GetTime(node);
-
                 for (int coord = 0; coord < 2; coord++) {
+                    int vars_index, vars_affecting;
+                    std::tie(vars_index, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
 
-                    if (coord < 2) {
-                        int vars_index, vars_affecting;
-                        std::tie(vars_index, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
+                    // position coef dependence
+                    const vector_t pos_coef_partials = traj.GetPositionCoefPartialsWrtContactTime(ee, coord, time,
+                                                                                                  contact_time_idx);
 
-                        // position coef dependence
-                        const vector_t pos_coef_partials = traj.GetPositionCoefPartialsWrtContactTime(ee, coord, time,
-                                                                                                      contact_time_idx);
-
-                        partial_data.constraint_mat_.SetMatrix(pos_coef_partials.transpose(),
-                                                               ee_constraint_start + idx,
-                                                               spline_offset + vars_index - vars_affecting);
-                        idx++;
-                    }
+                    partial_data.constraint_mat_.SetMatrix(pos_coef_partials.transpose(),
+                                                           ee_constraint_start + idx,
+                                                           spline_offset + vars_index - vars_affecting);
+                    idx++;
                 }
             }
 
@@ -672,6 +657,134 @@ namespace mpc {
             partials.dA = partial_data.sparse_constraint_;
             partials.dl = partial_data.lb_;
             partials.du = partial_data.ub_;
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool MPCSingleRigidBody::ComputeParamPartialsClarabel(const mpc::Trajectory& traj, mpc::QPPartials& partials,
+                                                          int ee, int contact_time_idx) {
+        if (solve_type_.at(solve_type_.size()-1) == Solved) {
+            QPData partial_data = data_;
+            partial_data.InitQPMats();
+
+            // For now the cost terms are not effected by the contact times
+
+            partials.dP.resize(data_.num_decision_vars, data_.num_decision_vars);
+            partials.dq.resize(data_.num_decision_vars);
+            partials.dA.resize(data_.num_equality_, data_.num_decision_vars);
+            partials.dG.resize(data_.num_inequality_, data_.num_decision_vars);
+            partials.db.resize(data_.num_equality_);
+            partials.dh.resize(data_.num_inequality_);
+
+            partials.SetZero();
+
+            // Force box constraints have no effect
+            // Cone constraints have on effect
+
+            // -------------- Dynamics constraints have an effect -------------- //
+            utils::SparseMatrixBuilder A_builder;
+            A_builder.Reserve(data_.sparse_constraint_.nonZeros()); // TODO: Reserves too much
+
+            utils::SparseMatrixBuilder G_builder;
+            G_builder.Reserve(data_.sparse_constraint_.nonZeros()); // TODO: Reserves too much
+
+            int eq_idx = 0;
+            int ineq_idx = 0;
+            for (int i = 0; i < data_.constraints_.size(); i++) {
+                if (data_.constraints_.at(i) == Dynamics) {
+                    matrix_t Adyn_deriv, Bdyn_deriv;
+                    vector_t Cdyn_deriv;
+
+                    for (int node = 0; node < info_.num_nodes; node++) {
+                        model_.ComputeLinearizationPartialWrtContactTimes(Adyn_deriv, Bdyn_deriv, Cdyn_deriv,
+                                                                          traj.GetState(node),
+                                                                          traj, GetTime(node),
+                                                                          ee, contact_time_idx);
+                        Adyn_deriv = integrator_.GetDt() * Adyn_deriv;
+                        Bdyn_deriv = integrator_.GetDt() * Bdyn_deriv;
+                        Cdyn_deriv = integrator_.GetDt() * Cdyn_deriv;
+
+
+                        A_builder.SetMatrix(Adyn_deriv, eq_idx + (node + 1) * num_states_, node * num_states_);
+
+                        A_builder.SetMatrix(Bdyn_deriv, eq_idx + (node + 1) * num_states_,
+                                            GetForceSplineStartIdx());
+
+                        partials.db.segment(eq_idx + (node + 1) * num_states_, num_states_) = -Cdyn_deriv;
+                    }
+                    eq_idx += data_.num_dynamics_constraints;
+                } else if (data_.constraints_.at(i) == JointForwardKinematics) {
+                    throw std::runtime_error("Joint Forward Kinematics not implemented with Carabela yet.");
+
+                } else if (data_.constraints_.at(i) == EndEffectorLocation) {
+
+                    // ----------- Inequality contribution ----------- //
+                    const int spline_offset = GetPosSplineStartIdx();
+                    int idx = ee * (data_.num_ee_location_constraints_ / (2*num_ee_));
+                    for (int node = 0; node < info_.num_nodes + 1; node++) {
+                        const double time = GetTime(node);
+                        for (int coord = 0; coord < 2; coord++) {
+                            int vars_index, vars_affecting;
+                            std::tie(vars_index, vars_affecting) = traj.GetPositionSplineIndex(ee, time, coord);
+
+                            // position coef dependence
+                            const vector_t pos_coef_partials = traj.GetPositionCoefPartialsWrtContactTime(ee, coord,
+                                                                                                          time,
+                                                                                                          contact_time_idx);
+
+                            G_builder.SetMatrix(pos_coef_partials.transpose(),
+                                                ineq_idx + idx,
+                                                spline_offset + vars_index - vars_affecting);
+
+                            // Need to account for the derivative in the negative term
+                            G_builder.SetMatrix(-pos_coef_partials.transpose(),
+                                                ineq_idx + idx + data_.num_ee_location_constraints_/2,
+                                                spline_offset + vars_index - vars_affecting);
+                            idx++;
+                        }
+                    }
+
+                    assert(idx - ee * (data_.num_ee_location_constraints_ / (2*num_ee_)) ==
+                           data_.num_ee_location_constraints_ / (2*num_ee_));
+
+
+                    // ----------- Equality contribution ----------- //
+                    matrix_t M(data_.num_start_ee_constraints_, traj.GetTotalPosSplineVars()); // TODO: DMA
+                    M.setZero();
+                    idx = 0;
+                    for (int coord = 0; coord < 2; coord++) {
+                        int vars_idx, vars_affecting;
+                        std::tie(vars_idx, vars_affecting) =
+                                prev_traj_.GetPositionSplineIndex(ee, GetTime(0), coord);
+
+                        // Position coef dependence
+                        vector_t pos_coef_partials = traj.GetPositionCoefPartialsWrtContactTime(ee, coord,
+                                                                                                GetTime(0),
+                                                                                                contact_time_idx); // TODO: DMA
+
+                        M.block(idx, vars_idx, 1, vars_affecting) =
+                                pos_coef_partials.transpose();
+                        idx++;
+                    }
+
+                    assert(idx == data_.num_start_ee_constraints_);
+
+                    A_builder.SetMatrix(M, eq_idx, GetPosSplineStartIdx());
+
+                    partials.dG.setFromTriplets(G_builder.GetTriplet().begin(), G_builder.GetTriplet().end());
+                    partials.dA.setFromTriplets(A_builder.GetTriplet().begin(), A_builder.GetTriplet().end());
+                } else if (data_.constraints_.at(i) == ForceBox) {
+                    ineq_idx += data_.num_force_box_constraints_;
+                } else if (data_.constraints_.at(i) == JointBox) {
+                    throw std::runtime_error("Joint box not implemented with Carabela yet.");
+
+                } else if (data_.constraints_.at(i) == FrictionCone) {
+                    ineq_idx += data_.num_cone_constraints_;
+                }
+            }
 
             return true;
         } else {
