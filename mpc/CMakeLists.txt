@@ -15,7 +15,8 @@ set(MPC_HEADER_LIST "include/mpc.h"
         "include/mpc_single_rigid_body.h"
         "include/mpc_centroidal.h"
         "include/spline/spline_node.h"
-        "include/spline/end_effector_splines.h")
+        "include/spline/end_effector_splines.h"
+        "include/qp/clarabel_interface.h")
 
 add_library(mpc mpc.cpp
         qp/qp_interface.cpp
@@ -34,6 +35,7 @@ add_library(mpc mpc.cpp
         mpc_centroidal.cpp
         spline/spline_node.cpp
         spline/end_effector_splines.cpp
+        qp/clarabel_interface.cpp
         ${MPC_HEADER_LIST})
 target_include_directories(mpc PUBLIC include)
 
@@ -71,3 +73,10 @@ target_link_libraries(mpc PUBLIC controller)
 
 # Utils
 target_link_libraries(mpc PUBLIC utils)
+
+# Clarabel
+add_library(clarabel STATIC IMPORTED)
+set_property(TARGET clarabel PROPERTY
+        IMPORTED_LOCATION "/home/zolkin/Repos/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so")
+target_include_directories(mpc PUBLIC "/home/zolkin/Repos/Clarabel.cpp/include")
+target_link_libraries(mpc PUBLIC clarabel)

@@ -17,9 +17,9 @@ namespace mpc {
     MPC(info, robot_urdf) {
         InitalizeQPData();
         if (info_.verbose == Optimization || info_.verbose == All) {
-            qp_solver = std::make_unique<OSQPInterface>(data_, true);
+            qp_solver = std::make_unique<ClarabelInterface>(data_, true);
         } else {
-            qp_solver = std::make_unique<OSQPInterface>(data_, false);
+            qp_solver = std::make_unique<ClarabelInterface>(data_, false);
         }
         num_run_ = 0;
 
@@ -108,8 +108,8 @@ namespace mpc {
         const vector_t sol = qp_solver->Solve(data_);
         qp_solve_timer.StopTimer();
 
-        if (qp_solver->GetSolveQuality() != OSQPInterface::SolvedInacc && qp_solver->GetSolveQuality() != OSQPInterface::Solved
-            && qp_solver->GetSolveQuality() != OSQPInterface::MaxIter) {
+        if (qp_solver->GetSolveQuality() != SolvedInacc && qp_solver->GetSolveQuality() != Solved
+            && qp_solver->GetSolveQuality() != MaxIter) {
             std::cerr << "Warning: " << qp_solver->GetSolveQualityAsString() << std::endl;
             throw std::runtime_error("Bad solve.");
         }
@@ -356,9 +356,14 @@ namespace mpc {
         data_.num_dynamics_constraints = (info_.num_nodes+1)*num_states_;
 
         data_.num_cone_constraints_ = (info_.num_nodes+1)*4*num_ee_;
-        data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
+        if (using_clarabel_) {
+            data_.num_force_box_constraints_ = 2*GetNodeIntersectMutableForces();
+            data_.num_ee_location_constraints_ = 2*(info_.num_nodes+0)*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
+        } else {
+            data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
+            data_.num_ee_location_constraints_ = (info_.num_nodes+1)*2*num_ee_;
+        }
 
-        data_.num_ee_location_constraints_ = (info_.num_nodes+1)*2*num_ee_;
         data_.num_start_ee_constraints_ = 2*num_ee_;
     }
 
@@ -403,7 +408,6 @@ namespace mpc {
     // TODO: Investigate more
     void MPCSingleRigidBody::AddEELocationConstraints(const std::vector<vector_3t>& ee_start_locations) {
         // TODO: Do I need a rotation matrix?
-        int idx = 0;
         const int pos_start_idx = GetPosSplineStartIdx();
 
         // -------------- End Effector Box Constraints -------------- //
@@ -415,36 +419,51 @@ namespace mpc {
         matrix_t A(data_.num_ee_location_constraints_, data_.num_decision_vars);
         A.setZero();
 
+        int extra_runs = 1;
+        if (using_clarabel_) {
+            extra_runs = 2;
+        }
+        int idx = 0;
+        for (int i = 0; i < extra_runs; i++) {
+            for (int node = 1; node < info_.num_nodes + 1; node++) {
+                for (int ee = 0; ee < num_ee_; ee++) {
+                    if (i == 0) {
+                        data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) =
+                                bounds + model_.GetCOMToHip(ee).head<CONSTRAINT_COORDS>();
+                        data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) =
+                                -bounds + model_.GetCOMToHip(ee).head<CONSTRAINT_COORDS>();
+                    }
 
-        // TODO: I think this may not be doing what I want... looks weird
-        for (int node = 0; node < info_.num_nodes+1; node++) {
-            for (int ee = 0; ee < num_ee_; ee++) {
-                data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) = bounds + model_.GetCOMToHip(ee).head<CONSTRAINT_COORDS>();
-                data_.ee_location_lb_.segment<CONSTRAINT_COORDS>(idx) = -bounds + model_.GetCOMToHip(ee).head<CONSTRAINT_COORDS>();
+                    for (int coord = 0; coord < CONSTRAINT_COORDS; coord++) {
+                        A(idx, (node) * num_states_ + coord) = -1;
 
-                for (int coord = 0; coord < CONSTRAINT_COORDS; coord++) {
-                    A(idx, node*num_states_ + coord) = -1;
+                        int vars_idx, vars_affecting;
+                        std::tie(vars_idx, vars_affecting) =
+                                prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
 
-                    int vars_idx, vars_affecting;
-                    std::tie(vars_idx, vars_affecting) =
-                            prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
+                        // TODO: DMA
+                        vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position,
+                                                                    ee, coord, GetTime(node));
 
-                    // TODO: DMA
-                    vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position,
-                                                                ee, coord, GetTime(node));
+                        if (i == 0) {
+                            A.block(idx,
+                                    pos_start_idx + vars_idx,
+                                    1, vars_affecting) = vars_lin.transpose();
+                        } else {
+                            A.block(idx,
+                                    pos_start_idx + vars_idx,
+                                    1, vars_affecting) = -vars_lin.transpose();
+                        }
 
-                    A.block(idx,
-                            pos_start_idx + vars_idx,
-                            1, vars_affecting) = vars_lin.transpose();
-
-                    idx++;
+                        idx++;
+                    }
                 }
             }
         }
 
         data_.constraint_mat_.SetMatrix(A, constraint_idx_, 0);
-        constraint_idx_ += idx;
         assert(idx == data_.num_ee_location_constraints_);
+        constraint_idx_ += idx;
 
         // -------------- End Effector Start Constraints -------------- //
         idx = 0;
@@ -530,7 +549,7 @@ namespace mpc {
     }
 
     bool MPCSingleRigidBody::ComputeParamPartials(const Trajectory& traj, QPPartials& partials, int ee, int contact_time_idx) {
-        if (solve_type_.at(solve_type_.size()-1) == OSQPInterface::Solved) {
+        if (solve_type_.at(solve_type_.size()-1) == Solved) {
             QPData partial_data = data_;
             partial_data.InitQPMats();
 

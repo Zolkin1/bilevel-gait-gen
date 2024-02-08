@@ -45,7 +45,8 @@ namespace mpc {
                     info.integrator_dt, info.swing_height, info.foot_offset),
         constraint_projection_(false),
         data_(false, 25000, 2000, model_.GetApplicableConstraints()),
-        integrator_(info.integrator_dt){
+        integrator_(info.integrator_dt),
+        using_clarabel_(true) {
 
         assert(info_.ee_frames.size() == num_ee_);
 
@@ -66,6 +67,8 @@ namespace mpc {
         constraint_idx_ = 0;
 
         in_real_time_ = false;
+
+        data_.using_clarabel_ = using_clarabel_;
     }
 
     Trajectory MPC::CreateInitialRun(const mpc::vector_t& state, const std::vector<vector_3t>& ee_start_locations) {
@@ -170,17 +173,17 @@ namespace mpc {
                                                             constraint_idx_ + idx + fric_con,
                                                             force_offset + vars_index);
                             data_.friction_cone_ub_(idx + fric_con) = 0;
-                            data_.friction_cone_lb_(idx + fric_con) = -qp_solver->GetInfinity(1)(0);
+                            data_.friction_cone_lb_(idx + fric_con) = -1e30;//qp_solver->GetInfinity(1)(0);
                         }
                     }
                 }
                 idx += 4;
             }
         }
-        Eigen::SparseMatrix<double> temp;
-        assert(idx == data_.num_cone_constraints_);
-        temp.resize(data_.GetTotalNumConstraints(), data_.num_decision_vars);
-        temp.setFromTriplets(data_.constraint_mat_.GetTriplet().begin(), data_.constraint_mat_.GetTriplet().end());
+//        Eigen::SparseMatrix<double> temp;
+//        assert(idx == data_.num_cone_constraints_);
+//        temp.resize(data_.GetTotalNumConstraints(), data_.num_decision_vars);
+//        temp.setFromTriplets(data_.constraint_mat_.GetTriplet().begin(), data_.constraint_mat_.GetTriplet().end());
 //        std::cout << temp.toDense().middleRows(constraint_idx_, data_.num_cone_constraints_) << std::endl;
 
         constraint_idx_ += idx;
@@ -189,23 +192,37 @@ namespace mpc {
     void MPC::AddForceBoxConstraints() {
         int force_idx = GetForceSplineStartIdx();
         int row_idx = 0;
-        for (int node = 0; node < info_.num_nodes+1; node++) {
-            double time = GetTime(node);
-            for (int ee = 0; ee < num_ee_; ee++) {
-                const int coord = 2;
-                if (prev_traj_.IsForceMutable(ee, time)) {
-                    int vars_index, vars_affecting;
-                    std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
-                    vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord, time);
+        int extra_runs = 1;
+        if (using_clarabel_) {
+            extra_runs = 2;
+        }
+        for (int i = 0; i < extra_runs; i++) {
+            for (int node = 0; node < info_.num_nodes + 1; node++) {
+                double time = GetTime(node);
+                for (int ee = 0; ee < num_ee_; ee++) {
+                    const int coord = 2;
+                    if (prev_traj_.IsForceMutable(ee, time)) {
+                        int vars_index, vars_affecting;
+                        std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
+                        vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord, time);
 
-                    data_.constraint_mat_.SetMatrix(vars_lin.transpose(),
-                                                    constraint_idx_ + row_idx,
-                                                    force_idx + vars_index);
+                        if (i == 0) {
+                            data_.constraint_mat_.SetMatrix(vars_lin.transpose(),
+                                                            constraint_idx_ + row_idx,
+                                                            force_idx + vars_index);
+                        } else {
+                            data_.constraint_mat_.SetMatrix(-vars_lin.transpose(),
+                                                            constraint_idx_ + row_idx,
+                                                            force_idx + vars_index);
+                        }
 
-                    data_.force_box_lb_(row_idx) = 0.0;
-                    data_.force_box_ub_(row_idx) = info_.force_bound;
+                        if (i == 0) {
+                            data_.force_box_lb_(row_idx) = 0.0;
+                            data_.force_box_ub_(row_idx) = info_.force_bound;
+                        }
 
-                    row_idx++;
+                        row_idx++;
+                    }
                 }
             }
         }
@@ -272,7 +289,11 @@ namespace mpc {
         data_.num_decision_vars = (info_.num_nodes+1)*num_states_ + num_inputs_;
 
         // TODO: May want to put in a check for this, but it should always be active
-        data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
+        if (using_clarabel_) {
+            data_.num_force_box_constraints_ = 2*GetNodeIntersectMutableForces();
+        } else {
+            data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
+        }
     }
 
     void MPC::SetDefaultGaitTrajectory(Gaits gait, int num_polys, const std::vector<vector_3t>& ee_pos) {
@@ -448,7 +469,7 @@ namespace mpc {
         }
     }
 
-    void MPC::RecordStats(double alpha, const vector_t& direction, const OSQPInterface::SolveQuality& solve_type,
+    void MPC::RecordStats(double alpha, const vector_t& direction, const SolveQuality& solve_type,
                           const vector_t& ref_state, double solve_time, double cost) {
         equality_constraint_violations_.push_back(GetEqualityConstraintValues(prev_traj_, ref_state).lpNorm<1>());
         step_norm_.push_back(direction.norm());
@@ -496,28 +517,28 @@ namespace mpc {
 
             std::string solve_type;
             switch (solve_type_.at(i)) {
-                case OSQPInterface::Solved:
+                case Solved:
                     solve_type = "Solved";
                     break;
-                case OSQPInterface::SolvedInacc:
+                case SolvedInacc:
                     solve_type = "Solved Inacc";
                     break;
-                case OSQPInterface::PrimalInfeasible:
+                case PrimalInfeasible:
                     solve_type = "P - Infeasible";
                     break;
-                case OSQPInterface::DualInfeasible:
+                case DualInfeasible:
                     solve_type = "D - Infeasible";
                     break;
-                case OSQPInterface::PrimalInfeasibleInacc:
+                case PrimalInfeasibleInacc:
                     solve_type = "P - Infeasible Inacc";
                     break;
-                case OSQPInterface::DualInfeasibleInacc:
+                case DualInfeasibleInacc:
                     solve_type = "D - Infeasible Inacc";
                     break;
-                case OSQPInterface::MaxIter:
+                case MaxIter:
                     solve_type = "Max Iter";
                     break;
-                case OSQPInterface::Unsolved:
+                case Unsolved:
                     solve_type = "Unsolved";
                     break;
                 default:
@@ -578,7 +599,7 @@ namespace mpc {
     }
 
     vector_t MPC::Getdx() {
-        if (solve_type_.at(solve_type_.size()-1) == OSQPInterface::Solved) { // TODO: Change to not be text based
+        if (solve_type_.at(solve_type_.size()-1) == Solved) { // TODO: Change to not be text based
             return qp_solver->Getdx();
         } else {
             return vector_t::Zero(data_.num_decision_vars); // TODO: Change this return
@@ -586,7 +607,7 @@ namespace mpc {
     }
 
     bool MPC::ComputeDerivativeTerms() {
-        if (solve_type_.at(solve_type_.size()-1) == OSQPInterface::Solved) { // TODO: Change to not be text based
+        if (solve_type_.at(solve_type_.size()-1) == Solved) { // TODO: Change to not be text based
            qp_solver->Computedx(data_.sparse_cost_, data_.cost_linear, prev_qp_sol);
            vector_t dx = qp_solver->Getdx();
            vector_t dy_lu = vector_t::Zero(data_.GetTotalNumConstraints());
@@ -598,7 +619,7 @@ namespace mpc {
     }
 
     bool MPC::GetQPPartials(QPPartials& partials) const {
-        if (solve_type_.at(solve_type_.size()-1) == OSQPInterface::Solved) {
+        if (solve_type_.at(solve_type_.size()-1) == Solved) {
             partials.dP.setZero();
             partials.dA.setZero();
             partials.dq.setZero();

@@ -15,18 +15,6 @@
 namespace mpc {
     class OSQPInterface {
     public:
-        enum SolveQuality {
-            Solved = 0,
-            SolvedInacc = 1,
-            MaxIter = 2,
-            PrimalInfeasible = 3,
-            DualInfeasible = 4,
-            PrimalInfeasibleInacc = 5,
-            DualInfeasibleInacc = 6,
-            Unsolved = 7,
-            Other = 8
-        };
-
         OSQPInterface(const QPData& data, bool verbose);
 
         void SetupQP(QPData& data, const vector_t& warm_start);

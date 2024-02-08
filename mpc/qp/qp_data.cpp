@@ -39,23 +39,24 @@ namespace mpc {
         constraint_projections_(0,0),
         lb_(), ub_(), sparse_constraint_(10000,10000), sparse_cost_(10000,10000),
         constraints_({Constraints::Dynamics, Constraints::JointForwardKinematics, Constraints::EndEffectorLocation,
-                      Constraints::ForceBox, Constraints::JointBox, Constraints::FrictionCone}) {}
+                      Constraints::ForceBox, Constraints::JointBox, Constraints::FrictionCone}),
+                      using_clarabel_(false) {}
 
     QPData::QPData(bool constraint_projection, int constraint_mat_nnz, int cost_mat_nnz,
                    std::vector<Constraints> constraints) :
         settings_(constraint_projection, constraint_mat_nnz, cost_mat_nnz), constraint_projections_(10, 100),
         lb_(), ub_(), sparse_constraint_(10000,10000), sparse_cost_(10000,10000),
-        constraints_(constraints) {}
+        constraints_(constraints), using_clarabel_(false) {}
 
     QPData::QPData(const mpc::QPSettings settings, std::vector<Constraints> constraints) : settings_(settings),
         constraint_projections_(10, 100),
         lb_(), ub_(), sparse_constraint_(10000,10000), sparse_cost_(10000,10000),
-        constraints_(constraints) {}
+        constraints_(constraints), using_clarabel_(false) {}
 
     QPData::QPData(const QPSettings settings, int projection_rows, int projection_cols, std::vector<Constraints> constraints) :
         settings_(settings), constraint_projections_(projection_rows, projection_cols),
         lb_(), ub_(), sparse_constraint_(10000,10000), sparse_cost_(10000,10000),
-        constraints_(constraints) {}
+        constraints_(constraints), using_clarabel_(false) {}
 
     int QPData::GetTotalNumConstraints() const {
         int num_constraints = 0;
@@ -65,11 +66,7 @@ namespace mpc {
                     num_constraints += num_dynamics_constraints;
                     break;
                 case Constraints::JointForwardKinematics:
-                    if (!settings_.constraint_projection_) {
-                        num_constraints += num_fk_constraints_ + num_fk_ineq_constraints_;
-                    } else {
-                        num_constraints += num_fk_ineq_constraints_;
-                    }
+                    num_constraints += num_fk_constraints_ + num_fk_ineq_constraints_;
                     break;
                 case Constraints::EndEffectorLocation:
                     num_constraints += num_ee_location_constraints_ + num_start_ee_constraints_;
@@ -114,13 +111,23 @@ namespace mpc {
                     }
                     break;
                 case Constraints::EndEffectorLocation:
-                    ee_location_lb_ = vector_t::Zero(num_ee_location_constraints_);
-                    ee_location_ub_ = vector_t::Zero(num_ee_location_constraints_);
+                    if (!using_clarabel_) {
+                        ee_location_lb_ = vector_t::Zero(num_ee_location_constraints_);
+                        ee_location_ub_ = vector_t::Zero(num_ee_location_constraints_);
+                    } else {
+                        ee_location_lb_ = vector_t::Zero(num_ee_location_constraints_/2);
+                        ee_location_ub_ = vector_t::Zero(num_ee_location_constraints_/2);
+                    }
                     start_ee_constants_ = vector_t::Zero(num_start_ee_constraints_);
                     break;
                 case Constraints::ForceBox:
-                    force_box_lb_ = vector_t::Zero(num_force_box_constraints_);
-                    force_box_ub_ = vector_t::Zero(num_force_box_constraints_);
+                    if (!using_clarabel_) {
+                        force_box_lb_ = vector_t::Zero(num_force_box_constraints_);
+                        force_box_ub_ = vector_t::Zero(num_force_box_constraints_);
+                    } else {
+                        force_box_lb_ = vector_t::Zero(num_force_box_constraints_/2);
+                        force_box_ub_ = vector_t::Zero(num_force_box_constraints_/2);
+                    }
                     break;
                 case Constraints::JointBox:
                     box_lb_ = vector_t::Zero(num_box_constraints_);
@@ -176,8 +183,12 @@ namespace mpc {
         for (int i = 0; i < constraints_.size(); i++) {
             switch (constraints_.at(i)) {
                 case Constraints::Dynamics:
-                    lb_.segment(idx, num_dynamics_constraints) = dynamics_constants;
-                    ub_.segment(idx, num_dynamics_constraints) = dynamics_constants;
+                    if (!using_clarabel_) {
+                        lb_.segment(idx, num_dynamics_constraints) = dynamics_constants;
+                        ub_.segment(idx, num_dynamics_constraints) = dynamics_constants;
+                    } else {
+                        ub_.segment(idx, num_dynamics_constraints) = dynamics_constants;
+                    }
                     idx += num_dynamics_constraints;
                     break;
                 case Constraints::JointForwardKinematics:
@@ -195,17 +206,29 @@ namespace mpc {
                     }
                     break;
                 case Constraints::EndEffectorLocation:
-                    lb_.segment(idx, num_ee_location_constraints_) = ee_location_lb_;
-                    ub_.segment(idx, num_ee_location_constraints_) = ee_location_ub_;
-                    idx += num_ee_location_constraints_;
-                    lb_.segment(idx, num_start_ee_constraints_) = start_ee_constants_;
-                    ub_.segment(idx, num_start_ee_constraints_) = start_ee_constants_;
-                    idx += num_start_ee_constraints_;
+                    if (!using_clarabel_) {
+                        lb_.segment(idx, num_ee_location_constraints_) = ee_location_lb_;
+                        ub_.segment(idx, num_ee_location_constraints_) = ee_location_ub_;
+                        idx += num_ee_location_constraints_;
+                        lb_.segment(idx, num_start_ee_constraints_) = start_ee_constants_;
+                        ub_.segment(idx, num_start_ee_constraints_) = start_ee_constants_;
+                        idx += num_start_ee_constraints_;
+                    } else {
+                        ub_.segment(idx, num_ee_location_constraints_) << ee_location_ub_, -ee_location_lb_;
+                        idx += num_ee_location_constraints_;
+                        ub_.segment(idx, num_start_ee_constraints_) = start_ee_constants_;
+                        idx += num_start_ee_constraints_;
+                    }
                     break;
                 case Constraints::ForceBox:
-                    lb_.segment(idx, num_force_box_constraints_) = force_box_lb_;
-                    ub_.segment(idx, num_force_box_constraints_) = force_box_ub_;
-                    idx += num_force_box_constraints_;
+                    if (!using_clarabel_) {
+                        lb_.segment(idx, num_force_box_constraints_) = force_box_lb_;
+                        ub_.segment(idx, num_force_box_constraints_) = force_box_ub_;
+                        idx += num_force_box_constraints_;
+                    } else {
+                        ub_.segment(idx, num_force_box_constraints_) << force_box_ub_, -force_box_lb_;
+                        idx += num_force_box_constraints_;
+                    }
                     break;
                 case Constraints::JointBox:
                     lb_.segment(idx, num_box_constraints_) = box_lb_;
@@ -213,8 +236,12 @@ namespace mpc {
                     idx += num_box_constraints_;
                     break;
                 case Constraints::FrictionCone:
-                    lb_.segment(idx, num_cone_constraints_) = friction_cone_lb_;
-                    ub_.segment(idx, num_cone_constraints_) = friction_cone_ub_;
+                    if (!using_clarabel_) {
+                        lb_.segment(idx, num_cone_constraints_) = friction_cone_lb_;
+                        ub_.segment(idx, num_cone_constraints_) = friction_cone_ub_;
+                    } else {
+                        ub_.segment(idx, num_cone_constraints_) = friction_cone_ub_;
+                    }
                     idx += num_cone_constraints_;
                     break;
             }

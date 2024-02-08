@@ -9,6 +9,17 @@
 #include "qp_data.h"
 
 namespace mpc {
+    enum SolveQuality {
+        Solved = 0,
+        SolvedInacc = 1,
+        MaxIter = 2,
+        PrimalInfeasible = 3,
+        DualInfeasible = 4,
+        PrimalInfeasibleInacc = 5,
+        DualInfeasibleInacc = 6,
+        Unsolved = 7,
+        Other = 8
+    };
 
     using vector_t = Eigen::VectorXd;
 
@@ -18,6 +29,7 @@ namespace mpc {
      */
     class QPInterface {
     public:
+
         QPInterface(int num_decision_vars);
 
         /*
@@ -37,7 +49,9 @@ namespace mpc {
 
         virtual vector_t GetInfinity(int size) const;
 
-        virtual std::string GetSolveQuality() const = 0;
+        virtual SolveQuality GetSolveQuality() const = 0;
+
+        std::string GetSolveQualityAsString() const;
 
         virtual vector_t GetDualSolution() const = 0;
 

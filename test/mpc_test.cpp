@@ -12,6 +12,8 @@
 #include "models/centroidal_model.h"
 #include "mpc_single_rigid_body.h"
 
+#include "qp/clarabel_interface.h"
+
 TEST_CASE("Basic MPC", "[mpc]") {
 
     std::string config_file("/home/zolkin/AmberLab/bilevel-gait-gen/test/a1_configuration_test.yaml");
@@ -619,5 +621,8 @@ TEST_CASE("Constant Splines", "[mpc][spline]") {
             time += 0.015;
         }
     }
+}
 
+TEST_CASE("Clarabel Solver", "[mpc][clarabel]") {
+    mpc::ClarabelInterface qp_solver;
 }

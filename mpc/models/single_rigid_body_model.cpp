@@ -19,8 +19,10 @@ namespace mpc {
     SingleRigidBodyModel::SingleRigidBodyModel(const std::string& robot_urdf, const std::vector<std::string>& frames,
                                                int discretization_steps, double dt, const vector_t& nom_state) :
             Model(robot_urdf, frames, discretization_steps, dt, false,
-                  {Constraints::Dynamics, Constraints::ForceBox,
-                   Constraints::FrictionCone, Constraints::EndEffectorLocation}),
+                  {Constraints::Dynamics,
+                   Constraints::ForceBox,
+                   Constraints::FrictionCone,
+                   Constraints::EndEffectorLocation}),
             num_tangent_states_(MOMENTUM_OFFSET + FLOATING_VEL_OFFSET),
             num_manifold_states_(MOMENTUM_OFFSET + FLOATING_BASE_OFFSET) {
         // Populate Ir

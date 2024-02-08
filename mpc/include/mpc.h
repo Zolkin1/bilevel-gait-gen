@@ -18,6 +18,7 @@
 #include "gait_optimizer.h"
 #include "models/single_rigid_body_model.h"
 #include "rk_integrator.h"
+#include "qp/clarabel_interface.h"
 
 namespace mpc {
     /**
@@ -187,7 +188,7 @@ namespace mpc {
 
         double GetMeritGradient(const vector_t& x, const vector_t& p, double mu, const vector_t& init_state);
 
-        void RecordStats(double alpha, const vector_t& direction, const OSQPInterface::SolveQuality& solve_type,
+        void RecordStats(double alpha, const vector_t& direction, const SolveQuality& solve_type,
                          const vector_t& ref_state, double solve_time, double cost);
 
         int GetNodeIntersectMutableForces() const;
@@ -222,7 +223,7 @@ namespace mpc {
         Eigen::Matrix<double, 4, 3> friction_pyramid_;
 
         // QP Interface
-        std::unique_ptr<OSQPInterface> qp_solver;
+        std::unique_ptr<ClarabelInterface> qp_solver;
 
         // previous trajectory
         Trajectory prev_traj_;
@@ -259,7 +260,7 @@ namespace mpc {
         std::vector<double> cost_result_;
         std::vector<double> merit_result_;
         std::vector<double> merit_directional_deriv_;
-        std::vector<OSQPInterface::SolveQuality> solve_type_;
+        std::vector<SolveQuality> solve_type_;
         std::vector<vector_t> ref_state_;
         std::vector<double> solve_time_;
         std::vector<double> cost_;
@@ -273,6 +274,8 @@ namespace mpc {
         vector_t C_, C2_;
 
         const bool constraint_projection_;
+
+        const bool using_clarabel_;
 
         RKIntegrator integrator_;
     private:

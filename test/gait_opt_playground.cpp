@@ -84,6 +84,9 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
 
         // Get full state through IK
         state = mpc.GetFullTargetState(time, state);
+//        vector_t temp = mpc.GetModel()->ConvertTangentStateToManifoldState(prev_traj.GetState(1),
+//                                                                           prev_traj.GetState(0));
+//        state << temp.head<3>(), temp.segment<4>(6), standing.tail(12);
 
         // Get end effector locations from trajectory
         for (int j = 0; j < ee_locations.size(); j++) {
@@ -257,8 +260,8 @@ int main() {
                          robot, info, config.ParseNumber<double>("viz_rate"), false, viz);
 
 
-    MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
-                         robot, info, config.ParseNumber<double>("viz_rate"), true, viz);
+//    MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
+//                         robot, info, config.ParseNumber<double>("viz_rate"), true, viz);
 
     // MPC w/ fixed position + line search
 

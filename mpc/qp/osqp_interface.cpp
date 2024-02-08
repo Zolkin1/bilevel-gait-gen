@@ -222,7 +222,7 @@ namespace mpc {
         }
     }
 
-    OSQPInterface::SolveQuality OSQPInterface::GetSolveQuality() const {
+    SolveQuality OSQPInterface::GetSolveQuality() const {
         switch (qp_solver_.getStatus()) {
             case OsqpEigen::Status::Solved:
                 return Solved;
@@ -268,7 +268,7 @@ namespace mpc {
     void OSQPInterface::ConfigureForRealTime(double run_time_iters) const {
         qp_solver_.settings()->setPolish(false);
         qp_solver_.settings()->setAbsoluteTolerance(1e-4);
-        qp_solver_.settings()->setRelativeTolerance(5e-4);      // 1e-3 works well to actually solve the problem. 5e-4 also works
+        qp_solver_.settings()->setRelativeTolerance(1e-5);      // 1e-3 works well to actually solve the problem. 5e-4 also works
         qp_solver_.settings()->setMaxIteration(run_time_iters);
     }
 

@@ -16,4 +16,27 @@ namespace mpc {
         return infty;
     }
 
+    std::string QPInterface::GetSolveQualityAsString() const {
+        switch (GetSolveQuality()) {
+            case Solved:
+                return "Solved";
+            case SolvedInacc:
+                return "Solved Inaccurate";
+            case PrimalInfeasible:
+                return "Primal Infeasible";
+            case DualInfeasible:
+                return "Dual Infeasible";
+            case PrimalInfeasibleInacc:
+                return "Primal Infeasible Inaccurate";
+            case DualInfeasibleInacc:
+                return "Dual Infeasible Inaccurate";
+            case MaxIter:
+                return "Max Iter Reached";
+            case Unsolved:
+                return "Unsolved";
+            default:
+                return "Other";
+        }
+    }
+
 } // mpc
