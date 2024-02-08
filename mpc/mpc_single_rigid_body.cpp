@@ -358,7 +358,7 @@ namespace mpc {
         data_.num_cone_constraints_ = (info_.num_nodes+1)*4*num_ee_;
         if (using_clarabel_) {
             data_.num_force_box_constraints_ = 2*GetNodeIntersectMutableForces();
-            data_.num_ee_location_constraints_ = 2*(info_.num_nodes+0)*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
+            data_.num_ee_location_constraints_ = 2*(info_.num_nodes)*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
         } else {
             data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
             data_.num_ee_location_constraints_ = (info_.num_nodes+1)*2*num_ee_;
@@ -435,7 +435,11 @@ namespace mpc {
                     }
 
                     for (int coord = 0; coord < CONSTRAINT_COORDS; coord++) {
-                        A(idx, (node) * num_states_ + coord) = -1;
+                        if (i == 0) {
+                            A(idx, (node) * num_states_ + coord) = -1;
+                        } else {
+                            A(idx, (node) * num_states_ + coord) = 1;
+                        }
 
                         int vars_idx, vars_affecting;
                         std::tie(vars_idx, vars_affecting) =

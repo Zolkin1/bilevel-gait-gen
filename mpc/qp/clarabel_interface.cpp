@@ -11,8 +11,9 @@ namespace mpc {
     ClarabelInterface::ClarabelInterface(const QPData& data, bool verbose) : QPInterface(data.num_decision_vars) {
         settings_ = DefaultSettings<double>::default_settings();
         settings_.verbose = verbose;
-//        settings_.tol_gap_rel = 1e-5;
-//        settings_.tol_gap_abs = 1e-5;
+//        settings_.tol_gap_rel = 5e-5;
+//        settings_.tol_gap_abs = 5e-5;
+//        settings_.max_iter = 10;
     }
 
     void ClarabelInterface::SetupQP(mpc::QPData& data, const mpc::vector_t& warm_start) {
@@ -47,8 +48,8 @@ namespace mpc {
             }
         }
 
-        data.sparse_cost_.makeCompressed();
-        data.sparse_constraint_.makeCompressed();
+//        data.sparse_cost_.makeCompressed();
+//        data.sparse_constraint_.makeCompressed();
         solver_ = std::make_unique<DefaultSolver<double>>(data.sparse_cost_, data.cost_linear,
                 data.sparse_constraint_,data.ub_, cones_, settings_);
     }
