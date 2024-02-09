@@ -89,8 +89,8 @@ namespace mpc {
 
     void GaitOptimizer::ComputeCostFcnDerivWrtContactTimes() {
 
-        sp_matrix_t dldAth;
-        sp_matrix_t dldGth;
+        sp_matrix_t dldAth(qp_partials_.dA.rows(), qp_partials_.dA.cols());
+        sp_matrix_t dldGth(qp_partials_.dG.rows(), qp_partials_.dG.cols());
         sp_matrix_t dldPth(num_decision_vars_, num_decision_vars_);
         dHdth = vector_t::Zero(GetNumTimeNodes(num_ee_));
 
@@ -132,7 +132,8 @@ namespace mpc {
 
                 dHdth(GetNumTimeNodes(ee) + idx) = dldPth.sum() + dldAth.sum() + dldGth.sum() +
                                                      qp_partials_.dl.dot(param_partial.dl) + qp_partials_.du.dot(param_partial.du) +
-                                                     qp_partials_.dq.dot(param_partial.dq);
+                                                     qp_partials_.dq.dot(param_partial.dq) + qp_partials_.db.dot(param_partial.db) +
+                                                     qp_partials_.dh.dot(param_partial.dh);
                 assert(!isnanl(dHdth(GetNumTimeNodes(ee) + idx)));
             }
         }
@@ -320,7 +321,7 @@ namespace mpc {
         return contact_times_;
     }
 
-    QPPartials& GaitOptimizer::GetPartials() {
+    QPPartials& GaitOptimizer::GetQPPartials() {
         return qp_partials_;
     }
 
@@ -439,7 +440,7 @@ namespace mpc {
         for (int ee = 0; ee < num_ee_; ee++) {
             int next_node = -1;
             for (int i = 1; i < contact_times_.at(ee).size(); i++) {
-                if (contact_times_.at(ee).at(i).GetTime() > time) {
+                if (contact_times_.at(ee).at(i).GetTime() >= time) {
                     next_node = i;
                     break;
                 }

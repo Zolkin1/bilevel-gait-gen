@@ -160,7 +160,7 @@ int main() {
             gait_optimizer.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
             if (mpc.ComputeDerivativeTerms()) {
                 std::cout << "optimization at: " << i << std::endl;
-                mpc.GetQPPartials(gait_optimizer.GetPartials());
+                mpc.GetQPPartials(gait_optimizer.GetQPPartials());
                 for (int ee = 0; ee < 4; ee++) {
                     gait_optimizer.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
                     for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {

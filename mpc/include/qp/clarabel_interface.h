@@ -52,9 +52,9 @@ namespace mpc {
 
         vector_t Solve(const QPData& data) override;
 
-        void ConfigureForInitialRun() const override;
+        void ConfigureForInitialRun();
 
-        void ConfigureForRealTime(double run_time_iters) const override;
+        void ConfigureForRealTime(double run_time_iters);
 
         vector_t GetDualSolution() const override;
 
@@ -87,6 +87,7 @@ namespace mpc {
 
         vector_t dual_;
         vector_t primal_;
+        vector_t slacks_;
 
         vector_t d_;
         vector_t dx_;

@@ -142,7 +142,7 @@ run_time_iterations: 6000 # 150 works well
 
 foot_offset: 0.02
 
-force_cost: 0.000 # 0.01 - makes the solve much harder
+force_cost: 0.001 # Note: without this cost, the problem is much more poorly conditioned
 
 Q_diag: [1, 1, 1,          # linear momentum
          1, 1, 1,           # angular momentum
@@ -170,7 +170,7 @@ Q_srbd_diag: [0, 0, 500, .1, .1, 0, 3000, 3000, 3000, 0, 0, 0]  # Convergence se
 #         1000, 500, 10,       # RL leg
 #         1000, 500, 10]
 
-mpc_verbosity: 2
+mpc_verbosity: 0
 
 ## --- Temp --- ##
 viz_rate: 0.01

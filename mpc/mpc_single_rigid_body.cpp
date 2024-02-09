@@ -358,7 +358,7 @@ namespace mpc {
         data_.num_cone_constraints_ = (info_.num_nodes+1)*4*num_ee_;
         if (using_clarabel_) {
             data_.num_force_box_constraints_ = 2*GetNodeIntersectMutableForces();
-            data_.num_ee_location_constraints_ = 2*(info_.num_nodes)*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
+            data_.num_ee_location_constraints_ = 2*(info_.num_nodes-1)*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
         } else {
             data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
             data_.num_ee_location_constraints_ = (info_.num_nodes+1)*2*num_ee_;
@@ -425,7 +425,7 @@ namespace mpc {
         }
         int idx = 0;
         for (int i = 0; i < extra_runs; i++) {
-            for (int node = 1; node < info_.num_nodes + 1; node++) {
+            for (int node = 2; node < info_.num_nodes + 1; node++) {
                 for (int ee = 0; ee < num_ee_; ee++) {
                     if (i == 0) {
                         data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) =
@@ -649,7 +649,7 @@ namespace mpc {
 
 //            assert(idx == data_.num_start_ee_constraints_);
 
-            data_.constraint_mat_.SetMatrix(M, constraint_idx_, GetPosSplineStartIdx());
+//            data_.constraint_mat_.SetMatrix(M, constraint_idx_, GetPosSplineStartIdx());
 
             partial_data.ConstructSparseMats();
             partial_data.ConstructVectors();
@@ -724,7 +724,7 @@ namespace mpc {
                     // ----------- Inequality contribution ----------- //
                     const int spline_offset = GetPosSplineStartIdx();
                     int idx = ee * (data_.num_ee_location_constraints_ / (2*num_ee_));
-                    for (int node = 0; node < info_.num_nodes + 1; node++) {
+                    for (int node = 2; node < info_.num_nodes + 1; node++) {
                         const double time = GetTime(node);
                         for (int coord = 0; coord < 2; coord++) {
                             int vars_index, vars_affecting;
@@ -770,7 +770,7 @@ namespace mpc {
                         idx++;
                     }
 
-                    assert(idx == data_.num_start_ee_constraints_);
+                    assert(idx == data_.num_start_ee_constraints_/num_ee_);
 
                     A_builder.SetMatrix(M, eq_idx, GetPosSplineStartIdx());
 

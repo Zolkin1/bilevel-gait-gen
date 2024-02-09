@@ -47,7 +47,7 @@ namespace mpc {
 
         void Setdx(const vector_t& dx);
 
-        QPPartials& GetPartials();
+        QPPartials& GetQPPartials();
 
         /**
          * Computes the partial derivative of the cost function wrt all the QP parameters:

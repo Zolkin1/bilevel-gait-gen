@@ -233,7 +233,7 @@ namespace controller {
 
 //                gait_optimizer_.UpdateSizes(mpc_.GetNumDecisionVars(), mpc_.GetNumConstraints());
 //                mpc_.ComputeDerivativeTerms();
-//                mpc_.GetQPPartials(gait_optimizer_.GetPartials());
+//                mpc_.GetQPPartials(gait_optimizer_.GetQPPartials());
 
 //                gait_optimizer_.SetParameterPartials()
 

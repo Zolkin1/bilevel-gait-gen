@@ -22,6 +22,8 @@ namespace utils {
 
         void SetMatrix(const matrix_t& M, int row_start, int col_start);
 
+        void SetVectorDiagonally(const vector_t& vec, int row_start, int col_start);
+
         const std::vector<triplet_t>& GetTriplet() const;
 
     protected:

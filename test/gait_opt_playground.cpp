@@ -32,7 +32,7 @@ double RunGaitOpt(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt, co
         gait_opt.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
         prev_cost = mpc.GetCost();
 
-        mpc.GetQPPartials(gait_opt.GetPartials());
+        mpc.GetQPPartials(gait_opt.GetQPPartials());
         for (int ee = 0; ee < 4; ee++) {
             gait_opt.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
             for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {
@@ -100,8 +100,9 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
 
         // Gait optimization
         if (run_gait_opt) {
-            if (!(i % 5)) {
+            if (!(i % 10)) {
                 prev_cost = RunGaitOpt(mpc, gait_opt, prev_traj, cost_red, time);
+//                PrintContactSched(mpc.GetTrajectory().GetContactTimes());
             }
         }
 

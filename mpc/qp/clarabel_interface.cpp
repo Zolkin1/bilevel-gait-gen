@@ -2,6 +2,11 @@
 // Created by zolkin on 2/7/24.
 //
 
+#include <Eigen/SparseCholesky>
+#include <Eigen/SparseQR>
+#include <Eigen/SparseLU>
+#include<Eigen/IterativeLinearSolvers>
+
 #include "qp/clarabel_interface.h"
 
 namespace mpc {
@@ -13,32 +18,28 @@ namespace mpc {
         settings_.verbose = verbose;
         settings_.tol_gap_rel = 1e-5;
         settings_.tol_gap_abs = 1e-5;
+//        settings_.linesearch_backtrack_step = 0.2;
+//        settings_.min_switch_step_length = 1e-2;
 //        settings_.max_iter = 10;
     }
 
     void ClarabelInterface::SetupQP(mpc::QPData& data, const mpc::vector_t& warm_start) {
         cones_ = {};
-        num_equality_constraints_ = 0;
-        num_inequality_constraints_ = 0;
         for (int i = 0; i < data.constraints_.size(); i++) {
             switch (data.constraints_.at(i)) {
                 case Constraints::Dynamics:
                     cones_.push_back(ZeroConeT<double>(data.num_dynamics_constraints));
-                    num_equality_constraints_ += data.num_dynamics_constraints;
                     break;
                 case Constraints::JointForwardKinematics:
                         throw std::runtime_error("not supported yet");
                     break;
                 case Constraints::EndEffectorLocation:
                     cones_.push_back(NonnegativeConeT<double>(data.num_ee_location_constraints_));
-                    num_inequality_constraints_ += data.num_ee_location_constraints_;
 
                     cones_.push_back(ZeroConeT<double>(data.num_start_ee_constraints_));
-                    num_equality_constraints_ += data.num_start_ee_constraints_;
                     break;
                 case Constraints::ForceBox:
                     cones_.push_back(NonnegativeConeT<double>(data.num_force_box_constraints_));
-                    num_inequality_constraints_ += data.num_force_box_constraints_;
                     break;
                 case Constraints::JointBox:
                     throw std::runtime_error("Joint box not implemented with clarabel yet");
@@ -48,7 +49,6 @@ namespace mpc {
                     break;
                 case Constraints::FrictionCone:
                     cones_.push_back(NonnegativeConeT<double>(data.num_cone_constraints_));
-                    num_inequality_constraints_ += data.num_cone_constraints_;
                     break;
             }
         }
@@ -96,8 +96,46 @@ namespace mpc {
                 solve_quality_ = Other;
         }
 
+        slacks_ = sol.s;
         dual_ = sol.z;
         primal_ = sol.x;
+
+        if (solve_quality_ == PrimalInfeasible) {
+            vector_t temp = data.sparse_constraint_*primal_ + slacks_ - data.ub_;
+            vector_t primal_product = data.sparse_constraint_*primal_;
+
+            const matrix_t A = data.sparse_constraint_.toDense();
+
+//            std::cout << "A top rows: " << std::endl;
+//            std::cout << A.topRows<6>() << std::endl;
+
+            const int nodes = 6;
+
+//            std::cout << "Constraint matrix: \n";
+//            for (int j = 0; j < data.GetTotalNumConstraints(); j++) {
+//                for (int i = 0; i < nodes*12; i++) {
+//                    std::cout << std::setw(15) << A(j, i);
+//                }
+//
+//                std::cout << " |||| ";
+//
+//                for (int i = nodes*12; i < A.cols(); i++) {
+//                    std::cout << std::setw(15) << A(j, i);
+//                }
+//
+//                std::cout << std::endl;
+//            }
+
+//            std::cout << "Constraint matrix: \n" << data.sparse_constraint_.toDense() << std::endl;
+
+//            std::cout << "A*z^* | s | b" << std::endl;
+//            for (int i = 0; i < temp.size(); i++) {
+//                std::cout << std::setw(15) << primal_product(i) << " | " <<
+//                    std::setw(15) << slacks_(i) << " | " <<
+//                    std::setw(15) << data.ub_(i) << std::endl;
+//            }
+        }
+
         return primal_;
     }
 
@@ -109,9 +147,15 @@ namespace mpc {
         return dual_;
     }
 
-    void ClarabelInterface::ConfigureForInitialRun() const {}
+    void ClarabelInterface::ConfigureForInitialRun() {
+        settings_.tol_gap_rel = 1e-8;
+        settings_.tol_gap_abs = 1e-8;
+    }
 
-    void ClarabelInterface::ConfigureForRealTime(double run_time_iters) const {}
+    void ClarabelInterface::ConfigureForRealTime(double run_time_iters) {
+         settings_.tol_gap_rel = 1e-5;
+        settings_.tol_gap_abs = 1e-5;
+    }
 
 
     vector_t ClarabelInterface::Getdx() const {
@@ -132,11 +176,26 @@ namespace mpc {
         const vector_t& dnu = d_.tail(num_equality_constraints_);
         const vector_t& dlam = d_.segment(primal_.size(), num_inequality_constraints_);
 
-        dP = 0.5*(dz*primal_.transpose() + primal_*dz.transpose()).sparseView();    // TODO: Is sparse view efficient?
+        dP.resize(primal_.size(), primal_.size());
+        dA.resize(nu_.size(), primal_.size());
+        dG.resize(lam_.size(), primal_.size());
 
-        dA = (dnu*primal_.transpose() + nu_*dz.transpose()).sparseView();
+//        std::cout << "dz*z^*: " << dz*primal_.transpose() << std::endl;
 
-        dG = (lam_.asDiagonal()*dlam*primal_.transpose() + lam_*dz.transpose()).sparseView();
+        utils::SparseMatrixBuilder P_builder;
+        P_builder.Reserve(1000);    // TODO: Adjust this number
+        P_builder.SetMatrix(0.5*(dz*primal_.transpose() + primal_*dz.transpose()), 0, 0);
+        dP.setFromTriplets(P_builder.GetTriplet().begin(), P_builder.GetTriplet().end());
+
+        utils::SparseMatrixBuilder A_builder;
+        A_builder.Reserve(1000);
+        A_builder.SetMatrix((dnu*primal_.transpose() + nu_*dz.transpose()), 0, 0);
+        dA.setFromTriplets(A_builder.GetTriplet().begin(), A_builder.GetTriplet().end());
+
+        utils::SparseMatrixBuilder G_builder;
+        G_builder.Reserve(1000);
+        G_builder.SetMatrix((lam_.asDiagonal()*dlam*primal_.transpose() + lam_*dz.transpose()), 0, 0);
+        dG.setFromTriplets(G_builder.GetTriplet().begin(), G_builder.GetTriplet().begin());
     }
 
     void ClarabelInterface::SetupDerivativeCalcs(mpc::vector_t& dx, mpc::vector_t& dy_l, mpc::vector_t& dy_u,
@@ -160,11 +219,16 @@ namespace mpc {
         // - Need to split the constraint matrix into the equality and inequality constraints.
         //      can split them based on the cones
 
-        matrix_t A(num_equality_constraints_, data.num_decision_vars);
-        matrix_t G(num_inequality_constraints_, data.num_decision_vars);
-        lam_.resize(num_inequality_constraints_);
-        nu_.resize(num_equality_constraints_);
-        vector_t h(num_inequality_constraints_);
+        utils::Timer timer("KKT mat solve");
+        timer.StartTimer();
+
+        // TODO: Speed up! The setup for the solve is about 20ms
+        matrix_t A(data.num_equality_, data.num_decision_vars);
+        matrix_t G(data.num_inequality_, data.num_decision_vars);
+        lam_.resize(data.num_inequality_);
+        nu_.resize(data.num_equality_);
+        vector_t h(data.num_inequality_);
+        vector_t s_ineq(data.num_inequality_);
 
         int eq_idx = 0;
         int ineq_idx = 0;
@@ -189,6 +253,8 @@ namespace mpc {
                             dual_.segment(gen_idx, data.num_ee_location_constraints_);
                     h.segment(ineq_idx, data.num_ee_location_constraints_) =
                             data.ub_.segment(gen_idx, data.num_ee_location_constraints_);
+                    s_ineq.segment(ineq_idx, data.num_ee_location_constraints_) =
+                            slacks_.segment(gen_idx, data.num_ee_location_constraints_);
                     ineq_idx += data.num_ee_location_constraints_;
                     gen_idx += data.num_ee_location_constraints_;
 
@@ -206,6 +272,8 @@ namespace mpc {
                             dual_.segment(gen_idx, data.num_force_box_constraints_);
                     h.segment(ineq_idx, data.num_force_box_constraints_) =
                             data.ub_.segment(gen_idx, data.num_force_box_constraints_);
+                    s_ineq.segment(ineq_idx, data.num_force_box_constraints_) =
+                            slacks_.segment(gen_idx, data.num_force_box_constraints_);
                     ineq_idx += data.num_force_box_constraints_;
                     gen_idx += data.num_force_box_constraints_;
                     break;
@@ -219,35 +287,83 @@ namespace mpc {
                             dual_.segment(gen_idx, data.num_cone_constraints_);
                     h.segment(ineq_idx, data.num_cone_constraints_) =
                             data.ub_.segment(gen_idx, data.num_cone_constraints_);
+                    s_ineq.segment(ineq_idx, data.num_cone_constraints_) =
+                            slacks_.segment(gen_idx, data.num_cone_constraints_);
                     ineq_idx += data.num_cone_constraints_;
                     gen_idx += data.num_cone_constraints_;
                     break;
             }
         }
 
-        matrix_t DiffMat (data.num_decision_vars + data.GetTotalNumConstraints(),
-                          data.num_decision_vars + data.GetTotalNumConstraints());
-        DiffMat.setZero();
+        utils::SparseMatrixBuilder mat_builder;
+        mat_builder.Reserve(3*data.sparse_constraint_.nonZeros() +
+                        3*data.sparse_cost_.nonZeros()); // TODO: might be too much
 
-        DiffMat.topLeftCorner(data.num_decision_vars, data.num_decision_vars) = -data.sparse_cost_;
-        DiffMat.block(0, data.num_decision_vars,
-                      data.num_decision_vars, num_inequality_constraints_) = -G.transpose() * lam_.asDiagonal();
-        DiffMat.block(0, data.num_decision_vars + num_inequality_constraints_,
-                      data.num_decision_vars, num_equality_constraints_) = -A.transpose();
+        mat_builder.SetMatrix(data.sparse_cost_.toDense(), 0, 0);
 
-        DiffMat.block(data.num_decision_vars, 0, G.rows(), G.cols()) = -G;
-        DiffMat.block(data.num_decision_vars, G.cols(),
-                      num_inequality_constraints_, num_inequality_constraints_) =
-                              -1*(G*primal_ - h).asDiagonal();
+        mat_builder.SetMatrix(G.transpose(), 0, data.num_decision_vars);
+//        mat_builder.SetMatrix(-G.transpose()*lam_.asDiagonal(), 0, data.num_decision_vars);
 
-        DiffMat.bottomLeftCorner(num_equality_constraints_, data.num_decision_vars) = -A;
+        mat_builder.SetMatrix(A.transpose(),
+                              0, data.num_decision_vars + data.num_inequality_);
+
+        mat_builder.SetMatrix((lam_.asDiagonal()*G), data.num_decision_vars, 0);
+
+//        mat_builder.SetMatrix(-(G.array().colwise() * lam_.array()), data.num_decision_vars, 0);
+//        mat_builder.SetMatrix(-G, data.num_decision_vars, 0);
+
+        mat_builder.SetVectorDiagonally(s_ineq, data.num_decision_vars, data.num_decision_vars);
+        mat_builder.SetMatrix(A, data.num_decision_vars + data.num_inequality_, 0);
+
+        assert(data.num_inequality_ + data.num_equality_ == data.GetTotalNumConstraints());
+
+
+        sp_matrix_t diff_mat(data.num_decision_vars + data.GetTotalNumConstraints(),
+                            data.num_decision_vars + data.GetTotalNumConstraints());
+
+        diff_mat.setFromTriplets(mat_builder.GetTriplet().begin(), mat_builder.GetTriplet().end());
+
 
         // Solve the system
-        d_.resize(data.num_decision_vars + num_equality_constraints_ + num_inequality_constraints_);
-        d_ << dx, vector_t::Zero(num_equality_constraints_ + num_inequality_constraints_);
+        // The system solve is only about 1-2ms
+        d_.resize(data.num_decision_vars + data.num_equality_ + data.num_inequality_);
+        d_ << dx, vector_t::Zero(data.num_equality_ + data.num_inequality_);
 
-//        DiffMat.llt().solveInPlace(d_);
-        DiffMat.ldlt().solveInPlace(d_);
+        assert(diff_mat.rows() == diff_mat.cols());
+
+        sp_matrix_t temp = diff_mat.transpose()*diff_mat;
+        temp.makeCompressed();
+
+        Eigen::ConjugateGradient<sp_matrix_t, Eigen::Lower|Eigen::Upper> solver;
+//        Eigen::SimplicialLDLT<sp_matrix_t> solver;
+
+//        solver.compute(temp);
+
+        solver.analyzePattern(temp);
+        solver.factorize(temp);
+        solver.setTolerance(5e-6);
+        solver.setMaxIterations(2*temp.rows());
+
+        if (solver.info() != Eigen::Success) {
+            throw std::runtime_error("Could not factorize the differential matrix.");
+        }
+
+        vector_t temp2 = diff_mat.transpose()*d_;
+        d_ = -solver.solve(temp2);
+        std::cout << "#iterations:     " << solver.iterations() << std::endl;
+        std::cout << "estimated error: " << solver.error()      << std::endl;
+//        std::cout << "d_: " << d_ << std::endl;
+//        d_ = diff_mat.transpose()*d_;
+//        std::cout << "again d_: " << d_ << std::endl;
+        if (solver.info() != Eigen::Success) {
+            throw std::runtime_error("Could not solve the differential matrix");
+        }
+        timer.StopTimer();
+
+        timer.PrintElapsedTime();
+
+        num_equality_constraints_ = data.num_equality_;
+        num_inequality_constraints_ = data.num_inequality_;
     }
 
     vector_t ClarabelInterface::Computedx(const Eigen::SparseMatrix<double>& P, const mpc::vector_t& q,

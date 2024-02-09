@@ -29,6 +29,14 @@ namespace utils {
         }
     }
 
+    void SparseMatrixBuilder::SetVectorDiagonally(const vector_t& vec, int row_start, int col_start) {
+        for (int i = 0; i < vec.size(); i++) {
+            if (vec(i) != 0) {
+                triplet_.push_back(triplet_t(row_start + i, col_start + i, vec(i)));
+            }
+        }
+    }
+
     const std::vector<triplet_t>& SparseMatrixBuilder::GetTriplet() const {
         return triplet_;
     }
