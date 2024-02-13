@@ -177,7 +177,7 @@ namespace mpc {
         vector_t gradk_, gradkp1_;
         vector_t dual_;
         matrix_t Bk_;
-        vector_t step_;
+        vector_t step_, last_step_;
 
         double pred_red_cost_;
         double gamma_; // Trust region shrinking scalar

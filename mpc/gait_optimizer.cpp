@@ -39,7 +39,7 @@ namespace mpc {
 
         gamma_ = 0.5;
         eta_ = 0.75;
-        Delta_ = 1e-8; //0.0005;
+        Delta_ = 0.1; //0.0005;
 
         run_num_ = 0;
         past_decision_vars_ = 0;
@@ -331,10 +331,10 @@ namespace mpc {
             }
         }
 
-        std::cout << "Max gradient occurs at: " << max_idx << " with value: " << dHdth(max_idx) << std::endl;
-        step_.setZero();
-        double step_len = 1e-3;
-        step_(max_idx) = step_len;
+//        std::cout << "Max gradient occurs at: " << max_idx << " with value: " << dHdth(max_idx) << std::endl;
+//        step_.setZero();
+//        double step_len = 1e-3;
+//        step_(max_idx) = step_len;
 
         xkp1_ = xk_ + step_;
 
@@ -352,7 +352,13 @@ namespace mpc {
             }
         }
 
-        std::cout << "approx grad: " << actual_red_cost/step_len << std::endl;
+//        std::cout << "approx grad: ";
+//        for (int i = 0; i < last_step_.size(); i++) {
+//            std::cout << actual_red_cost/last_step_(i) << ", ";
+//        }
+//        std::cout << std::endl;
+
+        last_step_ = step_;
 
         pred_red_cost_ = -dHdth.dot(step_) - 0.5*step_.transpose()*Bk_*step_;
 
@@ -360,6 +366,8 @@ namespace mpc {
 
 //        old_grad_ = dHdth;
 
+        std::cout << "Actual cost reduction (previous step): " << actual_red_cost << std::endl;
+        std::cout << "Predicted cost reduction: " << pred_red_cost_ << std::endl;
         std::cout << "trust region size: " << Delta_ << std::endl;
 
         run_num_++;

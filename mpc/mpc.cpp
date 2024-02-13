@@ -711,7 +711,9 @@ namespace mpc {
 
     void MPC::AddDiagonalCost() {
         // Adds a positive small cost to every value so that Q is PD
-        data_.cost_mat_.SetDiagonalMatrix(1e-2,0,0,data_.num_decision_vars);
+        // TODO: 1e-2 seemed to work well!
+        // TODO: The gradient descent appears to be better with this more PD!
+        data_.cost_mat_.SetDiagonalMatrix(1e-1,0,0,data_.num_decision_vars);
     }
 
 } // mpc

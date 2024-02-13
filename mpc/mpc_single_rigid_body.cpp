@@ -67,7 +67,7 @@ namespace mpc {
         AddHessianApproxCost();
         AddGradientCost();
         AddFinalCost();
-        AddDiagonalCost();
+//        AddDiagonalCost();
 
 //        data_.cost_mat_.SetDiagonalMatrix(1, 0, 0, data_.num_decision_vars);
 

@@ -198,8 +198,8 @@ namespace mpc {
         dG.setFromTriplets(G_builder.GetTriplet().begin(), G_builder.GetTriplet().end());
 //        std::cout << dG.toDense() << std::endl;
         matrix_t dG_dense = dG.toDense();
-        std::cout << "dG max coef: " << dG_dense.maxCoeff() << std::endl;
-        std::cout << "dA max coef: " << dA.toDense().maxCoeff() << std::endl;
+//        std::cout << "dG max coef: " << dG_dense.maxCoeff() << std::endl;
+//        std::cout << "dA max coef: " << dA.toDense().maxCoeff() << std::endl;
 //        const double dG_max = dG_dense.maxCoeff();
 //        for (int i = 0; i < dG.rows(); i++) {
 //            for (int j = 0; j < dG.cols(); j++) {
@@ -209,19 +209,19 @@ namespace mpc {
 //            }
 //        }
 
-        std::cout << "lam_ max: " << lam_.maxCoeff() << ", note: large value represents high sensitivity" << std::endl;
-        std::cout << "dlam max: " << dlam.maxCoeff() << std::endl;
+//        std::cout << "lam_ max: " << lam_.maxCoeff() << ", note: large value represents high sensitivity" << std::endl;
+//        std::cout << "dlam max: " << dlam.maxCoeff() << std::endl;
 //        for (int i = 0; i < lam_.size(); i++) {
 //            if (lam_.maxCoeff() == lam_(i)) {
 //                std::cout << "lam_ max occurs at index: " << i << std::endl;
 //            }
 //        }
 
-        std::cout << "dnu max: " << dnu.maxCoeff() << std::endl;
-        std::cout << "nu_ max: " << nu_.maxCoeff() << std::endl;
-
-        std::cout << "dz max: " << dz.maxCoeff() << std::endl;
-        std::cout << "primal max: " << primal_.maxCoeff() << std::endl;
+//        std::cout << "dnu max: " << dnu.maxCoeff() << std::endl;
+//        std::cout << "nu_ max: " << nu_.maxCoeff() << std::endl;
+//
+//        std::cout << "dz max: " << dz.maxCoeff() << std::endl;
+//        std::cout << "primal max: " << primal_.maxCoeff() << std::endl;
     }
 
     void ClarabelInterface::SetupDerivativeCalcs(mpc::vector_t& dx, mpc::vector_t& dy_l, mpc::vector_t& dy_u,
