@@ -66,7 +66,8 @@ void PrintContactSched(const std::vector<mpc::time_v>& contact_times) {
 void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt, const vector_t& init_state,
                           std::vector<Eigen::Vector3d> ee_locations, const std::string& robot_xml,
                           const vector_t& standing, const std::unique_ptr<simulator::SimulationRobot>& robot,
-                          const mpc::MPCInfo& info, double viz_rate, bool run_gait_opt, simulation::Visualizer viz) {
+                          const mpc::MPCInfo& info, double viz_rate, bool run_gait_opt, simulation::Visualizer viz,
+                          bool fixed_pos) {
     mpc.CreateInitialRun(init_state, ee_locations);
     mpc.PrintStats();
     mpc::Trajectory prev_traj = mpc.GetTrajectory();
@@ -81,6 +82,9 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
     const int N = 200;
     for (int i = 0; i < N; i++) {
         double time = i*info.integrator_dt;
+        if (fixed_pos) {
+            time = 0;
+        }
 
         // Get full state through IK
         state = mpc.GetFullTargetState(time, state);
@@ -100,14 +104,23 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
 
         // Gait optimization
         if (run_gait_opt) {
-            if (!(i % 10)) {
+            if (!(i % 19)) {        // At i = 10 we get primal infeasable. This also then happens to align with the period of the first trajectory.
                 prev_cost = RunGaitOpt(mpc, gait_opt, prev_traj, cost_red, time);
-//                PrintContactSched(mpc.GetTrajectory().GetContactTimes());
+                std::cout << "Time: " << time << std::endl;
+                PrintContactSched(mpc.GetTrajectory().GetContactTimes());
             }
         }
 
+        // TODO: Remove
+//        prev_cost = mpc.GetCost();
+
         // Run next MPC
-        prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
+        if (fixed_pos) {
+            prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(0), time, ee_locations, false);
+        } else {
+            prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
+        }
+        std::cout << "MPC iteration cost change: " << prev_cost - mpc.GetCost() << std::endl;
         cost_red = prev_cost - mpc.GetCost();
         total_cost += mpc.GetCost();
     }
@@ -257,12 +270,12 @@ int main() {
     robot->SetSimModel(viz.GetModel());
 
     // MPC w/ fixed position
-    MPCWithFixedPosition(mpc1, gait_optimizer1, init_state, ee_locations, config.ParseString("robot_xml"), standing,
-                         robot, info, config.ParseNumber<double>("viz_rate"), false, viz);
+//    MPCWithFixedPosition(mpc1, gait_optimizer1, init_state, ee_locations, config.ParseString("robot_xml"), standing,
+//                         robot, info, config.ParseNumber<double>("viz_rate"), false, viz, true);
 
 
     MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
-                         robot, info, config.ParseNumber<double>("viz_rate"), true, viz);
+                         robot, info, config.ParseNumber<double>("viz_rate"), true, viz, true);
 
     // MPC w/ fixed position + line search
 

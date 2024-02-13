@@ -177,10 +177,15 @@ namespace mpc {
 
         const double deltat = times_.at(upper_node).GetTime() - times_.at(lower_node).GetTime();
         const double time_spline = time - times_.at(lower_node).GetTime();
-        const vector_4t vars {spline.at(lower_node).GetVars()(0),         // x0
+        vector_4t vars {spline.at(lower_node).GetVars()(0),         // x0
                               spline.at(upper_node).GetVars()(0),         // x1
                               spline.at(lower_node).GetVars()(1),         // x0dot
                               spline.at(upper_node).GetVars()(1)};       // x1dot
+
+       if (type == Force) {
+           vars(2) *= FORCE_MULT; // TODO: Revert
+           vars(3) *= FORCE_MULT;
+       }
 
         const double a2 = -(1 / pow(deltat, 2)) * 3 * (vars(0) - vars(1)) -
                     (1 / deltat) * (2 * vars(2) + vars(3));
@@ -216,7 +221,7 @@ namespace mpc {
             if (spline.at(lower_node).GetType() == NoDeriv && spline.at(upper_node).GetType() == FullDeriv) {
                 vars_lin.resize(2);
                 vars_lin(0) = Getx1Coef(poly_time, deltat);
-                vars_lin(1) = Getx1dotCoef(poly_time, deltat);
+                vars_lin(1) = Getx1dotCoef(poly_time, deltat)*FORCE_MULT; // TODO: Revert
 
                 return vars_lin;
 
@@ -224,16 +229,16 @@ namespace mpc {
 
                 vars_lin.resize(2);
                 vars_lin(0) = Getx0Coef(poly_time, deltat);
-                vars_lin(1) = Getx0dotCoef(poly_time, deltat);
+                vars_lin(1) = Getx0dotCoef(poly_time, deltat)*FORCE_MULT; // TODO: Revert
 
                 return vars_lin;
             }
 
             vars_lin.resize(4);
             vars_lin(0) = Getx0Coef(poly_time, deltat);
-            vars_lin(1) = Getx0dotCoef(poly_time, deltat);
+            vars_lin(1) = Getx0dotCoef(poly_time, deltat)*FORCE_MULT; // TODO: Revert
             vars_lin(2) = Getx1Coef(poly_time, deltat);
-            vars_lin(3) = Getx1dotCoef(poly_time, deltat);
+            vars_lin(3) = Getx1dotCoef(poly_time, deltat)*FORCE_MULT; // TODO: Revert
 
             return vars_lin;
         } else {
@@ -512,18 +517,26 @@ namespace mpc {
         bool direct_dep = (node == lower_node || node == upper_node);
         bool wrt_lower = (node == lower_node);
 
-        if (direct_dep && wrt_lower) {
-            const double x0 = spline.at(lower_node).GetVars()(0);
-            const double x1 = spline.at(upper_node).GetVars()(0);
-            double x0dot = 0;
-            double x1dot = 0;
-            if (spline.at(lower_node).GetType() == FullDeriv) {
+        const double x0 = spline.at(lower_node).GetVars()(0);
+        const double x1 = spline.at(upper_node).GetVars()(0);
+        double x0dot = 0;
+        double x1dot = 0;
+        if (spline.at(lower_node).GetType() == FullDeriv) {
+            if (type == Force) {
+                x0dot = spline.at(lower_node).GetVars()(1)*FORCE_MULT;
+            } else {
                 x0dot = spline.at(lower_node).GetVars()(1);
             }
-            if (spline.at(upper_node).GetType() == FullDeriv) {
+        }
+        if (spline.at(upper_node).GetType() == FullDeriv) {
+            if (type == Force) {
+                x1dot = spline.at(upper_node).GetVars()(1)*FORCE_MULT;
+            } else {
                 x1dot = spline.at(upper_node).GetVars()(1);
             }
+        }
 
+        if (direct_dep && wrt_lower) {
             const double da2dt1 = -2*pow(deltat, -3)*(3*(x0 - x1) + deltat*(2*x0dot - x1dot)) -
                                   pow(deltat, -2)*(3*(x0 - x1) - (2*x0dot + x1dot));
             const double da3dt1 = 3*pow(deltat, -4)*(2*(x0 - x1) + deltat*(x0dot + x1dot)) +
@@ -538,17 +551,6 @@ namespace mpc {
         }
 
         if (direct_dep && !wrt_lower) {
-            const double x0 = spline.at(lower_node).GetVars()(0);
-            const double x1 = spline.at(upper_node).GetVars()(0);
-            double x0dot = 0;
-            double x1dot = 0;
-            if (spline.at(lower_node).GetType() == FullDeriv) {
-                x0dot = spline.at(lower_node).GetVars()(1);
-            }
-            if (spline.at(upper_node).GetType() == FullDeriv) {
-                x1dot = spline.at(upper_node).GetVars()(1);
-            }
-
             const double da2dt2 = 2*pow(deltat, -3)*(3*(x0 - x1) + deltat*(2*x0dot - x1dot)) -
                                   pow(deltat, -2)*(3*(x0 - x1) + (2*x0dot + x1dot));
             const double da3dt2 = -3*pow(deltat, -4)*(2*(x0 - x1) + deltat*(x0dot + x1dot)) +
@@ -559,17 +561,6 @@ namespace mpc {
 
         // Not a direct dependency
         if (node > upper_node && node <= GetUpperNodeIdx(Position, 0, time)) {
-            const double x0 = spline.at(lower_node).GetVars()(0);
-            const double x1 = spline.at(upper_node).GetVars()(0);
-            double x0dot = 0;
-            double x1dot = 0;
-            if (spline.at(lower_node).GetType() == FullDeriv) {
-                x0dot = spline.at(lower_node).GetVars()(1);
-            }
-            if (spline.at(upper_node).GetType() == FullDeriv) {
-                x1dot = spline.at(upper_node).GetVars()(1);
-            }
-
             const double da2dt2 = 2*pow(deltat, -3)*(3*(x0 - x1) + deltat*(2*x0dot - x1dot)) -
                                   pow(deltat, -2)*(3*(x0 - x1) + (2*x0dot + x1dot));
             const double da3dt2 = -3*pow(deltat, -4)*(2*(x0 - x1) + deltat*(x0dot + x1dot)) +
@@ -579,17 +570,6 @@ namespace mpc {
         }
 
         if (node < lower_node && node >= GetLowerNodeIdx(Position, 0, time)) {
-            const double x0 = spline.at(lower_node).GetVars()(0);
-            const double x1 = spline.at(upper_node).GetVars()(0);
-            double x0dot = 0;
-            double x1dot = 0;
-            if (spline.at(lower_node).GetType() == FullDeriv) {
-                x0dot = spline.at(lower_node).GetVars()(1);
-            }
-            if (spline.at(upper_node).GetType() == FullDeriv) {
-                x1dot = spline.at(upper_node).GetVars()(1);
-            }
-
             const double da2dt1 = -2*pow(deltat, -3)*(3*(x0 - x1) + deltat*(2*x0dot - x1dot)) -
                                   pow(deltat, -2)*(3*(x0 - x1) - (2*x0dot + x1dot));
             const double da3dt1 = 3*pow(deltat, -4)*(2*(x0 - x1) + deltat*(x0dot + x1dot)) +
@@ -640,11 +620,11 @@ namespace mpc {
                 if (wrt_lower) {
                     assert(vars_affecting == 2);
                     coef_partials(0) = Getx1CoefPartial(time_spline, deltat, wrt_lower);
-                    coef_partials(1) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower);
+                    coef_partials(1) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower)*FORCE_MULT;
                 } else {
                     assert(vars_affecting == 2);
                     coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower);
-                    coef_partials(1) = Getx0dotCoefPartial(time_spline, deltat, wrt_lower);
+                    coef_partials(1) = Getx0dotCoefPartial(time_spline, deltat, wrt_lower)*FORCE_MULT;
                 }
             } else {
                 // Checks that we are moving something above AND that we are within the next contact
@@ -653,16 +633,16 @@ namespace mpc {
                     if (spline.at(lower_node).GetType() == FullDeriv) {
                         assert(vars_affecting >= 2);
                         coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
-                        coef_partials(1) = Getx0dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
+                        coef_partials(1) = FORCE_MULT * Getx0dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
                         if (spline.at(upper_node).GetType() == FullDeriv) {
                             assert(vars_affecting == 4);
                             coef_partials(2) = Getx1CoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
-                            coef_partials(3) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
+                            coef_partials(3) = FORCE_MULT * Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
                         }
                     } else if (spline.at(upper_node).GetType() == FullDeriv) {
                         assert(vars_affecting == 2);
                         coef_partials(0) = Getx1CoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
-                        coef_partials(1) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
+                        coef_partials(1) = FORCE_MULT * Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
                     }
 
                 } else if (node < lower_node && node >= GetLowerNodeIdx(Position, 0, time)) {
@@ -670,16 +650,16 @@ namespace mpc {
                     if (spline.at(lower_node).GetType() == FullDeriv) {
                         assert(vars_affecting >= 2);
                         coef_partials(0) = Getx0CoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
-                        coef_partials(1) = Getx0dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
+                        coef_partials(1) = FORCE_MULT * Getx0dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
                         if (spline.at(upper_node).GetType() == FullDeriv) {
                             assert(vars_affecting == 4);
                             coef_partials(2) = Getx1CoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
-                            coef_partials(3) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
+                            coef_partials(3) = FORCE_MULT * Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
                         }
                     } else if (spline.at(upper_node).GetType() == FullDeriv) {
                         assert(vars_affecting == 2);
                         coef_partials(0) = Getx1CoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
-                        coef_partials(1) = Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
+                        coef_partials(1) = FORCE_MULT * Getx1dotCoefPartial(time_spline, deltat, wrt_lower)/static_cast<double>(num_force_polys_);
                     }
                 }
             }

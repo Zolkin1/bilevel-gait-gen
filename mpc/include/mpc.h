@@ -163,7 +163,13 @@ namespace mpc {
 
         void AddForceBoxConstraints();
 
+        void AddForceBoxConstraintPartials(utils::SparseMatrixBuilder& builder, int contact_idx,
+                                           int start_idx, int ee);
+
         void AddFrictionConeConstraints();
+
+        void AddFrictionConeConstraintPartials(utils::SparseMatrixBuilder& builder, int contact_idx,
+                                               int start_idx, int ee);
 
         virtual int GetForceSplineStartIdx() const = 0;
 
@@ -206,6 +212,8 @@ namespace mpc {
 
         int UpdateNumInputs();
 
+        void AddDiagonalCost();
+
         // ---------------- Member Variables ---------------- //
         // Centroidal model
         SingleRigidBodyModel model_;
@@ -239,6 +247,8 @@ namespace mpc {
         vector_t prev_qp_sol;
 
         double init_time_;
+
+        double force_weight_;
 
         // constants
         static int constexpr POS_VARS = 3;

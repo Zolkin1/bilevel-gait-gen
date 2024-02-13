@@ -63,9 +63,11 @@ namespace mpc {
         utils::Timer constraint_costs_timer("constraints and costs");
         constraint_costs_timer.StartTimer();
         // ----------------------- Costs ------------------------- //
+        AddForceCost(force_weight_);
         AddHessianApproxCost();
         AddGradientCost();
         AddFinalCost();
+        AddDiagonalCost();
 
 //        data_.cost_mat_.SetDiagonalMatrix(1, 0, 0, data_.num_decision_vars);
 
@@ -80,6 +82,16 @@ namespace mpc {
                     dynamics_timer.StopTimer();
                     break;
                 case Constraints::ForceBox:
+                    if (run_num_ == 20) {
+                        std::cout << "Dynamics constraints: " << data_.num_dynamics_constraints << std::endl;
+                        std::cout << "Force box constraints: " << data_.num_force_box_constraints_ << std::endl;
+                        std::cout << "Friction cone constraints: " << data_.num_cone_constraints_ << std::endl;
+                        std::cout << "EE location constraints: " << data_.num_ee_location_constraints_ << std::endl;
+                        std::cout << "Start EE constraints: " << data_.num_start_ee_constraints_ << std::endl;
+                        // No change in the negative direction (any amount), moving in the positive direction ANY amount gives the same change
+                        data_.constraint_mat_.SetDiagonalMatrix(1e-1, 82 + data_.num_dynamics_constraints, 284, 1);
+                        std::cout << "added slight modification" << std::endl;
+                    }
                     AddForceBoxConstraints();
                     break;
                 case Constraints::FrictionCone:
@@ -107,6 +119,9 @@ namespace mpc {
         // TODO: DMA
         const vector_t sol = qp_solver->Solve(data_);
         qp_solve_timer.StopTimer();
+
+//        std::cout << "friction cone constraint dual: " << qp_solver->GetDualSolution().transpose().segment(
+//                data_.num_dynamics_constraints + data_.num_force_box_constraints_, data_.num_cone_constraints_) << std::endl;
 
         if (qp_solver->GetSolveQuality() != SolvedInacc && qp_solver->GetSolveQuality() != Solved
             && qp_solver->GetSolveQuality() != MaxIter) {
@@ -717,7 +732,7 @@ namespace mpc {
                     }
                     eq_idx += data_.num_dynamics_constraints;
                 } else if (data_.constraints_.at(i) == JointForwardKinematics) {
-                    throw std::runtime_error("Joint Forward Kinematics not implemented with Carabela yet.");
+                    throw std::runtime_error("Joint Forward Kinematics not implemented with Carabel yet.");
 
                 } else if (data_.constraints_.at(i) == EndEffectorLocation) {
 
@@ -773,18 +788,22 @@ namespace mpc {
                     assert(idx == data_.num_start_ee_constraints_/num_ee_);
 
                     A_builder.SetMatrix(M, eq_idx, GetPosSplineStartIdx());
-
-                    partials.dG.setFromTriplets(G_builder.GetTriplet().begin(), G_builder.GetTriplet().end());
-                    partials.dA.setFromTriplets(A_builder.GetTriplet().begin(), A_builder.GetTriplet().end());
                 } else if (data_.constraints_.at(i) == ForceBox) {
+                    AddForceBoxConstraintPartials(G_builder, contact_time_idx, ineq_idx, ee);
                     ineq_idx += data_.num_force_box_constraints_;
                 } else if (data_.constraints_.at(i) == JointBox) {
-                    throw std::runtime_error("Joint box not implemented with Carabela yet.");
+                    throw std::runtime_error("Joint box not implemented with Clarabela yet.");
 
                 } else if (data_.constraints_.at(i) == FrictionCone) {
+                    // TODO: Note: when this is removed the derivatives are at least the right order of magnitude...
+//                    AddFrictionConeConstraintPartials(G_builder, contact_time_idx, ineq_idx, ee);
                     ineq_idx += data_.num_cone_constraints_;
+
                 }
             }
+
+            partials.dG.setFromTriplets(G_builder.GetTriplet().begin(), G_builder.GetTriplet().end());
+            partials.dA.setFromTriplets(A_builder.GetTriplet().begin(), A_builder.GetTriplet().end());
 
             return true;
         } else {

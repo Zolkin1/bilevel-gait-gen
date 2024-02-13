@@ -29,6 +29,7 @@ TEST_CASE("End Effector Splines", "[splines]") {
     splines.emplace_back(num_contacts, times, !start_constant, num_force_polys);
     splines.emplace_back(num_contacts, times, start_constant, num_force_polys);
 
+    constexpr double FORCE_MULT = 100;
 
     SECTION("Setting Vars") {
         for (auto& spline : splines) {
@@ -38,7 +39,7 @@ TEST_CASE("End Effector Splines", "[splines]") {
                 const std::vector<int> position_nodes = spline.GetMutableNodes(EndEffectorSplines::Position, coord);
                 for (auto& it: position_nodes) {
                     Eigen::Vector2d vars;
-                    vars << it, 2;
+                    vars << it, 2.0;
                     spline.SetVars(EndEffectorSplines::Position, coord, it, vars);
                     REQUIRE(spline.ValueAt(EndEffectorSplines::Position, coord, spline_times.at(it)) == it);
                 }
@@ -46,7 +47,7 @@ TEST_CASE("End Effector Splines", "[splines]") {
                 const std::vector<int> force_nodes = spline.GetMutableNodes(EndEffectorSplines::Force, coord);
                 for (auto& it: force_nodes) {
                     Eigen::Vector2d vars;
-                    vars << it, 2;
+                    vars << it, 2.0/FORCE_MULT;
                     spline.SetVars(EndEffectorSplines::Force, coord, it, vars);
                     REQUIRE(spline.ValueAt(EndEffectorSplines::Force, coord, spline_times.at(it)) == it);
                 }
@@ -95,7 +96,7 @@ TEST_CASE("End Effector Splines", "[splines]") {
             const std::vector<int> force_nodes = splines.at(0).GetMutableNodes(EndEffectorSplines::Force, coord);
             for (auto& it: force_nodes) {
                 Eigen::Vector2d vars;
-                vars << it, it - 1;
+                vars << it, (it - 1)/FORCE_MULT;
                 splines.at(0).SetVars(EndEffectorSplines::Force, coord, it, vars);
             }
             REQUIRE(splines.at(0).ValueAt(EndEffectorSplines::Force, coord, 0) == 0);
@@ -133,7 +134,7 @@ TEST_CASE("End Effector Splines", "[splines]") {
                 const std::vector<int> force_nodes = spline.GetMutableNodes(EndEffectorSplines::Force, coord);
                 for (auto& it: force_nodes) {
                     Eigen::Vector2d vars;
-                    vars << it, 1.4;
+                    vars << it, 1.4/FORCE_MULT;
                     spline.SetVars(EndEffectorSplines::Force, coord, it, vars);
                 }
 
@@ -170,7 +171,7 @@ TEST_CASE("End Effector Splines", "[splines]") {
                 const std::vector<int> force_nodes = spline.GetMutableNodes(EndEffectorSplines::Force, coord);
                 for (auto& it: force_nodes) {
                     Eigen::Vector2d vars;
-                    vars << it - 1, .75;
+                    vars << it - 1, .75/FORCE_MULT;
                     spline.SetVars(EndEffectorSplines::Force, coord, it, vars);
                 }
 
@@ -205,7 +206,7 @@ TEST_CASE("End Effector Splines", "[splines]") {
                 const std::vector<int> force_nodes = spline.GetMutableNodes(EndEffectorSplines::Force, coord);
                 for (auto& it: force_nodes) {
                     Eigen::Vector2d vars;
-                    vars << 2 * it - 1, .5;
+                    vars << 2 * it - 1, .5/FORCE_MULT;
                     spline.SetVars(EndEffectorSplines::Force, coord, it, vars);
                 }
 

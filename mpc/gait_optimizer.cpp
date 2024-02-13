@@ -39,7 +39,7 @@ namespace mpc {
 
         gamma_ = 0.5;
         eta_ = 0.75;
-        Delta_ = 0.005;
+        Delta_ = 1e-8; //0.0005;
 
         run_num_ = 0;
         past_decision_vars_ = 0;
@@ -97,12 +97,23 @@ namespace mpc {
 
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int idx = 0; idx < contact_times_.at(ee).size(); idx++) {
-                const QPPartials& param_partial = param_partials_.at(ee).at(idx);
+                QPPartials& param_partial = param_partials_.at(ee).at(idx);
 //                assert(!param_partial.dA.toDense().array().isNaN());
 
-//                std::cout << "max param partial dA: " << param_partial.dA.coeffs().maxCoeff() << std::endl;
+                if (param_partial.dA.size() == 0) {
+                    param_partial.dA.resize(qp_partials_.dA.rows(), qp_partials_.dA.cols());
+                    param_partial.dA.setZero();
+                }
 
-//                std::cout << "qp partial dA: \n" << qp_partials_.dA.toDense().topLeftCorner<48+24,48+24>() << std::endl;
+                if (param_partial.dG.size() == 0) {
+                    param_partial.dG.resize(qp_partials_.dG.rows(), qp_partials_.dG.cols());
+                    param_partial.dG.setZero();
+                }
+
+//                std::cout << "max param partial dA: " << param_partial.dA.toDense().maxCoeff() << std::endl;
+//                std::cout << "max param partial dG: " << param_partial.dG.toDense().maxCoeff() << std::endl;
+
+                //                std::cout << "qp partial dA: \n" << qp_partials_.dA.toDense().topLeftCorner<48+24,48+24>() << std::endl;
 
                 dldAth = qp_partials_.dA.cwiseProduct(param_partial.dA);
                 dldGth = qp_partials_.dG.cwiseProduct(param_partial.dG);
@@ -138,8 +149,24 @@ namespace mpc {
             }
         }
 
-//        std::cout << "max qp partial dA: " << qp_partials_.dA.coeffs().maxCoeff() << std::endl;
-//        std::cout << "gradient term: \n" << dHdth << std::endl;
+        std::cout << "max qp partial dA: " << qp_partials_.dA.coeffs().maxCoeff() << std::endl;
+        std::cout << "max qp partial dG: " << qp_partials_.dG.coeffs().maxCoeff() << std::endl;
+        double max = -1e10;
+        int max_row = -1;
+        int max_col = -1;
+        matrix_t dG = qp_partials_.dG.toDense();
+        for (int i = 0; i < qp_partials_.dG.rows(); i++) {
+            for (int j = 0; j < qp_partials_.dG.cols(); j++) {
+                if (dG(i,j) > max) {
+                    max = qp_partials_.dG.toDense()(i,j);
+                    max_row = i;
+                    max_col = j;
+                }
+            }
+        }
+
+        std::cout << "dG max coeff row, col: " << max_row << ", " << max_col << std::endl;
+        std::cout << "gradient term: " << dHdth.transpose() << std::endl;
 
 //        dHdth.normalize();
     }
@@ -160,10 +187,13 @@ namespace mpc {
             double rho = actual_red_cost / pred_red_cost_;
             std::cout << "rho: " << rho << std::endl;
             if (rho > eta_) {
-                IncreaseTrustRegion(rho);
+//                IncreaseTrustRegion(rho);
                 old_contact_times_ = contact_times_;
             } else {
-                DecreaseTrustRegion(step_);
+//                DecreaseTrustRegion(step_);
+
+// TODO: Put trust region changing back
+
 //                contact_times_ = old_contact_times_;
 //                num_decision_vars = GetNumTimeNodes(num_ee_);
 //                num_constraints = num_decision_vars + num_decision_vars + 3*num_ee_;
@@ -290,6 +320,22 @@ namespace mpc {
         //      is small enough we guaruntee to have some reduction.
 
         xk_ = xkp1_;
+
+        // TODO: Remove after finish debugging
+        int max_idx = -1;
+        double max = 1e10;
+        for (int i = 0; i < dHdth.size(); i++) {
+            if (dHdth(i) < max && (i%2) != 0) {
+                max = dHdth(i);
+                max_idx = i;
+            }
+        }
+
+        std::cout << "Max gradient occurs at: " << max_idx << " with value: " << dHdth(max_idx) << std::endl;
+        step_.setZero();
+        double step_len = 1e-3;
+        step_(max_idx) = step_len;
+
         xkp1_ = xk_ + step_;
 
         for (int ee = 0; ee < num_ee_; ee++) {
@@ -305,6 +351,8 @@ namespace mpc {
                 }
             }
         }
+
+        std::cout << "approx grad: " << actual_red_cost/step_len << std::endl;
 
         pred_red_cost_ = -dHdth.dot(step_) - 0.5*step_.transpose()*Bk_*step_;
 

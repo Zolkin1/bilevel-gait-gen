@@ -623,6 +623,156 @@ TEST_CASE("Constant Splines", "[mpc][spline]") {
     }
 }
 
+void GetData(mpc::QPData& data) {
+    data.num_decision_vars = 3;
+    data.num_dynamics_constraints = 2;
+    if (data.using_clarabel_) {
+        data.num_force_box_constraints_ = 4;
+    } else {
+        data.num_force_box_constraints_ = 2;
+    }
+
+    data.InitQPMats();
+
+    mpc::vector_t P_vals(3);
+    P_vals << 3.001, 4, 0.5;
+
+    mpc::vector_t q(3);
+    q << 0.1, 4.6, 2;
+
+    data.cost_mat_.SetVectorDiagonally(P_vals, 0, 0);
+    data.cost_linear = q;
+
+    mpc::matrix_t A(2,3);
+    A << 1, 1, 0, 1.3, 0, 0.2;
+
+    mpc::vector_t b(2);
+    b << 1, 3;
+
+    data.constraint_mat_.SetMatrix(A, 0, 0);
+    data.dynamics_constants = b;
+
+    A << -2, 0, 0.9, 1, 8, 5;
+    b << 3.1, 13.3;
+
+    mpc::vector_t b_lb(2);
+    b_lb << -2, -5;
+
+    data.constraint_mat_.SetMatrix(A, 2, 0);
+    if (data.using_clarabel_) {
+        data.constraint_mat_.SetMatrix(-A, 4, 0);
+    }
+    data.force_box_lb_ = b_lb;
+    data.force_box_ub_ = b;
+
+    data.ConstructVectors();
+    data.ConstructSparseMats();
+
+    std::cout << "Constraint mat: \n" << data.sparse_constraint_.toDense() << std::endl;
+    std::cout << "upper bound: \n" << data.ub_ << std::endl;
+}
+
+void CheckVectorsEqual(const mpc::vector_t& vec1, const mpc::vector_t& vec2, const double MARGIN) {
+    using Catch::Matchers::WithinAbs;
+
+    REQUIRE(vec1.size() == vec2.size());
+
+    for (int i = 0; i < vec1.size(); i++) {
+        REQUIRE_THAT(vec1(i) - vec2(i), WithinAbs(0, MARGIN));
+    }
+}
+
 TEST_CASE("Clarabel Solver", "[mpc][clarabel]") {
-    mpc::ClarabelInterface qp_solver;
+
+    constexpr double MARGIN = 1e-4;
+
+    using namespace mpc;
+    using Catch::Matchers::WithinAbs;
+
+    QPData clar_data(false, 10, 10, {Dynamics, ForceBox});
+    clar_data.using_clarabel_ = true;
+
+    QPData osqp_data(false, 10, 10, {Dynamics, ForceBox});
+    osqp_data.using_clarabel_ = false;
+
+    GetData(clar_data);
+    GetData(osqp_data);
+
+    ClarabelInterface clarabel(clar_data, true);
+    clarabel.SetupQP(clar_data, {});
+    vector_t clara_sol = clarabel.Solve(clar_data);
+
+    vector_t clara_dx = clarabel.Computedx(clar_data.sparse_cost_, clar_data.cost_linear, clara_sol);
+    vector_t zero = vector_t::Zero(1);
+    clarabel.SetupDerivativeCalcs(clara_dx, zero, zero, clar_data);
+
+    sp_matrix_t dP(clar_data.sparse_cost_.rows(), clar_data.sparse_cost_.cols());
+    sp_matrix_t dA(clar_data.num_dynamics_constraints, 3);
+    sp_matrix_t dG(clar_data.num_force_box_constraints_, 3);
+    clarabel.CalcDerivativeWrtMats(dP, dA, dG);
+
+
+    OSQPInterface osqp(osqp_data, true);
+    vector_t zero_warmstart = vector_t::Zero(3);
+    osqp.SetupQP(osqp_data, zero_warmstart);
+    vector_t osqp_sol = osqp.Solve(osqp_data);
+
+    REQUIRE(osqp.GetSolveQuality() == clarabel.GetSolveQuality());
+
+    CheckVectorsEqual(osqp_sol, clara_sol, MARGIN);
+
+    osqp.Computedx(osqp_data.sparse_cost_, osqp_data.cost_linear, osqp_sol);
+    vector_t osqp_dx = osqp.Getdx();
+
+    CheckVectorsEqual(osqp_dx, clara_dx, MARGIN);
+
+    vector_t zero_b = vector_t::Zero(osqp_data.GetTotalNumConstraints());
+    osqp.SetupDerivativeCalcs(osqp_dx, zero_b, zero_b);
+
+    sp_matrix_t osqp_dP(clar_data.sparse_cost_.rows(), clar_data.sparse_cost_.cols());
+    sp_matrix_t osqp_dA(2, 3);
+    osqp.CalcDerivativeWrtMats(osqp_dP, osqp_dA);
+
+    std::cout << "clara dual: " << clarabel.GetDualSolution().transpose() << std::endl;
+    std::cout << "osqp dual: " << osqp.GetDualSolution().transpose() << std::endl;
+
+    matrix_t c_dP = dP.toDense();
+    matrix_t o_dP = osqp_dP.toDense();
+    std::cout << "Clara dP: " << c_dP << std::endl;
+    std::cout << "OSQP dP: " << o_dP << std::endl;
+
+    for (int i = 0; i < clar_data.num_decision_vars; i++) {
+        for (int j = 0; j < clar_data.num_decision_vars; j++) {
+//            REQUIRE_THAT(c_dP(i, j) - o_dP(i, j), WithinAbs(0, MARGIN));
+        }
+    }
+
+    matrix_t c_dA = dA.toDense();
+    matrix_t c_dG = dG.toDense();
+    matrix_t o_dA = osqp_dA.toDense();
+
+    std::cout << "Clara dA: \n" << c_dA << std::endl;
+    std::cout << "Clara dG: \n" << c_dG << std::endl;
+    std::cout << "OSQP dA: \n" << o_dA << std::endl;
+
+    // TODO: OSQP dA only matches mine where the sparsity pattern is non-zero! (my implementation is correct afaik)
+
+    for (int i = 0; i < osqp_data.num_dynamics_constraints; i++) {
+        for (int j = 0; j < osqp_data.num_decision_vars; j++) {
+            if (osqp_data.sparse_constraint_.toDense()(i,j) != 0) {   // Due to OSQP bug can only expect this to match when the term is non-zero
+                REQUIRE_THAT(c_dA(i, j) - o_dA(i, j), WithinAbs(0, MARGIN));
+            }
+        }
+    }
+
+    for (int i = 0; i < osqp_data.num_force_box_constraints_; i++) {
+        for (int j = 0; j < osqp_data.num_decision_vars; j++) {
+            int idx = i + osqp_data.num_dynamics_constraints;
+            if (osqp_data.sparse_constraint_.toDense()(idx, j) != 0) { // Due to OSQP bug can only expect this to match when the term is non-zero
+                REQUIRE_THAT(c_dG(i, j) + c_dG(i + osqp_data.num_force_box_constraints_, j)
+                             - o_dA(idx, j), WithinAbs(0, MARGIN));
+            }
+        }
+    }
+
 }

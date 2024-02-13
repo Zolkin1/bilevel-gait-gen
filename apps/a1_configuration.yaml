@@ -80,7 +80,7 @@ torque_bounds: [100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100]
-friction_coef: 0.3
+friction_coef: 0.3 #0.3
 
 # TODO: Tune
 base_pos_gains: [0, 0]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
@@ -124,7 +124,7 @@ joint_bounds_ub: [0.802851, 4.18879, -0.916298,
 #   0.802851, 4.18879, -0.916298]
 
 num_switches: 2
-force_bound: 200 #300
+force_bound: 200 #200
 
 swing_height: 0.1
 
@@ -142,7 +142,9 @@ run_time_iterations: 6000 # 150 works well
 
 foot_offset: 0.02
 
-force_cost: 0.001 # Note: without this cost, the problem is much more poorly conditioned
+force_cost: 0.0 # Note: without this cost, the problem is much more poorly
+                  # conditioned and can return infeasible, also the derivative computations are much worse
+                  # without this force cost, the QP cost is almost constant in steady state.
 
 Q_diag: [1, 1, 1,          # linear momentum
          1, 1, 1,           # angular momentum
@@ -153,7 +155,8 @@ Q_diag: [1, 1, 1,          # linear momentum
          60000, 500, 10,       # RL leg
          60000, 500, 10]       # RR leg
 
-Q_srbd_diag: [0, 0, 500, .1, .1, 0, 3000, 3000, 3000, 0, 0, 0]  # Convergence seems to be better when the z tracking is high
+#Q_srbd_diag: [0, 0, 5, .1, .1, 0, 3, 3, 3, 0, 0, 0]
+Q_srbd_diag: [0, 0, 5000, .1, .1, 0, 3000, 3000, 3000, 0, 0, 0]  # Convergence seems to be better when the z tracking is high
 
 #  [300, 300, 7500,   # COM position
 #              1, 1, 1,          # linear momentum

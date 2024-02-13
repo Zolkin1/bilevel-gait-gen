@@ -66,7 +66,8 @@ namespace mpc {
 
         void CalcDerivativeWrtVecs(vector_t& dq, vector_t& db, vector_t& dh);
 
-        vector_t Computedx(const Eigen::SparseMatrix<double>& P, const vector_t& q, const vector_t& xstar);
+        vector_t Computedx(const Eigen::SparseMatrix<double>& P, const vector_t& q,
+                           const vector_t& xstar);
 
         vector_t Getdx() const;
 

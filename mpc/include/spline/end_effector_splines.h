@@ -136,6 +136,8 @@ namespace mpc {
         std::vector<NodeType> z_position_type_pattern_;
         std::vector<TimeType> time_type_pattern_;
         static constexpr int POS_VARS = 3;
+
+        static constexpr double FORCE_MULT = 100; // 100 seems to work best (?)
     };
 } // mpc
 

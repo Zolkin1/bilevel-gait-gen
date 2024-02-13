@@ -22,7 +22,8 @@ namespace mpc {
                   {Constraints::Dynamics,
                    Constraints::ForceBox,
                    Constraints::FrictionCone,
-                   Constraints::EndEffectorLocation}),
+                   Constraints::EndEffectorLocation
+                  }),
             num_tangent_states_(MOMENTUM_OFFSET + FLOATING_VEL_OFFSET),
             num_manifold_states_(MOMENTUM_OFFSET + FLOATING_BASE_OFFSET) {
         // Populate Ir
@@ -511,16 +512,24 @@ namespace mpc {
             }
         }
 
+        // TODO: Do this more efficiently
+//        matrix_t A, B;
+//        vector_t C, C2;
+//        GetLinearDynamics(state, traj.GetState(0), traj, 0.02, time, A, B, C, C2);  // TODO: Make the dt not hard coded!
+
         // dC
+        tan_state_t tan_state = ConvertManifoldStateToTangentState(state, traj.GetState(0));
+        dC.noalias() = -dA*tan_state - dB*traj.SplinesAsVec();
+
         // Linear momentum depends on the force
-        dC.segment<POS_VARS>(LIN_MOM_START) = force_partial;
+        dC.segment<POS_VARS>(LIN_MOM_START) += force_partial;
 
         // Angular momentum depends on force and position
-        for (int coord = 0; coord < POS_VARS; coord++) {
+//        for (int coord = 0; coord < POS_VARS; coord++) {
             // position and force
-            dC.segment<POS_VARS>(ANG_VEL_START).noalias() +=
-                        ee_pos_wrt_com.cross(force_partial) + position_partial.cross(force);
-        }
+        dC.segment<POS_VARS>(ANG_VEL_START).noalias() +=
+                    ee_pos_wrt_com.cross(force_partial) + position_partial.cross(force);
+//        }
     }
 
 //    vector_t SingleRigidBodyModel::VelocityInverseKinematics(const vector_t& config,

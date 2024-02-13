@@ -105,6 +105,8 @@ namespace mpc {
 
         vector_t SplinesAsVec() const;
 
+        vector_t SplinePartialsAsVec(int contact_idx) const;
+
         int GetNode(double time) const;
 
         controller::Contact GetDesiredContacts(double time) const;

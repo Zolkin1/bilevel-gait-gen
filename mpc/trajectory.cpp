@@ -444,6 +444,31 @@ namespace mpc {
         return qp_vec;
     }
 
+    vector_t Trajectory::SplinePartialsAsVec(int contact_idx) const {
+        vector_t qp_vec = vector_t::Zero(GetTotalForceSplineVars() + GetTotalPosSplineVars());
+
+        int force_idx = 0;
+        int pos_idx = GetTotalForceSplineVars();
+        for (int ee = 0; ee < ee_splines_.size(); ee++) {
+            for (int node = 0; node < states_.size(); node++) {
+                const double time = GetTime(node);
+
+                qp_vec.segment(force_idx, POS_VARS) =
+                        GetForcePartialWrtContactTime(ee, time, contact_idx);
+
+                qp_vec.segment(pos_idx, 2) =
+                        GetPositionPartialWrtContactTime(ee, time, contact_idx).head<2>();
+
+                force_idx += POS_VARS;
+                pos_idx += 2;
+            }
+        }
+
+        assert(force_idx == GetTotalForceSplineVars());
+        assert(pos_idx == GetTotalForceSplineVars() + GetTotalPosSplineVars());
+        return qp_vec;
+    }
+
     int Trajectory::GetNode(double time) const {
         return std::ceil((time - init_time_)/node_dt_);
     }

@@ -13,7 +13,7 @@ namespace utils {
         triplet_.reserve(num_nz);
     }
 
-    void SparseMatrixBuilder::SetDiagonalMatrix(int val, int row_start, int col_start, int num_diag) {
+    void SparseMatrixBuilder::SetDiagonalMatrix(double val, int row_start, int col_start, int num_diag) {
         for (int i = 0; i < num_diag; i++) {
             triplet_.push_back(triplet_t( row_start + i, col_start + i,val));
         }

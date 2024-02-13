@@ -18,7 +18,7 @@ namespace utils {
 
         void Reserve(int num_nz);
 
-        void SetDiagonalMatrix(int val, int row_start, int col_start, int num_diag);
+        void SetDiagonalMatrix(double val, int row_start, int col_start, int num_diag);
 
         void SetMatrix(const matrix_t& M, int row_start, int col_start);
 

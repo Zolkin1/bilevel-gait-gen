@@ -180,13 +180,33 @@ namespace mpc {
                 idx += 4;
             }
         }
-//        Eigen::SparseMatrix<double> temp;
-//        assert(idx == data_.num_cone_constraints_);
-//        temp.resize(data_.GetTotalNumConstraints(), data_.num_decision_vars);
-//        temp.setFromTriplets(data_.constraint_mat_.GetTriplet().begin(), data_.constraint_mat_.GetTriplet().end());
-//        std::cout << temp.toDense().middleRows(constraint_idx_, data_.num_cone_constraints_) << std::endl;
 
         constraint_idx_ += idx;
+    }
+
+    void MPC::AddFrictionConeConstraintPartials(utils::SparseMatrixBuilder& builder, int contact_idx,
+                                                int start_idx, int ee) {
+        int force_offset = GetForceSplineStartIdx();
+        int idx = 0;
+        for (int node = 0; node < info_.num_nodes+1; node++) {
+            double time = GetTime(node);
+            for (int coord = 0; coord < POS_VARS; coord++) {
+                if (prev_traj_.IsForceMutable(ee, time)) {
+                    vector_t vars_coef = prev_traj_.GetForceCoefPartialsWrtContactTime( ee, coord, time, contact_idx);
+
+                    int vars_index, vars_affecting;
+                    std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee,time,coord);
+
+                    for (int fric_con = 0; fric_con < 4; fric_con++) {
+                        // All the friction constraints are effected by all 3 coordinates of the end effectors
+                        builder.SetMatrix(friction_pyramid_(fric_con, coord) * vars_coef.transpose(),
+                                                        start_idx + idx + fric_con,
+                                                        force_offset + vars_index);
+                    }
+                }
+            }
+            idx += 4;
+        }
     }
 
     void MPC::AddForceBoxConstraints() {
@@ -230,6 +250,41 @@ namespace mpc {
         constraint_idx_ += row_idx;
     }
 
+    void MPC::AddForceBoxConstraintPartials(utils::SparseMatrixBuilder& builder, int contact_idx,
+                                            int start_idx, int ee) {
+        int force_idx = GetForceSplineStartIdx();
+        int row_idx = 0;
+        int extra_runs = 1;
+        if (using_clarabel_) {
+            extra_runs = 2;
+        }
+        for (int i = 0; i < extra_runs; i++) {
+            for (int node = 0; node < info_.num_nodes + 1; node++) {
+                double time = GetTime(node);
+                const int coord = 2;
+                if (prev_traj_.IsForceMutable(ee, time)) {
+                    int vars_index, vars_affecting;
+                    std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
+                    vector_t vars_partials = prev_traj_.GetForceCoefPartialsWrtContactTime(ee, coord, time,
+                                                                                           contact_idx);
+
+                    if (i == 0) {
+                        builder.SetMatrix(vars_partials.transpose(),
+                                          start_idx + row_idx,
+                                          force_idx + vars_index);
+                    } else {
+                        builder.SetMatrix(-vars_partials.transpose(),
+                                          start_idx + row_idx,
+                                          force_idx + vars_index);
+                    }
+
+                    row_idx++;
+                }
+
+            }
+        }
+    }
+
     void MPC::AddQuadraticTrackingCost(const vector_t& state_des, const matrix_t& Q) {
         if (Q.rows() != num_states_ || Q.cols() != num_states_) {
             throw std::runtime_error("Supplied quadratic cost term is the wrong size.");
@@ -247,6 +302,8 @@ namespace mpc {
         if (Q_forces_.size() > 0) {
             data_.cost_mat_.SetMatrix(Q_forces_, GetForceSplineStartIdx(), GetForceSplineStartIdx());
         }
+
+//        data_.cost_mat_.SetDiagonalMatrix(10, GetPosSplineStartIdx(), GetPosSplineStartIdx(), prev_traj_.GetTotalPosSplineVars());
     }
 
     void MPC::AddGradientCost() {
@@ -307,12 +364,14 @@ namespace mpc {
             case Trot: {
                 std::vector<std::vector<double>> times(num_ee_);
 
+                // TODO: Make this a yaml configuration
                 for (int ee = 0; ee < num_ee_; ee++) {
                     times.at(ee).push_back(0);
                     times.at(ee).push_back(0.2);
-                    times.at(ee).push_back(0.4);
-                    times.at(ee).push_back(0.6);
-                    times.at(ee).push_back(0.8);
+//                    times.at(ee).push_back(0.4);
+//                    times.at(ee).push_back(0.6);
+//                    times.at(ee).push_back(0.8);
+//                    times.at(ee).push_back(1);
                 }
 
 //                prev_traj_.UpdateContactTimes(times);
@@ -461,6 +520,7 @@ namespace mpc {
 
     // TODO: Make this weight only on force values, so we don't hit the derivatives
     void MPC::AddForceCost(double weight) {
+        force_weight_ = weight;
         const int num_forces = prev_traj_.GetTotalForceSplineVars();
         Q_forces_.resize(num_forces, num_forces);
         Q_forces_.setZero();        // TODO: Note. Without this my performance was totally shot and occasional errors
@@ -647,6 +707,11 @@ namespace mpc {
     void MPC::UpdateContactTimes(const std::vector<time_v>& contact_times) {
         prev_traj_.UpdateContactTimes(contact_times);
         contact_sched_change_.push_back(run_num_);
+    }
+
+    void MPC::AddDiagonalCost() {
+        // Adds a positive small cost to every value so that Q is PD
+        data_.cost_mat_.SetDiagonalMatrix(1e-2,0,0,data_.num_decision_vars);
     }
 
 } // mpc
