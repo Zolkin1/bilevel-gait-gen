@@ -537,50 +537,96 @@ namespace mpc {
         }
 
         if (direct_dep && wrt_lower) {
-            const double da2dt1 = -2*pow(deltat, -3)*(3*(x0 - x1) + deltat*(2*x0dot - x1dot)) -
-                                  pow(deltat, -2)*(3*(x0 - x1) - (2*x0dot + x1dot));
-            const double da3dt1 = 3*pow(deltat, -4)*(2*(x0 - x1) + deltat*(x0dot + x1dot)) +
-                                  pow(deltat, -3)*(2*(x0 - x1) - (x0dot + x1dot));
+            double dDTdth = -1.0;
+
+            if (type == Force) {
+                dDTdth = -1.0/static_cast<double>(num_force_polys_);
+            }
+
+            const double da2dt1 = 6*pow(deltat, -3)*(x0 - x1)*dDTdth + (2*x0dot + x1dot)*pow(deltat, -2)*dDTdth;
+
+            const double da3dt1 = -6*pow(deltat, -4)*(x0 - x1)*dDTdth - 2*pow(deltat, -3)*(x0dot + x1dot)*dDTdth;
+//                    3*pow(deltat, -4)*(2*(x0 - x1) + deltat*(x0dot + x1dot)) +
+//                                  pow(deltat, -3)*(2*(x0 - x1) - (x0dot + x1dot));
 
             const double a2 = -pow(deltat, -2)*(3*(x0 - x1) + deltat*(2*x0dot + x1dot));
 
             const double a3 = pow(deltat, -3)*(2*(x0 - x1) + deltat*(x0dot + x1dot));
 
-            return da2dt1*pow(time_spline,2) + da3dt1* pow(time_spline, 3) - x0dot
-                        -a2*2*time_spline - a3*3*pow(time_spline, 2);
+            // TODO: time = t2-t1. Missing the partial term of t2 wrt the contact time
+            // TODO: (for an internal node this is re-scaled when time is scaled)
+
+            return da2dt1 * pow(time_spline, 2) + da3dt1 * pow(time_spline, 3) - x0dot
+                   - a2 * 2 * time_spline - a3 * 3 * pow(time_spline, 2);
         }
 
         if (direct_dep && !wrt_lower) {
-            const double da2dt2 = 2*pow(deltat, -3)*(3*(x0 - x1) + deltat*(2*x0dot - x1dot)) -
-                                  pow(deltat, -2)*(3*(x0 - x1) + (2*x0dot + x1dot));
-            const double da3dt2 = -3*pow(deltat, -4)*(2*(x0 - x1) + deltat*(x0dot + x1dot)) +
-                                  pow(deltat, -3)*(2*(x0 - x1) + (x0dot + x1dot));
+            double dDTdth = 1.0;
+            double dtdth = 0.0;
 
-            return da2dt2*pow(time_spline,2) + da3dt2* pow(time_spline, 3);
+            if (type == Force) {
+                dDTdth = 1.0/static_cast<double>(num_force_polys_);
+                dtdth = -static_cast<double>(num_force_polys_-1)/static_cast<double>(num_force_polys_);
+            }
+
+            const double da2dt2 = 6*pow(deltat, -3)*(x0 - x1)*dDTdth + (2*x0dot + x1dot)*pow(deltat, -2)*dDTdth;
+            const double da3dt2 = -6*pow(deltat, -4)*(x0 - x1)*dDTdth - 2*pow(deltat, -3)*(x0dot + x1dot)*dDTdth;
+
+            const double a2 = -pow(deltat, -2)*(3*(x0 - x1) + deltat*(2*x0dot + x1dot));
+            const double a3 = pow(deltat, -3)*(2*(x0 - x1) + deltat*(x0dot + x1dot));
+
+            return da2dt2 * pow(time_spline, 2) + da3dt2 * pow(time_spline, 3)
+                    + (x0dot + a2*2*time_spline + a3*3*pow(time_spline, 2))*dtdth;
         }
 
         // Not a direct dependency
         if (node > upper_node && node <= GetUpperNodeIdx(Position, 0, time)) {
-            const double da2dt2 = 2*pow(deltat, -3)*(3*(x0 - x1) + deltat*(2*x0dot - x1dot)) -
-                                  pow(deltat, -2)*(3*(x0 - x1) + (2*x0dot + x1dot));
-            const double da3dt2 = -3*pow(deltat, -4)*(2*(x0 - x1) + deltat*(x0dot + x1dot)) +
-                                  pow(deltat, -3)*(2*(x0 - x1) + (x0dot + x1dot));
+            assert(type == Force);
+            const double dDTdth = 1.0/static_cast<double>(num_force_polys_);
 
-            return (da2dt2*pow(time_spline,2) + da3dt2* pow(time_spline, 3))/static_cast<double>(num_force_polys_);
+            SplineNode force_node = forces_.at(coord).at(lower_node);
+            int node_idx = lower_node;
+            int j = 0;
+            while (force_node.GetType() == FullDeriv) {
+                j++;
+                node_idx--;
+                force_node = forces_.at(coord).at(node_idx);
+            }
+            const double dtdth = -static_cast<double>(j)/static_cast<double>(num_force_polys_);
+
+            const double da2dt2 = 6*pow(deltat, -3)*(x0 - x1)*dDTdth + (2*x0dot + x1dot)*pow(deltat, -2)*dDTdth;
+            const double da3dt2 = -6*pow(deltat, -4)*(x0 - x1)*dDTdth - 2*pow(deltat, -3)*(x0dot + x1dot)*dDTdth;
+
+            const double a2 = -pow(deltat, -2)*(3*(x0 - x1) + deltat*(2*x0dot + x1dot));
+            const double a3 = pow(deltat, -3)*(2*(x0 - x1) + deltat*(x0dot + x1dot));
+
+            return da2dt2*pow(time_spline,2) + da3dt2* pow(time_spline, 3)
+                   + (x0dot + a2*2*time_spline + a3*3*pow(time_spline, 2))*dtdth;
         }
 
         if (node < lower_node && node >= GetLowerNodeIdx(Position, 0, time)) {
-            const double da2dt1 = -2*pow(deltat, -3)*(3*(x0 - x1) + deltat*(2*x0dot - x1dot)) -
-                                  pow(deltat, -2)*(3*(x0 - x1) - (2*x0dot + x1dot));
-            const double da3dt1 = 3*pow(deltat, -4)*(2*(x0 - x1) + deltat*(x0dot + x1dot)) +
-                                  pow(deltat, -3)*(2*(x0 - x1) - (x0dot + x1dot));
+            assert(type == Force);
+            const double dDTdth = -1.0/static_cast<double>(num_force_polys_);
+
+            SplineNode force_node = forces_.at(coord).at(lower_node);
+            int node_idx = lower_node;
+            int j = 0;
+            while (force_node.GetType() == FullDeriv) {
+                j++;
+                node_idx--;
+                force_node = forces_.at(coord).at(node_idx);
+            }
+
+            const double dtdth = -(static_cast<double>(-j)/static_cast<double>(num_force_polys_) + 1.0);
+
+            const double da2dt1 = 6*pow(deltat, -3)*(x0 - x1)*dDTdth + (2*x0dot + x1dot)*pow(deltat, -2)*dDTdth;
+            const double da3dt1 = -6*pow(deltat, -4)*(x0 - x1)*dDTdth - 2*pow(deltat, -3)*(x0dot + x1dot)*dDTdth;
 
             const double a2 = -pow(deltat, -2)*(3*(x0 - x1) + deltat*(2*x0dot + x1dot));
-
             const double a3 = pow(deltat, -3)*(2*(x0 - x1) + deltat*(x0dot + x1dot));
 
-            return (da2dt1*pow(time_spline,2) + da3dt1* pow(time_spline, 3) - x0dot
-                   -a2*2*time_spline - a3*3*pow(time_spline, 2))/static_cast<double>(num_force_polys_);
+            return da2dt1*pow(time_spline,2) + da3dt1* pow(time_spline, 3)
+                    + (x0dot + a2*2*time_spline + a3*3*pow(time_spline, 2))*dtdth;
         }
 
         return 0;

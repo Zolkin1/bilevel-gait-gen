@@ -142,7 +142,7 @@ run_time_iterations: 6000 # 150 works well
 
 foot_offset: 0.02
 
-force_cost: 0.001 # Note: without this cost, the problem is much more poorly
+force_cost: 0.0001 # Note: without this cost, the problem is much more poorly
                   # conditioned and can return infeasible, also the derivative computations are much worse
                   # without this force cost, the QP cost is almost constant in steady state.
 
