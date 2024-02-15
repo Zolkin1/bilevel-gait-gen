@@ -67,7 +67,7 @@ namespace mpc {
         // ------------------ Setters ------------------ //
         void SetVars(SplineType type, int coord, int node_idx, const vector_2t& vars);
 
-        void SetContactTimes(const time_v& contact_times);
+        void SetContactTimes(time_v& contact_times);
 
         // ------------------ Getters ------------------ //
         NodeType GetNodeType(SplineType type, int coord, int node_idx) const;

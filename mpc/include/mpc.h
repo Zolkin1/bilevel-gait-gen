@@ -145,7 +145,7 @@ namespace mpc {
 
         virtual std::vector<std::vector<Eigen::Vector3d>> CreateVizData() = 0;
 
-        void UpdateContactTimes(const std::vector<time_v>& contact_times);
+        void UpdateContactTimes(std::vector<time_v>& contact_times);
 
     protected:
         // ---------------- Protected Member Functions ---------------- //

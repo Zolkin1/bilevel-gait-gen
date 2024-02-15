@@ -731,9 +731,17 @@ namespace mpc {
 
     }
 
-    void EndEffectorSplines::SetContactTimes(const time_v& contact_times) {
+    void EndEffectorSplines::SetContactTimes(time_v& contact_times) {
 
         assert(contact_times.size() == GetNumContacts()); // TODO: Check this
+
+        for (int i = 0; i < contact_times.size(); i++) {
+            if (contact_times.at(i).GetTime() < 0 && std::abs(contact_times.at(i).GetTime()) < 1e-3) {
+                contact_times.at(i).SetTime(0);
+            } else if (contact_times.at(i).GetTime() < 0) {
+                throw std::runtime_error("Invalid time: negative");
+            }
+        }
 
         const int num_nodes_start = GetNumNodes();
         int contact_idx = 0;

@@ -522,7 +522,7 @@ namespace mpc {
                                                                       coord, time, contact_idx);
     }
 
-    void Trajectory::UpdateContactTimes(const std::vector<time_v>& contact_times) {
+    void Trajectory::UpdateContactTimes(std::vector<time_v>& contact_times) {
         for (int ee = 0; ee < ee_splines_.size(); ee++) {
             ee_splines_.at(ee).SetContactTimes(contact_times.at(ee));
         }

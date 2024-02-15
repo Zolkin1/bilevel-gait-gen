@@ -80,3 +80,8 @@ set_property(TARGET clarabel PROPERTY
         IMPORTED_LOCATION "/home/zolkin/Repos/Clarabel.cpp/rust_wrapper/target/release/libclarabel_c.so")
 target_include_directories(mpc PUBLIC "/home/zolkin/Repos/Clarabel.cpp/include")
 target_link_libraries(mpc PUBLIC clarabel)
+
+#lsqr
+message(STATUS "CMAKE_MODULE_PATH: ${CMAKE_MODULE_PATH}")
+find_package(lsqr-cpp REQUIRED)
+target_link_libraries(mpc PUBLIC lsqr-cpp::lsqr-cpp)

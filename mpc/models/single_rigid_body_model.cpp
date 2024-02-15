@@ -21,8 +21,8 @@ namespace mpc {
             Model(robot_urdf, frames, discretization_steps, dt, false,
                   {Constraints::Dynamics,
                    Constraints::ForceBox,
-                   Constraints::FrictionCone,
-                   Constraints::EndEffectorLocation
+                   Constraints::EndEffectorLocation,
+                   Constraints::FrictionCone
                   }),
             num_tangent_states_(MOMENTUM_OFFSET + FLOATING_VEL_OFFSET),
             num_manifold_states_(MOMENTUM_OFFSET + FLOATING_BASE_OFFSET) {

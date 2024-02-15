@@ -82,7 +82,7 @@ namespace mpc {
                     dynamics_timer.StopTimer();
                     break;
                 case Constraints::ForceBox:
-                    if (run_num_ == 20) {
+                    if (run_num_ == -1) {
                         std::cout << "Dynamics constraints: " << data_.num_dynamics_constraints << std::endl;
                         std::cout << "Force box constraints: " << data_.num_force_box_constraints_ << std::endl;
                         std::cout << "Friction cone constraints: " << data_.num_cone_constraints_ << std::endl;
@@ -512,6 +512,7 @@ namespace mpc {
         data_.constraint_mat_.SetMatrix(M, constraint_idx_, GetPosSplineStartIdx());
 
         assert(idx == data_.start_ee_constants_.size());
+        constraint_idx_ += idx;
     }
 
     vector_t MPCSingleRigidBody::GetFullTargetState(double time, const vector_t& prev_state) {
@@ -692,7 +693,7 @@ namespace mpc {
             partials.dA.resize(data_.num_equality_, data_.num_decision_vars);
             partials.dG.resize(data_.num_inequality_, data_.num_decision_vars);
             partials.db.resize(data_.num_equality_);
-            partials.dh.resize(data_.num_inequality_);
+            partials.dh.resize(data_.num_inequality_); //- data_.num_cone_constraints_);
 
             partials.SetZero();
 
@@ -788,6 +789,8 @@ namespace mpc {
                     assert(idx == data_.num_start_ee_constraints_/num_ee_);
 
                     A_builder.SetMatrix(M, eq_idx, GetPosSplineStartIdx());
+                    eq_idx += data_.num_start_ee_constraints_;
+                    ineq_idx += data_.num_ee_location_constraints_;
                 } else if (data_.constraints_.at(i) == ForceBox) {
                     AddForceBoxConstraintPartials(G_builder, contact_time_idx, ineq_idx, ee);
                     ineq_idx += data_.num_force_box_constraints_;

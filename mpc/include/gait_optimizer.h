@@ -91,7 +91,7 @@ namespace mpc {
         /**
          * @return the current computed contact times
          */
-        std::vector<time_v> GetContactTimes();
+        std::vector<time_v>& GetContactTimes();
 
         void SetNumContactTimes(int ee, int num_times);
 

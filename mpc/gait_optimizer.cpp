@@ -28,10 +28,10 @@ namespace mpc {
         qp_solver_.settings()->setPolish(true);
         qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
         qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
-        qp_solver_.settings()->setAbsoluteTolerance(1e-5);
-        qp_solver_.settings()->setRelativeTolerance(1e-5);
+        qp_solver_.settings()->setAbsoluteTolerance(1e-10);
+        qp_solver_.settings()->setRelativeTolerance(1e-10);
         qp_solver_.settings()->setScaledTerimination(false);
-        qp_solver_.settings()->setMaxIteration(1000);
+        qp_solver_.settings()->setMaxIteration(2000);
         qp_solver_.settings()->setRho(.01);
         qp_solver_.settings()->setWarmStart(true);
         qp_solver_.settings()->setScaling(10);
@@ -39,7 +39,7 @@ namespace mpc {
 
         gamma_ = 0.5;
         eta_ = 0.75;
-        Delta_ = 0.1; //0.0005;
+        Delta_ = 1e-3; // 1e-5 seems consisten //0.0005; 0.011 works to keep standing still with a dt of 0.1
 
         run_num_ = 0;
         past_decision_vars_ = 0;
@@ -373,7 +373,7 @@ namespace mpc {
         run_num_++;
     }
 
-    std::vector<time_v> GaitOptimizer::GetContactTimes() {
+    std::vector<time_v>& GaitOptimizer::GetContactTimes() {
         return contact_times_;
     }
 

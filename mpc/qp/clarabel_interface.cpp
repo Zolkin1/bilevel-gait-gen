@@ -7,6 +7,8 @@
 #include <Eigen/SparseLU>
 #include<Eigen/IterativeLinearSolvers>
 
+#include "lsqr-cpp/lsqr.h"
+
 #include "qp/clarabel_interface.h"
 
 namespace mpc {
@@ -165,16 +167,18 @@ namespace mpc {
     void ClarabelInterface::CalcDerivativeWrtVecs(vector_t& dq, vector_t& db, vector_t& dh) {
         dq = d_.head(primal_.size());
 
-        dh.noalias() = lam_.asDiagonal()*-1*d_.segment(primal_.size(), num_inequality_constraints_);
+        dh.noalias() = lam_.asDiagonal()*-1*d_.segment(primal_.size(), num_inequality_constraints_ - 0);
 
         db = -d_.tail(num_equality_constraints_);
     }
 
     void ClarabelInterface::CalcDerivativeWrtMats(sp_matrix_t& dP, sp_matrix_t& dA, sp_matrix_t& dG) {
 
+        const int num_cone_constraints = 0;
+
         const vector_t& dz = d_.head(primal_.size());
         const vector_t& dnu = d_.tail(num_equality_constraints_);
-        const vector_t& dlam = d_.segment(primal_.size(), num_inequality_constraints_);
+        const vector_t& dlam = d_.segment(primal_.size(), num_inequality_constraints_ - num_cone_constraints);
 
         dP.resize(primal_.size(), primal_.size());
         dA.resize(nu_.size(), primal_.size());
@@ -209,19 +213,19 @@ namespace mpc {
 //            }
 //        }
 
-//        std::cout << "lam_ max: " << lam_.maxCoeff() << ", note: large value represents high sensitivity" << std::endl;
-//        std::cout << "dlam max: " << dlam.maxCoeff() << std::endl;
+        std::cout << "lam_ max: " << lam_.maxCoeff() << ", note: large value represents high sensitivity" << std::endl;
+        std::cout << "dlam max: " << dlam.maxCoeff() << std::endl;
 //        for (int i = 0; i < lam_.size(); i++) {
 //            if (lam_.maxCoeff() == lam_(i)) {
 //                std::cout << "lam_ max occurs at index: " << i << std::endl;
 //            }
 //        }
 
-//        std::cout << "dnu max: " << dnu.maxCoeff() << std::endl;
-//        std::cout << "nu_ max: " << nu_.maxCoeff() << std::endl;
-//
-//        std::cout << "dz max: " << dz.maxCoeff() << std::endl;
-//        std::cout << "primal max: " << primal_.maxCoeff() << std::endl;
+        std::cout << "dnu max: " << dnu.maxCoeff() << std::endl;
+        std::cout << "nu_ max: " << nu_.maxCoeff() << std::endl;
+
+        std::cout << "dz max: " << dz.maxCoeff() << std::endl;
+        std::cout << "primal max: " << primal_.maxCoeff() << std::endl;
     }
 
     void ClarabelInterface::SetupDerivativeCalcs(mpc::vector_t& dx, mpc::vector_t& dy_l, mpc::vector_t& dy_u,
@@ -337,14 +341,14 @@ namespace mpc {
         mat_builder.SetMatrix(G.transpose()*lam_.asDiagonal(), 0, data.num_decision_vars);
 
         mat_builder.SetMatrix(A.transpose(),
-                              0, data.num_decision_vars + data.num_inequality_);
+                              0, data.num_decision_vars + G.rows());
 
 //        mat_builder.SetMatrix((lam_.asDiagonal()*G), data.num_decision_vars, 0);
 //        mat_builder.SetMatrix((G.array().colwise() * lam_.array()), data.num_decision_vars, 0);
         mat_builder.SetMatrix(G, data.num_decision_vars, 0);
 
         mat_builder.SetVectorDiagonally(s_ineq, data.num_decision_vars, data.num_decision_vars);
-        mat_builder.SetMatrix(A, data.num_decision_vars + data.num_inequality_, 0);
+        mat_builder.SetMatrix(A, data.num_decision_vars + G.rows(), 0);
 
         assert(data.num_inequality_ + data.num_equality_ == data.GetTotalNumConstraints());
 
@@ -434,6 +438,24 @@ namespace mpc {
         d_ << dx, vector_t::Zero(data.num_equality_ + data.num_inequality_);
 
 
+        lsqr::LSQRSettings settings{};
+        settings.max_iter = 1*diff_mat.rows(); //100000;
+        settings.A_tol = 1e-10;
+        settings.b_tol = 1e-10;
+        settings.damping = 0;
+        settings.conditioning_lim = 1e9;
+        settings.verbose = false;
+
+        lsqr::LSQR lsqr(settings);
+
+        utils::Timer lsqr_timer("lsqr");
+        lsqr_timer.StartTimer();
+        lsqr::LSQROutput output = lsqr.Solve(diff_mat, d_);
+        lsqr_timer.StopTimer();
+        lsqr_timer.PrintElapsedTime();
+
+        // TODO: Compare to LSCG
+
         assert(diff_mat.rows() == diff_mat.cols());
 
         sp_matrix_t temp = diff_mat.transpose()*diff_mat;
@@ -450,30 +472,48 @@ namespace mpc {
 
 //        diff_mat.pruned(ZERO_THRESHOLD);
 
+        vector_t temp2 = d_; //diff_mat.transpose()*d_;
+
+        // TODO: Can't solve the high tolerance problem with 50 nodes
+        solver.setTolerance(1e-10); // TODO: Higher tolerances make this much better! Ideally AT LEAST 1e-8!
+        // TODO: Note it seems more related to the conditioning of the problem rather than the tolerance.
+        solver.setMaxIterations(1*diff_mat.rows());
+
+        utils::Timer lscg_timer("lscg");
+        lscg_timer.StartTimer();
         // TODO: Check if I am row rank or column rank deficient and think about those implications
         solver.analyzePattern(diff_mat);
         solver.factorize(diff_mat);
-        // TODO: Can't solve the high tolerance problem with 50 nodes
-        solver.setTolerance(1e-7); // TODO: Higher tolerances make this much better! Ideally AT LEAST 1e-8!
-        // TODO: Note it seems more related to the conditioning of the problem rather than the tolerance.
-        solver.setMaxIterations(10*temp.rows());
 
         if (solver.info() != Eigen::Success) {
             throw std::runtime_error("Could not factorize the differential matrix.");
         }
 
-        vector_t temp2 = d_; //diff_mat.transpose()*d_;
-        d_ = -solver.solve(temp2);
-        std::cout << "#iterations:     " << solver.iterations() << std::endl;
-        std::cout << "estimated error: " << solver.error()      << std::endl;
-        std::cout << "max elemnt of d_: " << d_.maxCoeff() << std::endl;
+        vector_t x = solver.solve(temp2);
+        lscg_timer.StopTimer();
+        lscg_timer.PrintElapsedTime();
+
+        std::cout << "LSCG #iterations:     " << solver.iterations() << std::endl;
+        std::cout << "LSCG estimated error: " << solver.error()      << std::endl;
+        std::cout << "LSQR convergence value: " << output.convergence << std::endl;
+//        std::cout << "max elemnt of d_ (lsqr): " << d_.maxCoeff() << std::endl;
+
+        std::cout << "LSCG error: " << (diff_mat*x - d_).norm() << std::endl;
+        std::cout << "LSCG norm: " << x.norm() << std::endl;
+        std::cout << "LSQR error: " << (diff_mat*output.x - d_).norm() << std::endl;
+        std::cout << "LSQR norm: " << output.x.norm() << std::endl;
+
+        // TODO: Negative?
+        // The LSQR solution seems to be much better behaved for the ill-conditioned problem, although maybe less accurate?
+        d_ = -output.x; // x
+
 
 //        std::cout << "d_: " << d_ << std::endl;
 //        d_ = diff_mat.transpose()*d_;
 //        std::cout << "again d_: " << d_ << std::endl;
-        if (solver.info() != Eigen::Success) {
-            throw std::runtime_error("Could not solve the differential matrix");
-        }
+//        if (solver.info() != Eigen::Success) {
+//            throw std::runtime_error("Could not solve the differential matrix");
+//        }
         timer.StopTimer();
 
         timer.PrintElapsedTime();

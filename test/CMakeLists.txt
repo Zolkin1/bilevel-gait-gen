@@ -2,6 +2,7 @@ find_package(Catch2 3 REQUIRED)
 
 add_executable(sim_test simulator_test.cpp)
 
+message(STATUS "Making test directory.")
 
 target_link_libraries(sim_test PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(sim_test PUBLIC simulator)

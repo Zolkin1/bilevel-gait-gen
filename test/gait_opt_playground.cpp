@@ -79,7 +79,7 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
     const auto contact_sched = mpc.GetTrajectory().GetContactTimes();
     double total_cost = 0;
 
-    const int N = 400;
+    const int N = 300;
     for (int i = 0; i < N; i++) {
         double time = i*info.integrator_dt;
         if (fixed_pos) {
@@ -104,7 +104,7 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
 
         // Gait optimization
         if (run_gait_opt) {
-            if (!(i % 3)) {        // At i = 10 we get primal infeasable. This also then happens to align with the period of the first trajectory.
+            if (!(i % 2)) {        // At i = 10 we get primal infeasable. This also then happens to align with the period of the first trajectory.
                 prev_cost = RunGaitOpt(mpc, gait_opt, prev_traj, cost_red, time);
                 std::cout << "Time: " << time << std::endl;
                 PrintContactSched(mpc.GetTrajectory().GetContactTimes());
@@ -275,7 +275,7 @@ int main() {
 
 
     MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
-                         robot, info, config.ParseNumber<double>("viz_rate"), true, viz, false);
+                         robot, info, config.ParseNumber<double>("viz_rate"), true, viz, true);
 
     // MPC w/ fixed position + line search
 

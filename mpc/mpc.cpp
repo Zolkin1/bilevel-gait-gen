@@ -704,7 +704,7 @@ namespace mpc {
         return num_inputs_;
     }
 
-    void MPC::UpdateContactTimes(const std::vector<time_v>& contact_times) {
+    void MPC::UpdateContactTimes(std::vector<time_v>& contact_times) {
         prev_traj_.UpdateContactTimes(contact_times);
         contact_sched_change_.push_back(run_num_);
     }
