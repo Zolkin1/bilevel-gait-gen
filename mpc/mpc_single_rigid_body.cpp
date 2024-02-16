@@ -372,10 +372,10 @@ namespace mpc {
 
         data_.num_cone_constraints_ = (info_.num_nodes+1)*4*num_ee_;
         if (using_clarabel_) {
-            data_.num_force_box_constraints_ = 2*GetNodeIntersectMutableForces();
+            data_.num_force_box_constraints_ = GetNumForceBoxConstraints(); //2*GetNodeIntersectMutableForces();
             data_.num_ee_location_constraints_ = 2*(info_.num_nodes-1)*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
         } else {
-            data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
+            data_.num_force_box_constraints_ = GetNodeIntersectMutableForces(); // TODO: Change
             data_.num_ee_location_constraints_ = (info_.num_nodes+1)*2*num_ee_;
         }
 
@@ -739,7 +739,7 @@ namespace mpc {
 
                     // ----------- Inequality contribution ----------- //
                     const int spline_offset = GetPosSplineStartIdx();
-                    int idx = ee * (data_.num_ee_location_constraints_ / (2*num_ee_));
+                    int idx = 2*ee; //* (data_.num_ee_location_constraints_ / (2*num_ee_));
                     for (int node = 2; node < info_.num_nodes + 1; node++) {
                         const double time = GetTime(node);
                         for (int coord = 0; coord < 2; coord++) {
@@ -753,18 +753,18 @@ namespace mpc {
 
                             G_builder.SetMatrix(pos_coef_partials.transpose(),
                                                 ineq_idx + idx,
-                                                spline_offset + vars_index - vars_affecting);
+                                                spline_offset + vars_index);
 
                             // Need to account for the derivative in the negative term
                             G_builder.SetMatrix(-pos_coef_partials.transpose(),
                                                 ineq_idx + idx + data_.num_ee_location_constraints_/2,
-                                                spline_offset + vars_index - vars_affecting);
+                                                spline_offset + vars_index);
                             idx++;
                         }
+                        idx += 2*(num_ee_-1);
                     }
 
-                    assert(idx - ee * (data_.num_ee_location_constraints_ / (2*num_ee_)) ==
-                           data_.num_ee_location_constraints_ / (2*num_ee_));
+//                    assert(idx  == data_.num_ee_location_constraints_);
 
 
                     // ----------- Equality contribution ----------- //

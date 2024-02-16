@@ -140,10 +140,17 @@ TEST_CASE("Basic MPC", "[mpc]") {
                 matrix_t finite_diff_dynamics = (data2.sparse_constraint_.topRows(data.num_dynamics_constraints)
                                                  - data.sparse_constraint_.topRows(data.num_dynamics_constraints))/dt;
 
+                matrix_t finite_diff_ee_loc = (data2.sparse_constraint_.middleRows(data2.num_dynamics_constraints
+                        + data2.num_force_box_constraints_ + data2.num_cone_constraints_, data.num_ee_location_constraints_)
+                       - data.sparse_constraint_.middleRows(data.num_dynamics_constraints
+                       + data.num_force_box_constraints_ + data.num_cone_constraints_,
+                       data.num_ee_location_constraints_))/dt;
+
+                // TODO: This one might be hard as the number of constraints changes - this may be a fundamental issue that needs addressing
                 matrix_t finite_diff_fb = (data2.sparse_constraint_.middleRows(data.num_dynamics_constraints, data.num_force_box_constraints_)
                         - data.sparse_constraint_.middleRows(data.num_dynamics_constraints, data.num_force_box_constraints_))/dt;
 
-//                std::cout << "finite diff dynamics (top rows): \n" << finite_diff_dynamics.topRows(50) << std::endl;
+//                std::cout << "finite diff ee (top rows): \n" << finite_diff_ee_loc.topRightCorner(50, 50) << std::endl;
 
                 // Get partial calculations
                 QPPartials partials;
@@ -155,7 +162,6 @@ TEST_CASE("Basic MPC", "[mpc]") {
                 dG += partials.dG;
 
                 matrix_t dDynamics = dA.topRows(data.num_dynamics_constraints);
-                matrix_t dForceBox = dG.topRows(data.num_force_box_constraints_);
                 for (int row = 0; row < dDynamics.rows(); row++) {
                     for (int col = 0; col < dDynamics.cols(); col++) {
                         if (std::abs(dDynamics(row, col) - finite_diff_dynamics(row, col)) >= DERIV_MARGIN) {
@@ -168,14 +174,28 @@ TEST_CASE("Basic MPC", "[mpc]") {
                     }
                 }
 
-                for (int row = 0; row < dForceBox.rows(); row++) {
-                    for (int col = 0; col < dForceBox.cols(); col++) {
-                        if (std::abs(dForceBox(row, col) - finite_diff_fb(row, col)) >= DERIV_MARGIN) {
-                            std::cout << "FB MISMATCH at row " << row << ", col " << col << std::endl;
-                            std::cout << "finite_diff: " << finite_diff_fb(row, col) << std::endl;
-                            std::cout << "partial: " << dForceBox(row, col) << std::endl;
+                matrix_t dEELocations = dG.bottomRows(data.num_ee_location_constraints_);
+                for (int row = 0; row < dDynamics.rows(); row++) {
+                    for (int col = 0; col < dDynamics.cols(); col++) {
+                        if (std::abs(dEELocations(row, col) - finite_diff_ee_loc(row, col)) >= DERIV_MARGIN) {
+                            std::cout << "EE MISMATCH at row " << row << ", col " << col << std::endl;
+                            std::cout << "finite_diff: " << finite_diff_ee_loc(row, col) << std::endl;
+                            std::cout << "partial: " << dEELocations(row, col) << std::endl;
                             std::cout << "ee: " << ee << ", contact idx: " << idx << std::endl;
                         }
+                        REQUIRE_THAT(dEELocations(row, col) - finite_diff_ee_loc(row, col), WithinAbs(0, DERIV_MARGIN));
+                    }
+                }
+
+                matrix_t dForceBox = dG.topRows(data.num_force_box_constraints_);
+                for (int row = 0; row < dForceBox.rows(); row++) {
+                    for (int col = 0; col < dForceBox.cols(); col++) {
+//                        if (std::abs(dForceBox(row, col) - finite_diff_fb(row, col)) >= DERIV_MARGIN) {
+//                            std::cout << "FB MISMATCH at row " << row << ", col " << col << std::endl;
+//                            std::cout << "finite_diff: " << finite_diff_fb(row, col) << std::endl;
+//                            std::cout << "partial: " << dForceBox(row, col) << std::endl;
+//                            std::cout << "ee: " << ee << ", contact idx: " << idx << std::endl;
+//                        }
 //                        REQUIRE_THAT(dForceBox(row, col) - finite_diff_fb(row, col), WithinAbs(0, DERIV_MARGIN));
                     }
                 }

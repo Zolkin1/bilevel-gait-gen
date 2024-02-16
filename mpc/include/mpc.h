@@ -216,6 +216,8 @@ namespace mpc {
 
         void AddDiagonalCost();
 
+        int GetNumForceBoxConstraints() const;
+
         // ---------------- Member Variables ---------------- //
         // Centroidal model
         SingleRigidBodyModel model_;
@@ -290,6 +292,8 @@ namespace mpc {
         const bool using_clarabel_;
 
         RKIntegrator integrator_;
+
+        static constexpr int FB_PER_FORCE = 10;
     private:
     };
 } // mpc

@@ -209,43 +209,61 @@ namespace mpc {
         }
     }
 
+    // TODO: Could consider converting to bezier and then bounding the convex hull
     void MPC::AddForceBoxConstraints() {
         int force_idx = GetForceSplineStartIdx();
         int row_idx = 0;
+
+        const int coord = 2;
+
+
         int extra_runs = 1;
         if (using_clarabel_) {
             extra_runs = 2;
         }
-        for (int i = 0; i < extra_runs; i++) {
-            for (int node = 0; node < info_.num_nodes + 1; node++) {
-                double time = GetTime(node);
-                for (int ee = 0; ee < num_ee_; ee++) {
-                    const int coord = 2;
-                    if (prev_traj_.IsForceMutable(ee, time)) {
-                        int vars_index, vars_affecting;
-                        std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
-                        const vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord, time);
 
-                        if (i == 0) {
-                            data_.constraint_mat_.SetMatrix(vars_lin.transpose(),
-                                                            constraint_idx_ + row_idx,
-                                                            force_idx + vars_index);
-                        } else {
-                            data_.constraint_mat_.SetMatrix(-vars_lin.transpose(),
-                                                            constraint_idx_ + row_idx,
-                                                            force_idx + vars_index);
+        const std::vector<time_v> contact_times = prev_traj_.GetContactTimes();
+        for (int j = 0; j < extra_runs; j++) {
+            for (int ee = 0; ee < num_ee_; ee++) {
+                for (int time_idx = 0; time_idx < contact_times.at(ee).size() - 1; time_idx++) {
+                    if (contact_times.at(ee).at(time_idx).GetType() == TouchDown) {
+                        for (int i = 0; i < FB_PER_FORCE; i++) {
+                            double lower_time = contact_times.at(ee).at(time_idx).GetTime();
+                            double upper_time = contact_times.at(ee).at(time_idx + 1).GetTime();
+                            double time =
+                                    (static_cast<double>(i) / static_cast<double>(FB_PER_FORCE)) * (upper_time - lower_time) +
+                                    lower_time;
+                            assert(prev_traj_.IsForceMutable(ee, time));
+
+
+                            int vars_index, vars_affecting;
+                            std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
+                            const vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord,
+                                                                              time);
+
+                            if (j == 0) {
+                                data_.constraint_mat_.SetMatrix(vars_lin.transpose(),
+                                                                constraint_idx_ + row_idx,
+                                                                force_idx + vars_index);
+                            } else {
+                                data_.constraint_mat_.SetMatrix(-vars_lin.transpose(),
+                                                                constraint_idx_ + row_idx,
+                                                                force_idx + vars_index);
+                            }
+
+                            if (j == 0) {
+                                data_.force_box_lb_(row_idx) = 0.0;
+                                data_.force_box_ub_(row_idx) = info_.force_bound;
+                            }
+
+                            row_idx++;
+
                         }
-
-                        if (i == 0) {
-                            data_.force_box_lb_(row_idx) = 0.0;
-                            data_.force_box_ub_(row_idx) = info_.force_bound;
-                        }
-
-                        row_idx++;
                     }
                 }
             }
         }
+        
         assert(row_idx == data_.num_force_box_constraints_);
         constraint_idx_ += row_idx;
     }
@@ -347,9 +365,9 @@ namespace mpc {
 
         // TODO: May want to put in a check for this, but it should always be active
         if (using_clarabel_) {
-            data_.num_force_box_constraints_ = 2*GetNodeIntersectMutableForces();
+            data_.num_force_box_constraints_ = GetNumForceBoxConstraints();
         } else {
-            data_.num_force_box_constraints_ = GetNodeIntersectMutableForces();
+            data_.num_force_box_constraints_ = GetNodeIntersectMutableForces(); // TODO: Change
         }
     }
 
@@ -718,5 +736,19 @@ namespace mpc {
 
     const QPData& MPC::GetQPData() const {
         return data_;
+    }
+
+    int MPC::GetNumForceBoxConstraints() const {
+        const std::vector<time_v> contact_times = prev_traj_.GetContactTimes();
+        int num_constraints = 0;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int i = 0; i < contact_times.at(ee).size() - 1; i++) {
+                if (contact_times.at(ee).at(i).GetType() == TouchDown) {
+                    num_constraints += 2*FB_PER_FORCE;
+                }
+            }
+        }
+
+        return num_constraints;
     }
 } // mpc
