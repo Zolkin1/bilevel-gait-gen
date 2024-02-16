@@ -236,9 +236,9 @@ TEST_CASE("End Effector Splines", "[splines]") {
         }
     }
 
-    SECTION("Derivatives") {
+    SECTION("Value Derivatives") {
         for (auto& spline : splines) {
-            // force
+            // Force
             for (int coord = 0; coord < 3; coord++) {
                 const std::vector<int> force_nodes = spline.GetMutableNodes(EndEffectorSplines::Force, coord);
                 for (auto& it: force_nodes) {
@@ -314,6 +314,125 @@ TEST_CASE("End Effector Splines", "[splines]") {
                                                                       contact);
 
                         REQUIRE_THAT(partial - finite_diff, WithinAbs(0, DERIV_MARGIN));
+
+                        contact_times2.at(contact).SetTime(contact_times2.at(contact).GetTime() - dt);
+                        spline2.SetContactTimes(contact_times2);
+                    }
+                }
+                time += 0.01;
+            }
+        }
+    }
+
+    SECTION("Coefficient Derivatives") {
+        for (auto& spline : splines) {
+            // Force
+            for (int coord = 0; coord < 3; coord++) {
+                const std::vector<int> force_nodes = spline.GetMutableNodes(EndEffectorSplines::Force, coord);
+                for (auto& it: force_nodes) {
+                    Eigen::Vector2d vars;
+                    vars << 2 * it - 1, .5 / FORCE_MULT;
+                    spline.SetVars(EndEffectorSplines::Force, coord, it, vars);
+                }
+            }
+
+            time_v contact_times = spline.GetContactTimes();
+            time_v contact_times2 = contact_times;
+            EndEffectorSplines spline2 = spline;
+
+            const double dt = std::sqrt(1e-16);
+            constexpr double DERIV_MARGIN = 1e-4;
+
+            // the last third part of the spline stuggles wrt to lift off
+
+            double time = 0;
+            while (time < spline.GetEndTime()) {
+                if (spline.IsForceMutable(time)) {
+                    for (int contact = 0; contact < contact_times.size(); contact++) {
+                        for (int coord = 0; coord < 3; coord++) {
+                            const vector_t coefs = spline.GetPolyVarsLin(mpc::EndEffectorSplines::Force, coord, time);
+
+                            contact_times2.at(contact).SetTime(contact_times2.at(contact).GetTime() + dt);
+                            spline2.SetContactTimes(contact_times2);
+                            if (spline2.IsForceMutable(time)) {
+                                const vector_t coefs2 = spline2.GetPolyVarsLin(mpc::EndEffectorSplines::Force, coord,
+                                                                               time);
+
+                                REQUIRE(coefs.size() == coefs2.size());
+
+                                const vector_t coef_partials = spline.ComputeCoefPartialWrtTime(
+                                        mpc::EndEffectorSplines::Force, coord, time,
+                                        contact);
+
+                                REQUIRE(coefs.size() == coef_partials.size());
+
+                                for (int i = 0; i < coefs.size(); i++) {
+                                    const double finite_diff = (coefs2(i) - coefs(i)) / dt;
+//                                    if (std::abs(coef_partials(i) - finite_diff) > DERIV_MARGIN) {
+//                                        std::cout << "MISMATCH at time: " << time << ", coord: " << coord
+//                                                  << ", contact: "
+//                                                  << contact << std::endl;
+//                                        std::cout << "finite diff: " << finite_diff << std::endl;
+//                                        std::cout << "partial: " << coef_partials(i) << std::endl;
+//                                    }
+                                    REQUIRE_THAT(coef_partials(i) - finite_diff, WithinAbs(0, DERIV_MARGIN));
+                                }
+                            }
+
+                            contact_times2.at(contact).SetTime(contact_times2.at(contact).GetTime() - dt);
+                            spline2.SetContactTimes(contact_times2);
+                        }
+                    }
+                }
+                time += 0.01;
+            }
+
+            // Force
+            for (int coord = 0; coord < 3; coord++) {
+                const std::vector<int> pos_nodes = spline.GetMutableNodes(EndEffectorSplines::Position, coord);
+                for (auto& it: pos_nodes) {
+                    Eigen::Vector2d vars;
+                    vars << 2 * it - 1, .5 / FORCE_MULT;
+                    spline.SetVars(EndEffectorSplines::Position, coord, it, vars);
+                }
+            }
+
+            spline2 = spline;
+
+            // the last third part of the spline stuggles wrt to lift off
+
+            time = 0;
+            while (time < spline.GetEndTime()) {
+                for (int contact = 0; contact < contact_times.size(); contact++) {
+                    for (int coord = 0; coord < 2; coord++) {
+                        const vector_t coefs = spline.GetPolyVarsLin(mpc::EndEffectorSplines::Position, coord, time);
+
+                        contact_times2.at(contact).SetTime(contact_times2.at(contact).GetTime() + dt);
+                        spline2.SetContactTimes(contact_times2);
+                        const vector_t coefs2 = spline2.GetPolyVarsLin(mpc::EndEffectorSplines::Position, coord,
+                                                                       time);
+
+//                        REQUIRE(coefs.size() == coefs2.size());
+                        if (coefs.size() == coefs2.size()) {
+
+                            const vector_t coef_partials = spline.ComputeCoefPartialWrtTime(
+                                    mpc::EndEffectorSplines::Position, coord, time,
+                                    contact);
+
+                            REQUIRE(coefs.size() == coef_partials.size());
+
+                            for (int i = 0; i < coefs.size(); i++) {
+                                const double finite_diff = (coefs2(i) - coefs(i)) / dt;
+//                                if (std::abs(coef_partials(i) - finite_diff) > DERIV_MARGIN) {
+//                                    std::cout << "MISMATCH at time: " << time << ", coord: " << coord
+//                                              << ", contact: "
+//                                              << contact << std::endl;
+//                                    std::cout << "finite diff: " << finite_diff << std::endl;
+//                                    std::cout << "partial: " << coef_partials(i) << std::endl;
+//                                }
+                            REQUIRE_THAT(coef_partials(i) - finite_diff, WithinAbs(0, DERIV_MARGIN));
+                            }
+                        }
 
                         contact_times2.at(contact).SetTime(contact_times2.at(contact).GetTime() - dt);
                         spline2.SetContactTimes(contact_times2);

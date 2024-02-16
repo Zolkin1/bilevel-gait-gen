@@ -114,10 +114,10 @@ namespace mpc {
         double Getx0dotCoef(double time, double deltat) const;
         double Getx1dotCoef(double time, double deltat) const;
 
-        double Getx0CoefPartial(double time, double DeltaT, bool wrt_t1) const;
-        double Getx1CoefPartial(double time, double DeltaT, bool wrt_t1) const;
-        double Getx0dotCoefPartial(double time, double DeltaT, bool wrt_t1) const;
-        double Getx1dotCoefPartial(double time, double DeltaT, bool wrt_t1) const;
+        double Getx0CoefPartial(double time, double DeltaT, double dtdth, double dDtdth, bool wrt_t1) const;
+        double Getx1CoefPartial(double time, double DeltaT, double dtdth, double dDtdth, bool wrt_t1) const;
+        double Getx0dotCoefPartial(double time, double DeltaT, double dtdth, double dDtdth, bool wrt_t1) const;
+        double Getx1dotCoefPartial(double time, double DeltaT, double dtdth, double dDtdth, bool wrt_t1) const;
 
         node_v& SelectSpline(SplineType type, int coord);
 
