@@ -224,7 +224,7 @@ namespace mpc {
                     if (prev_traj_.IsForceMutable(ee, time)) {
                         int vars_index, vars_affecting;
                         std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
-                        vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord, time);
+                        const vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord, time);
 
                         if (i == 0) {
                             data_.constraint_mat_.SetMatrix(vars_lin.transpose(),
@@ -265,7 +265,7 @@ namespace mpc {
                 if (prev_traj_.IsForceMutable(ee, time)) {
                     int vars_index, vars_affecting;
                     std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
-                    vector_t vars_partials = prev_traj_.GetForceCoefPartialsWrtContactTime(ee, coord, time,
+                    const vector_t vars_partials = prev_traj_.GetForceCoefPartialsWrtContactTime(ee, coord, time,
                                                                                            contact_idx);
 
                     if (i == 0) {
@@ -716,4 +716,7 @@ namespace mpc {
         data_.cost_mat_.SetDiagonalMatrix(1e-1,0,0,data_.num_decision_vars);
     }
 
+    const QPData& MPC::GetQPData() const {
+        return data_;
+    }
 } // mpc

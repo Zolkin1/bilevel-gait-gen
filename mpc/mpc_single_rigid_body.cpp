@@ -795,7 +795,7 @@ namespace mpc {
                     AddForceBoxConstraintPartials(G_builder, contact_time_idx, ineq_idx, ee);
                     ineq_idx += data_.num_force_box_constraints_;
                 } else if (data_.constraints_.at(i) == JointBox) {
-                    throw std::runtime_error("Joint box not implemented with Clarabela yet.");
+                    throw std::runtime_error("Joint box not implemented with Clarabel yet.");
 
                 } else if (data_.constraints_.at(i) == FrictionCone) {
                     // TODO: Note: when this is removed the derivatives are at least the right order of magnitude...

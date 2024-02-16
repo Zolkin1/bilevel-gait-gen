@@ -147,6 +147,8 @@ namespace mpc {
 
         void UpdateContactTimes(std::vector<time_v>& contact_times);
 
+        const QPData& GetQPData() const;
+
     protected:
         // ---------------- Protected Member Functions ---------------- //
         // Assumes flat ground and constant coef of friction

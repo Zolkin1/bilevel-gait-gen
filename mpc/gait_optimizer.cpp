@@ -39,7 +39,7 @@ namespace mpc {
 
         gamma_ = 0.5;
         eta_ = 0.75;
-        Delta_ = 1e-4; // 1e-5 seems consistent //0.0005; 0.011 works to keep standing still with a dt of 0.1
+        Delta_ = 1e-6; // 1e-5 seems consistent //0.0005; 0.011 works to keep standing still with a dt of 0.1
 
         run_num_ = 0;
         past_decision_vars_ = 0;

@@ -21,8 +21,8 @@ namespace mpc {
             Model(robot_urdf, frames, discretization_steps, dt, false,
                   {Constraints::Dynamics,
                    Constraints::ForceBox,
-                   Constraints::EndEffectorLocation,
-                   Constraints::FrictionCone
+                   Constraints::FrictionCone,
+                   Constraints::EndEffectorLocation
                   }),
             num_tangent_states_(MOMENTUM_OFFSET + FLOATING_VEL_OFFSET),
             num_manifold_states_(MOMENTUM_OFFSET + FLOATING_BASE_OFFSET) {
@@ -485,7 +485,7 @@ namespace mpc {
 
                 // linear momentum -- force coefficients depend on contact times
                 dB.block(LIN_MOM_START + coord, vars_idx, 1, vars_affecting) =
-                        force_coef_partials.transpose();
+                        force_coef_partials.transpose(); // Not agreeing with the finite difference
 
                 // Angular momentum - force -- force coefficients depend on contact times
                 for (int poly = 0; poly < force_coef_partials.size(); poly++) {
