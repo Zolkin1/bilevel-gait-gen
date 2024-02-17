@@ -511,9 +511,14 @@ namespace mpc {
     }
 
     vector_t Trajectory::GetForceCoefPartialsWrtContactTime(int end_effector, int coord, double time,
-                                                            int contact_idx) const {
+                                                            int contact_idx, double dtwdth) const {
         return ee_splines_.at(end_effector).ComputeCoefPartialWrtTime(EndEffectorSplines::Force,
-                                                                      coord, time, contact_idx);
+                                                                      coord, time, contact_idx, dtwdth);
+    }
+
+    vector_t Trajectory::GetForceCoefPartialsWrtContactTime(int end_effector, int coord, double time,
+                                                            int contact_idx) const {
+        return GetForceCoefPartialsWrtContactTime(end_effector, coord, time, contact_idx, 0);
     }
 
     vector_t Trajectory::GetPositionCoefPartialsWrtContactTime(int end_effector, int coord, double time,

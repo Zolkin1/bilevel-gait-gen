@@ -146,11 +146,12 @@ TEST_CASE("Basic MPC", "[mpc]") {
                        + data.num_force_box_constraints_ + data.num_cone_constraints_,
                        data.num_ee_location_constraints_))/dt;
 
+                REQUIRE(data2.num_force_box_constraints_ == data.num_force_box_constraints_);
                 // TODO: This one might be hard as the number of constraints changes - this may be a fundamental issue that needs addressing
                 matrix_t finite_diff_fb = (data2.sparse_constraint_.middleRows(data.num_dynamics_constraints, data.num_force_box_constraints_)
                         - data.sparse_constraint_.middleRows(data.num_dynamics_constraints, data.num_force_box_constraints_))/dt;
 
-//                std::cout << "finite diff ee (top rows): \n" << finite_diff_ee_loc.topRightCorner(50, 50) << std::endl;
+//                std::cout << "finite diff fb (top rows): \n" << finite_diff_fb.topRightCorner(50, 150) << std::endl;
 
                 // Get partial calculations
                 QPPartials partials;
@@ -190,13 +191,14 @@ TEST_CASE("Basic MPC", "[mpc]") {
                 matrix_t dForceBox = dG.topRows(data.num_force_box_constraints_);
                 for (int row = 0; row < dForceBox.rows(); row++) {
                     for (int col = 0; col < dForceBox.cols(); col++) {
-//                        if (std::abs(dForceBox(row, col) - finite_diff_fb(row, col)) >= DERIV_MARGIN) {
-//                            std::cout << "FB MISMATCH at row " << row << ", col " << col << std::endl;
-//                            std::cout << "finite_diff: " << finite_diff_fb(row, col) << std::endl;
-//                            std::cout << "partial: " << dForceBox(row, col) << std::endl;
-//                            std::cout << "ee: " << ee << ", contact idx: " << idx << std::endl;
-//                        }
-//                        REQUIRE_THAT(dForceBox(row, col) - finite_diff_fb(row, col), WithinAbs(0, DERIV_MARGIN));
+                        if (std::abs(dForceBox(row, col) - finite_diff_fb(row, col)) >= DERIV_MARGIN) {
+                            std::cout << "FB MISMATCH at row " << row << ", col " << col << std::endl;
+                            std::cout << "finite_diff: " << finite_diff_fb(row, col) << std::endl;
+                            std::cout << "partial: " << dForceBox(row, col) << std::endl;
+                            std::cout << "next partial: " << dForceBox(row, col+1) << std::endl;
+                            std::cout << "ee: " << ee << ", contact idx: " << idx << std::endl;
+                        }
+                        REQUIRE_THAT(dForceBox(row, col) - finite_diff_fb(row, col), WithinAbs(0, DERIV_MARGIN));
                     }
                 }
 

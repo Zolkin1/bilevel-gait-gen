@@ -62,7 +62,10 @@ namespace mpc {
 
         double ComputePartialWrtTime(SplineType type, int coord, double time, int time_idx) const;     // Note: time_idx is only of contact times
 
+        vector_t ComputeCoefPartialWrtTime(SplineType type, int coord, double time, int time_idx, double dtwdth) const; // Note: time_idx is only of contact times
+
         vector_t ComputeCoefPartialWrtTime(SplineType type, int coord, double time, int time_idx) const; // Note: time_idx is only of contact times
+
 
         // ------------------ Setters ------------------ //
         void SetVars(SplineType type, int coord, int node_idx, const vector_2t& vars);

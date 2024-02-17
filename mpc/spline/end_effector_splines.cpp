@@ -632,7 +632,12 @@ namespace mpc {
         return 0;
     }
 
-    vector_t EndEffectorSplines::ComputeCoefPartialWrtTime(SplineType type, int coord, double time, int time_idx) const {
+    vector_t EndEffectorSplines::ComputeCoefPartialWrtTime(mpc::EndEffectorSplines::SplineType type, int coord,
+                                                           double time, int time_idx) const {
+        return ComputeCoefPartialWrtTime(type, coord, time, time_idx, 0);
+    }
+
+    vector_t EndEffectorSplines::ComputeCoefPartialWrtTime(SplineType type, int coord, double time, int time_idx, double dtwdth) const {
         const node_v& spline = SelectSpline(type, coord);
         const int upper_node = GetUpperNodeIdx(type, coord, time);
         const int lower_node = GetLowerNodeIdx(type, coord, time);
@@ -660,6 +665,7 @@ namespace mpc {
         bool direct_dep = (node == lower_node || node == upper_node);
         bool wrt_lower = (node == lower_node);
 
+        double dtdth = dtwdth;
 
         if (type == Force) {
             SplineNode force_node = forces_.at(coord).at(lower_node);
@@ -672,10 +678,11 @@ namespace mpc {
             }
 
             double dDTdth = 1.0 / static_cast<double>(num_force_polys_);
-            double dtdth = -static_cast<double>(j) / static_cast<double>(num_force_polys_);
             if (wrt_lower) {
                 dDTdth = -1.0 / static_cast<double>(num_force_polys_);
-                dtdth = static_cast<double>(j) / static_cast<double>(num_force_polys_) - 1.0;
+                dtdth += static_cast<double>(j) / static_cast<double>(num_force_polys_) - 1.0;
+            } else {
+                dtdth += -static_cast<double>(j) / static_cast<double>(num_force_polys_);
             }
 
             // TODO: Go through everything carefully.
@@ -696,7 +703,7 @@ namespace mpc {
                     wrt_lower = false;
 
                     dDTdth = 1.0 / static_cast<double>(num_force_polys_);
-                    dtdth = -static_cast<double>(j) / static_cast<double>(num_force_polys_);
+                    dtdth = dtwdth -static_cast<double>(j) / static_cast<double>(num_force_polys_);
 
                     if (spline.at(lower_node).GetType() == FullDeriv) {
                         assert(vars_affecting >= 2);
@@ -719,7 +726,7 @@ namespace mpc {
                     wrt_lower = true;
 
                     dDTdth = -1.0 / static_cast<double>(num_force_polys_);
-                    dtdth = static_cast<double>(j) / static_cast<double>(num_force_polys_) - 1.0;
+                    dtdth = dtwdth + static_cast<double>(j) / static_cast<double>(num_force_polys_) - 1.0;
 
                     if (spline.at(lower_node).GetType() == FullDeriv) {
                         assert(vars_affecting >= 2);
@@ -740,9 +747,8 @@ namespace mpc {
         } else {
 
             double dDTdth = 1.0;
-            double dtdth = 0.0;
             if (wrt_lower) {
-                dtdth = -1.0;
+                dtdth += -1.0;
                 dDTdth = -1.0;
             }
 

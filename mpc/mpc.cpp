@@ -153,6 +153,7 @@ namespace mpc {
                             -(l + n*info_.friction_coef).transpose();
     }
 
+    // TODO: Examine what this looks like on areas when the force is NOT mutable
     void MPC::AddFrictionConeConstraints() {
         // -------------------- Friction pyramid -------------------- //
         int force_offset = GetForceSplineStartIdx();
@@ -209,7 +210,6 @@ namespace mpc {
         }
     }
 
-    // TODO: Could consider converting to bezier and then bounding the convex hull
     void MPC::AddForceBoxConstraints() {
         int force_idx = GetForceSplineStartIdx();
         int row_idx = 0;
@@ -263,7 +263,7 @@ namespace mpc {
                 }
             }
         }
-        
+
         assert(row_idx == data_.num_force_box_constraints_);
         constraint_idx_ += row_idx;
     }
@@ -271,22 +271,58 @@ namespace mpc {
     void MPC::AddForceBoxConstraintPartials(utils::SparseMatrixBuilder& builder, int contact_idx,
                                             int start_idx, int ee) {
         int force_idx = GetForceSplineStartIdx();
-        int row_idx = 0;
+
+        const std::vector<time_v> contact_times = prev_traj_.GetContactTimes();
+        int row_idx = 0; // TODO: This should not be 0
+
+        for (int i = 0; i < ee; i++) {
+            for (int contact_time = 0; contact_time < contact_times.at(i).size()-1; contact_time++) {
+                if (contact_times.at(i).at(contact_time).GetType() == TouchDown) {
+                    row_idx += FB_PER_FORCE;
+                }
+            }
+        }
+
+        for (int contact_time = 0; contact_time < contact_idx; contact_time++) {
+            if (contact_times.at(ee).at(contact_time).GetType() == TouchDown) {
+                row_idx += FB_PER_FORCE;
+            }
+        }
+
+        if (contact_times.at(ee).at(contact_idx).GetType() == LiftOff && contact_idx > 0) {
+            row_idx -= FB_PER_FORCE;
+        }
+
+        const int coord = 2;
+
+
         int extra_runs = 1;
         if (using_clarabel_) {
             extra_runs = 2;
         }
-        for (int i = 0; i < extra_runs; i++) {
-            for (int node = 0; node < info_.num_nodes + 1; node++) {
-                double time = GetTime(node);
-                const int coord = 2;
-                if (prev_traj_.IsForceMutable(ee, time)) {
-                    int vars_index, vars_affecting;
-                    std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
-                    const vector_t vars_partials = prev_traj_.GetForceCoefPartialsWrtContactTime(ee, coord, time,
-                                                                                           contact_idx);
 
-                    if (i == 0) {
+        for (int j = 0; j < extra_runs; j++) {
+            vector_t vars_partials;
+            int vars_index, vars_affecting;
+
+            if (contact_times.at(ee).at(contact_idx).GetType() == TouchDown) { // TODO: Account for the change in lift off (look backwards in time)
+                double lower_time = contact_times.at(ee).at(contact_idx).GetTime();
+                double upper_time = contact_times.at(ee).at(contact_idx + 1).GetTime();
+
+                for (int i = 0; i < FB_PER_FORCE; i++) {
+                    double time =
+                            (static_cast<double>(i) / static_cast<double>(FB_PER_FORCE)) * (upper_time - lower_time) +
+                            lower_time;
+
+                    assert(prev_traj_.IsForceMutable(ee, time));
+
+                    double dtimedth = -(static_cast<double>(i) / static_cast<double>(FB_PER_FORCE)) + 1.0;
+
+                    std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
+                    vars_partials = prev_traj_.GetForceCoefPartialsWrtContactTime(ee, coord,
+                                                                      time, contact_idx, dtimedth);
+
+                    if (j == 0) {
                         builder.SetMatrix(vars_partials.transpose(),
                                           start_idx + row_idx,
                                           force_idx + vars_index);
@@ -298,9 +334,55 @@ namespace mpc {
 
                     row_idx++;
                 }
+            } else if (contact_idx > 0) { // Liftoff - so effect the derivatives behind in time
+                double lower_time = contact_times.at(ee).at(contact_idx-1).GetTime();
+                double upper_time = contact_times.at(ee).at(contact_idx).GetTime();
 
+                for (int i = 0; i < FB_PER_FORCE; i++) {
+                    double time =
+                            (static_cast<double>(i) / static_cast<double>(FB_PER_FORCE)) * (upper_time - lower_time) +
+                            lower_time;
+
+                    assert(prev_traj_.IsForceMutable(ee, time));
+
+                    double dtimedth = (static_cast<double>(i) / static_cast<double>(FB_PER_FORCE));
+
+
+                    std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
+                    vars_partials = prev_traj_.GetForceCoefPartialsWrtContactTime(ee, coord,
+                                                                                                 time, contact_idx, dtimedth);
+
+                    if (j == 0) {
+                        builder.SetMatrix(vars_partials.transpose(),
+                                          start_idx + row_idx,
+                                          force_idx + vars_index);
+                    } else {
+                        builder.SetMatrix(-vars_partials.transpose(),
+                                          start_idx + row_idx,
+                                          force_idx + vars_index);
+                    }
+                    row_idx++;
+
+                }
             }
+
+
+//            int skip = 0;
+//            for (int end_effector = 0; end_effector < num_ee_; end_effector++) {
+//                if (end_effector != ee) {
+//                    for (int time_idx = 0; time_idx < contact_times.at(end_effector).size()-1; time_idx++) {
+//                        if (contact_times.at(end_effector).at(time_idx).GetType() == TouchDown) {
+//                            skip += FB_PER_FORCE;
+//                        }
+//                    }
+//                }
+//            }
+
+            row_idx += data_.num_force_box_constraints_/2 - FB_PER_FORCE;
+
         }
+//        assert(row_idx == data_.num_force_box_constraints_); // this is tough to do because I need to know the number of force segments for that end effector
+//        start_idx += row_idx;
     }
 
     void MPC::AddQuadraticTrackingCost(const vector_t& state_des, const matrix_t& Q) {

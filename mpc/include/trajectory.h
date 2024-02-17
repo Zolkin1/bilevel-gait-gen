@@ -117,6 +117,8 @@ namespace mpc {
 
         vector_t GetForceCoefPartialsWrtContactTime(int end_effector, int coord, double time, int contact_idx) const;
 
+        vector_t GetForceCoefPartialsWrtContactTime(int end_effector, int coord, double time, int contact_idx, double dtwdth) const;
+
         vector_t GetPositionCoefPartialsWrtContactTime(int end_effector, int coord, double time, int contact_idx) const;
 
         void UpdateContactTimes(std::vector<time_v>& contact_times);
