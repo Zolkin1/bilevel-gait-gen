@@ -5,6 +5,8 @@
 #ifndef BILEVEL_GAIT_GEN_CLARABEL_INTERFACE_H
 #define BILEVEL_GAIT_GEN_CLARABEL_INTERFACE_H
 
+#include <fstream>
+
 #include <Eigen/SparseCore>
 
 #include <Clarabel>
@@ -94,6 +96,8 @@ namespace mpc {
         vector_t dx_;
         vector_t lam_;
         vector_t nu_;
+
+//        std::ofstream qp_file;
     };
 }
 

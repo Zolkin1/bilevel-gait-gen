@@ -170,6 +170,14 @@ namespace mpc {
         dh.noalias() = lam_.asDiagonal()*-1*d_.segment(primal_.size(), num_inequality_constraints_ - 0);
 
         db = -d_.tail(num_equality_constraints_);
+
+//        qp_file << "dq: \n" << dq << std::endl;
+//        qp_file << std::endl;
+//        qp_file << "dh: \n" << dh << std::endl;
+//        qp_file << std::endl;
+//        qp_file << "db: \n" << db << std::endl;
+//        qp_file << std::endl;
+//        qp_file.close();
     }
 
     void ClarabelInterface::CalcDerivativeWrtMats(sp_matrix_t& dP, sp_matrix_t& dA, sp_matrix_t& dG) {
@@ -226,6 +234,13 @@ namespace mpc {
 
         std::cout << "dz max: " << dz.maxCoeff() << std::endl;
         std::cout << "primal max: " << primal_.maxCoeff() << std::endl;
+
+//        qp_file << "dP: \n" << dP.toDense() << std::endl;
+//        qp_file << std::endl;
+//        qp_file << "dA: \n" << dA.toDense() << std::endl;
+//        qp_file << std::endl;
+//        qp_file << "dG: \n" << dG.toDense() << std::endl;
+//        qp_file << std::endl;
     }
 
     void ClarabelInterface::SetupDerivativeCalcs(mpc::vector_t& dx, mpc::vector_t& dy_l, mpc::vector_t& dy_u,
@@ -259,6 +274,7 @@ namespace mpc {
         nu_.resize(data.num_equality_);
         vector_t h(data.num_inequality_);
         vector_t s_ineq(data.num_inequality_);
+        vector_t b(data.num_equality_);
 
         int eq_idx = 0;
         int ineq_idx = 0;
@@ -270,6 +286,8 @@ namespace mpc {
                             data.sparse_constraint_.middleRows(gen_idx, data.num_dynamics_constraints);
                     nu_.segment(eq_idx, data.num_dynamics_constraints) =
                             dual_.segment(gen_idx, data.num_dynamics_constraints);
+                    b.segment(eq_idx, data.num_dynamics_constraints) =
+                            data.ub_.segment(gen_idx, data.num_dynamics_constraints);
                     eq_idx += data.num_dynamics_constraints;
                     gen_idx += data.num_dynamics_constraints;
                     break;
@@ -292,6 +310,8 @@ namespace mpc {
                             data.sparse_constraint_.middleRows(gen_idx, data.num_start_ee_constraints_);
                     nu_.segment(eq_idx, data.num_start_ee_constraints_) =
                             dual_.segment(gen_idx, data.num_start_ee_constraints_);
+                    b.segment(eq_idx, data.num_start_ee_constraints_) =
+                            data.ub_.segment(gen_idx, data.num_start_ee_constraints_);
                     eq_idx += data.num_start_ee_constraints_;
                     gen_idx += data.num_start_ee_constraints_;
                     break;
@@ -324,6 +344,20 @@ namespace mpc {
                     break;
             }
         }
+
+//        qp_file.open("clarabel_qp_data.txt");
+//        qp_file << "A: \n" << A << std::endl;
+//        qp_file << std::endl;
+//        qp_file << "G: \n" << G << std::endl;
+//        qp_file << std::endl;
+//        qp_file << "b: \n" << b << std::endl;
+//        qp_file << std::endl;
+//        qp_file << "h: \n" << h << std::endl;
+//        qp_file << std::endl;
+//        qp_file << "P: \n" << data.sparse_cost_.toDense() << std::endl;
+//        qp_file << std::endl;
+//        qp_file << "q: \n" << data.cost_linear << std::endl;
+//        qp_file << std::endl;
 
         // TODO: Check that lam or eq constraint is always 0!
 
@@ -505,7 +539,7 @@ namespace mpc {
 
         // TODO: Negative?
         // The LSQR solution seems to be much better behaved for the ill-conditioned problem, although maybe less accurate?
-        d_ = -output.x; // x
+        d_ = -x; //output.x;
 
 
 //        std::cout << "d_: " << d_ << std::endl;

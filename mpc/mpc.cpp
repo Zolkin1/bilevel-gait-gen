@@ -155,59 +155,189 @@ namespace mpc {
 
     // TODO: Examine what this looks like on areas when the force is NOT mutable
     void MPC::AddFrictionConeConstraints() {
-        // -------------------- Friction pyramid -------------------- //
-        int force_offset = GetForceSplineStartIdx();
-        int idx = 0;
-        for (int node = 0; node < info_.num_nodes+1; node++) {
-            double time = GetTime(node);
-            for (int ee = 0; ee < num_ee_; ee++) {
-                for (int coord = 0; coord < POS_VARS; coord++) {
-                    if (prev_traj_.IsForceMutable(ee, time)) {
-                        vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord, time);
+        int force_idx = GetForceSplineStartIdx();
+        int row_idx = 0;
 
-                        int vars_index, vars_affecting;
-                        std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee,time,coord);
+        const std::vector<time_v> contact_times = prev_traj_.GetContactTimes();
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int time_idx = 0; time_idx < contact_times.at(ee).size() - 1; time_idx++) {
+                if (contact_times.at(ee).at(time_idx).GetType() == TouchDown) {
+                    for (int i = 0; i < FB_PER_FORCE; i++) { // for each cone constraint
+                        for (int coord = 0; coord < POS_VARS; coord++) {
+                            double lower_time = contact_times.at(ee).at(time_idx).GetTime();
+                            double upper_time = contact_times.at(ee).at(time_idx + 1).GetTime();
+                            double time =
+                                    (static_cast<double>(i) / static_cast<double>(FB_PER_FORCE)) *
+                                    (upper_time - lower_time) +
+                                    lower_time;
+                            assert(prev_traj_.IsForceMutable(ee, time));
 
-                        for (int fric_con = 0; fric_con < 4; fric_con++) {
-                            // All the friction constraints are effected by all 3 coordinates of the end effectors
-                            data_.constraint_mat_.SetMatrix(friction_pyramid_(fric_con, coord) * vars_lin.transpose(),
-                                                            constraint_idx_ + idx + fric_con,
-                                                            force_offset + vars_index);
-                            data_.friction_cone_ub_(idx + fric_con) = 0;
-                            data_.friction_cone_lb_(idx + fric_con) = -1e30;//qp_solver->GetInfinity(1)(0);
+
+                            int vars_index, vars_affecting;
+                            std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
+                            const vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee,
+                                                                              coord,
+                                                                              time);
+
+                            for (int fric_con = 0; fric_con < 4; fric_con++) {
+                                // All the friction constraints are effected by all 3 coordinates of the end effectors
+                                data_.constraint_mat_.SetMatrix(friction_pyramid_(fric_con, coord) * vars_lin.transpose(),
+                                                                constraint_idx_ + row_idx + fric_con,
+                                                                force_idx + vars_index);
+                                data_.friction_cone_ub_(row_idx + fric_con) = 0;
+                                data_.friction_cone_lb_(row_idx + fric_con) = -1e30;//qp_solver->GetInfinity(1)(0);
+                            }
                         }
+                        row_idx += 4;
                     }
                 }
-                idx += 4;
             }
         }
 
-        constraint_idx_ += idx;
+
+        assert(row_idx == data_.num_cone_constraints_);
+        constraint_idx_ += row_idx;
+
+        // -------------------- Friction pyramid -------------------- //
+//        int force_offset = GetForceSplineStartIdx();
+//        int idx = 0;
+//        for (int node = 0; node < info_.num_nodes+1; node++) {
+//            double time = GetTime(node);
+//            for (int ee = 0; ee < num_ee_; ee++) {
+//                for (int coord = 0; coord < POS_VARS; coord++) {
+//                    if (prev_traj_.IsForceMutable(ee, time)) {
+//                        vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord, time);
+//
+//                        int vars_index, vars_affecting;
+//                        std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee,time,coord);
+//
+//                        for (int fric_con = 0; fric_con < 4; fric_con++) {
+//                            // All the friction constraints are effected by all 3 coordinates of the end effectors
+//                            data_.constraint_mat_.SetMatrix(friction_pyramid_(fric_con, coord) * vars_lin.transpose(),
+//                                                            constraint_idx_ + idx + fric_con,
+//                                                            force_offset + vars_index);
+//                            data_.friction_cone_ub_(idx + fric_con) = 0;
+//                            data_.friction_cone_lb_(idx + fric_con) = -1e30;//qp_solver->GetInfinity(1)(0);
+//                        }
+//                    }
+//                }
+//                idx += 4;
+//            }
+//        }
+//
+//        constraint_idx_ += idx;
     }
 
     void MPC::AddFrictionConeConstraintPartials(utils::SparseMatrixBuilder& builder, int contact_idx,
                                                 int start_idx, int ee) {
-        int force_offset = GetForceSplineStartIdx();
-        int idx = 0;
-        for (int node = 0; node < info_.num_nodes+1; node++) {
-            double time = GetTime(node);
-            for (int coord = 0; coord < POS_VARS; coord++) {
-                if (prev_traj_.IsForceMutable(ee, time)) {
-                    vector_t vars_coef = prev_traj_.GetForceCoefPartialsWrtContactTime( ee, coord, time, contact_idx);
+
+        int force_idx = GetForceSplineStartIdx();
+
+        const std::vector<time_v> contact_times = prev_traj_.GetContactTimes();
+        int row_idx = 0;
+
+        for (int i = 0; i < ee; i++) {
+            for (int contact_time = 0; contact_time < contact_times.at(i).size()-1; contact_time++) {
+                if (contact_times.at(i).at(contact_time).GetType() == TouchDown) {
+                    row_idx += 4*FB_PER_FORCE;
+                }
+            }
+        }
+
+        for (int contact_time = 0; contact_time < contact_idx; contact_time++) {
+            if (contact_times.at(ee).at(contact_time).GetType() == TouchDown) {
+                row_idx += 4*FB_PER_FORCE;
+            }
+        }
+
+        if (contact_times.at(ee).at(contact_idx).GetType() == LiftOff && contact_idx > 0) {
+            row_idx -= 4*FB_PER_FORCE;
+        }
+
+
+        if (contact_times.at(ee).at(contact_idx).GetType() == TouchDown
+                && contact_idx <= contact_times.at(ee).size()-1) {
+            for (int i = 0; i < FB_PER_FORCE; i++) { // for each cone constraint
+                for (int coord = 0; coord < POS_VARS; coord++) {
+                    double lower_time = contact_times.at(ee).at(contact_idx).GetTime();
+                    double upper_time = contact_times.at(ee).at(contact_idx + 1).GetTime();
+                    double time =
+                            (static_cast<double>(i) / static_cast<double>(FB_PER_FORCE)) *
+                            (upper_time - lower_time) +
+                            lower_time;
+                    assert(prev_traj_.IsForceMutable(ee, time));
+
+                    double dtimedth = -(static_cast<double>(i) / static_cast<double>(FB_PER_FORCE)) + 1.0;
 
                     int vars_index, vars_affecting;
-                    std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee,time,coord);
+                    std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
+                    const vector_t vars_partial = prev_traj_.GetForceCoefPartialsWrtContactTime(
+                            ee,coord,time, contact_idx, dtimedth);
+
+
 
                     for (int fric_con = 0; fric_con < 4; fric_con++) {
                         // All the friction constraints are effected by all 3 coordinates of the end effectors
-                        builder.SetMatrix(friction_pyramid_(fric_con, coord) * vars_coef.transpose(),
-                                                        start_idx + idx + fric_con,
-                                                        force_offset + vars_index);
+                        builder.SetMatrix(friction_pyramid_(fric_con, coord) * vars_partial.transpose(),
+                                                        start_idx + row_idx + fric_con,
+                                                        force_idx + vars_index);
                     }
                 }
+                row_idx += 4;
             }
-            idx += 4;
+        } else if (contact_idx > 0 && contact_times.at(ee).at(contact_idx).GetType() == LiftOff) {
+            for (int i = 0; i < FB_PER_FORCE; i++) { // for each cone constraint
+                for (int coord = 0; coord < POS_VARS; coord++) {
+                    double lower_time = contact_times.at(ee).at(contact_idx - 1).GetTime();
+                    double upper_time = contact_times.at(ee).at(contact_idx).GetTime();
+                    double time =
+                            (static_cast<double>(i) / static_cast<double>(FB_PER_FORCE)) *
+                            (upper_time - lower_time) +
+                            lower_time;
+                    assert(prev_traj_.IsForceMutable(ee, time));
+
+                    double dtimedth = (static_cast<double>(i) / static_cast<double>(FB_PER_FORCE));
+
+                    int vars_index, vars_affecting;
+                    std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
+                    const vector_t vars_partial = prev_traj_.GetForceCoefPartialsWrtContactTime(
+                            ee, coord, time, contact_idx, dtimedth);
+
+
+                    for (int fric_con = 0; fric_con < 4; fric_con++) {
+                        // All the friction constraints are effected by all 3 coordinates of the end effectors
+                        builder.SetMatrix(friction_pyramid_(fric_con, coord) * vars_partial.transpose(),
+                                                        start_idx + row_idx + fric_con,
+                                                        force_idx + vars_index);
+                    }
+                }
+                row_idx += 4;
+            }
         }
+
+
+
+//        int force_offset = GetForceSplineStartIdx();
+//        int idx = 0;
+//        for (int node = 0; node < info_.num_nodes+1; node++) {
+//            double time = GetTime(node);
+//            for (int coord = 0; coord < POS_VARS; coord++) {
+//                if (prev_traj_.IsForceMutable(ee, time)) {
+//                    vector_t vars_coef = prev_traj_.GetForceCoefPartialsWrtContactTime( ee, coord, time, contact_idx);
+//
+//                    int vars_index, vars_affecting;
+//                    std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee,time,coord);
+//
+//                    for (int fric_con = 0; fric_con < 4; fric_con++) {
+//                        // All the friction constraints are effected by all 3 coordinates of the end effectors
+//                        builder.SetMatrix(friction_pyramid_(fric_con, coord) * vars_coef.transpose(),
+//                                                        start_idx + idx + fric_con,
+//                                                        force_offset + vars_index);
+//                    }
+//                }
+//            }
+//            idx += 4;
+//        }
     }
 
     void MPC::AddForceBoxConstraints() {
@@ -273,7 +403,7 @@ namespace mpc {
         int force_idx = GetForceSplineStartIdx();
 
         const std::vector<time_v> contact_times = prev_traj_.GetContactTimes();
-        int row_idx = 0; // TODO: This should not be 0
+        int row_idx = 0;
 
         for (int i = 0; i < ee; i++) {
             for (int contact_time = 0; contact_time < contact_times.at(i).size()-1; contact_time++) {
@@ -305,7 +435,7 @@ namespace mpc {
             vector_t vars_partials;
             int vars_index, vars_affecting;
 
-            if (contact_times.at(ee).at(contact_idx).GetType() == TouchDown) { // TODO: Account for the change in lift off (look backwards in time)
+            if (contact_times.at(ee).at(contact_idx).GetType() == TouchDown && contact_idx < contact_times.at(ee).size()-1) { // TODO: Account for the change in lift off (look backwards in time)
                 double lower_time = contact_times.at(ee).at(contact_idx).GetTime();
                 double upper_time = contact_times.at(ee).at(contact_idx + 1).GetTime();
 
@@ -334,7 +464,7 @@ namespace mpc {
 
                     row_idx++;
                 }
-            } else if (contact_idx > 0) { // Liftoff - so effect the derivatives behind in time
+            } else if (contact_times.at(ee).at(contact_idx).GetType() == LiftOff && contact_idx > 0) { // Liftoff - so effect the derivatives behind in time
                 double lower_time = contact_times.at(ee).at(contact_idx-1).GetTime();
                 double upper_time = contact_times.at(ee).at(contact_idx).GetTime();
 
@@ -448,8 +578,10 @@ namespace mpc {
         // TODO: May want to put in a check for this, but it should always be active
         if (using_clarabel_) {
             data_.num_force_box_constraints_ = GetNumForceBoxConstraints();
+            data_.num_cone_constraints_ = GetNumFricConeConstraints();
         } else {
             data_.num_force_box_constraints_ = GetNodeIntersectMutableForces(); // TODO: Change
+            // TODO: Add other constraint
         }
     }
 
@@ -827,6 +959,20 @@ namespace mpc {
             for (int i = 0; i < contact_times.at(ee).size() - 1; i++) {
                 if (contact_times.at(ee).at(i).GetType() == TouchDown) {
                     num_constraints += 2*FB_PER_FORCE;
+                }
+            }
+        }
+
+        return num_constraints;
+    }
+
+    int MPC::GetNumFricConeConstraints() const {
+        const std::vector<time_v> contact_times = prev_traj_.GetContactTimes();
+        int num_constraints = 0;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int i = 0; i < contact_times.at(ee).size() - 1; i++) {
+                if (contact_times.at(ee).at(i).GetType() == TouchDown) {
+                    num_constraints += 4*FB_PER_FORCE;
                 }
             }
         }

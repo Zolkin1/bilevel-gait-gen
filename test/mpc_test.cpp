@@ -147,11 +147,16 @@ TEST_CASE("Basic MPC", "[mpc]") {
                        data.num_ee_location_constraints_))/dt;
 
                 REQUIRE(data2.num_force_box_constraints_ == data.num_force_box_constraints_);
-                // TODO: This one might be hard as the number of constraints changes - this may be a fundamental issue that needs addressing
                 matrix_t finite_diff_fb = (data2.sparse_constraint_.middleRows(data.num_dynamics_constraints, data.num_force_box_constraints_)
                         - data.sparse_constraint_.middleRows(data.num_dynamics_constraints, data.num_force_box_constraints_))/dt;
 
-//                std::cout << "finite diff fb (top rows): \n" << finite_diff_fb.topRightCorner(50, 150) << std::endl;
+                REQUIRE(data2.num_cone_constraints_ == data.num_cone_constraints_);
+                matrix_t finite_diff_cone = (data2.sparse_constraint_.middleRows(data.num_dynamics_constraints + data.num_force_box_constraints_,
+                                                                                data.num_cone_constraints_)
+                                        - data.sparse_constraint_.middleRows(data.num_dynamics_constraints +
+                                        data.num_force_box_constraints_,data.num_cone_constraints_))/dt;
+
+//                std::cout << "finite diff cone (top rows): \n" << finite_diff_cone.topRightCorner(50, 150) << std::endl;
 
                 // Get partial calculations
                 QPPartials partials;
@@ -199,6 +204,20 @@ TEST_CASE("Basic MPC", "[mpc]") {
                             std::cout << "ee: " << ee << ", contact idx: " << idx << std::endl;
                         }
                         REQUIRE_THAT(dForceBox(row, col) - finite_diff_fb(row, col), WithinAbs(0, DERIV_MARGIN));
+                    }
+                }
+
+                matrix_t dConeConstraints = dG.middleRows(data.num_force_box_constraints_, data.num_cone_constraints_);
+                for (int row = 0; row < dConeConstraints.rows(); row++) {
+                    for (int col = 0; col < dConeConstraints.cols(); col++) {
+                        if (std::abs(dConeConstraints(row, col) - finite_diff_cone(row, col)) >= DERIV_MARGIN) {
+                            std::cout << "Cone MISMATCH at row " << row << ", col " << col << std::endl;
+                            std::cout << "finite_diff: " << finite_diff_cone(row, col) << std::endl;
+                            std::cout << "partial: " << dConeConstraints(row, col) << std::endl;
+                            std::cout << "next partial: " << dConeConstraints(row, col+1) << std::endl;
+                            std::cout << "ee: " << ee << ", contact idx: " << idx << std::endl;
+                        }
+                        REQUIRE_THAT(dConeConstraints(row, col) - finite_diff_cone(row, col), WithinAbs(0, DERIV_MARGIN));
                     }
                 }
 
@@ -929,7 +948,7 @@ TEST_CASE("Clarabel Solver", "[mpc][clarabel]") {
     for (int i = 0; i < osqp_data.num_dynamics_constraints; i++) {
         for (int j = 0; j < osqp_data.num_decision_vars; j++) {
             if (osqp_data.sparse_constraint_.toDense()(i,j) != 0) {   // Due to OSQP bug can only expect this to match when the term is non-zero
-//                REQUIRE_THAT(c_dA(i, j) - o_dA(i, j), WithinAbs(0, MARGIN));
+                REQUIRE_THAT(c_dA(i, j) - o_dA(i, j), WithinAbs(0, MARGIN));
             }
         }
     }
@@ -938,8 +957,8 @@ TEST_CASE("Clarabel Solver", "[mpc][clarabel]") {
         for (int j = 0; j < osqp_data.num_decision_vars; j++) {
             int idx = i + osqp_data.num_dynamics_constraints;
             if (osqp_data.sparse_constraint_.toDense()(idx, j) != 0) { // Due to OSQP bug can only expect this to match when the term is non-zero
-//                REQUIRE_THAT(c_dG(i, j) + c_dG(i + osqp_data.num_force_box_constraints_, j)
-//                             - o_dA(idx, j), WithinAbs(0, MARGIN));
+                REQUIRE_THAT(c_dG(i, j) + c_dG(i + osqp_data.num_force_box_constraints_, j)
+                             - o_dA(idx, j), WithinAbs(0, MARGIN));
             }
         }
     }

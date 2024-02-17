@@ -370,7 +370,8 @@ namespace mpc {
         data_.num_decision_vars = (info_.num_nodes+1)*num_states_ + num_inputs_;
         data_.num_dynamics_constraints = (info_.num_nodes+1)*num_states_;
 
-        data_.num_cone_constraints_ = (info_.num_nodes+1)*4*num_ee_;
+        data_.num_cone_constraints_ = GetNumFricConeConstraints();
+//        data_.num_cone_constraints_ = (info_.num_nodes+1)*4*num_ee_;
         if (using_clarabel_) {
             data_.num_force_box_constraints_ = GetNumForceBoxConstraints(); //2*GetNodeIntersectMutableForces();
             data_.num_ee_location_constraints_ = 2*(info_.num_nodes-1)*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
@@ -799,7 +800,7 @@ namespace mpc {
 
                 } else if (data_.constraints_.at(i) == FrictionCone) {
                     // TODO: Note: when this is removed the derivatives are at least the right order of magnitude...
-//                    AddFrictionConeConstraintPartials(G_builder, contact_time_idx, ineq_idx, ee);
+                    AddFrictionConeConstraintPartials(G_builder, contact_time_idx, ineq_idx, ee);
                     ineq_idx += data_.num_cone_constraints_;
 
                 }

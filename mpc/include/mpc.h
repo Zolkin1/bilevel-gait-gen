@@ -218,6 +218,8 @@ namespace mpc {
 
         int GetNumForceBoxConstraints() const;
 
+        int GetNumFricConeConstraints() const;
+
         // ---------------- Member Variables ---------------- //
         // Centroidal model
         SingleRigidBodyModel model_;
