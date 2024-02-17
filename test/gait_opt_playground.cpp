@@ -107,7 +107,7 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
             if (!(i % 2)) {        // At i = 10 we get primal infeasable. This also then happens to align with the period of the first trajectory.
                 prev_cost = RunGaitOpt(mpc, gait_opt, prev_traj, cost_red, time);
                 std::cout << "Time: " << time << std::endl;
-                PrintContactSched(mpc.GetTrajectory().GetContactTimes());
+//                PrintContactSched(mpc.GetTrajectory().GetContactTimes());
             }
         }
 
@@ -270,12 +270,12 @@ int main() {
     robot->SetSimModel(viz.GetModel());
 
     // MPC w/ fixed position
-    MPCWithFixedPosition(mpc1, gait_optimizer1, init_state, ee_locations, config.ParseString("robot_xml"), standing,
-                         robot, info, config.ParseNumber<double>("viz_rate"), false, viz, false);
+//    MPCWithFixedPosition(mpc1, gait_optimizer1, init_state, ee_locations, config.ParseString("robot_xml"), standing,
+//                         robot, info, config.ParseNumber<double>("viz_rate"), false, viz, false);
 
 
-//    MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
-//                         robot, info, config.ParseNumber<double>("viz_rate"), true, viz, true);
+    MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
+                         robot, info, config.ParseNumber<double>("viz_rate"), true, viz, true);
 
     // MPC w/ fixed position + line search
 

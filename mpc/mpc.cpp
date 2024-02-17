@@ -256,7 +256,7 @@ namespace mpc {
 
 
         if (contact_times.at(ee).at(contact_idx).GetType() == TouchDown
-                && contact_idx <= contact_times.at(ee).size()-1) {
+                && contact_idx < contact_times.at(ee).size()-1) {
             for (int i = 0; i < FB_PER_FORCE; i++) { // for each cone constraint
                 for (int coord = 0; coord < POS_VARS; coord++) {
                     double lower_time = contact_times.at(ee).at(contact_idx).GetTime();

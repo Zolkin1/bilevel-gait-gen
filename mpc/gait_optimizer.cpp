@@ -94,6 +94,8 @@ namespace mpc {
         sp_matrix_t dldPth(num_decision_vars_, num_decision_vars_);
         dHdth = vector_t::Zero(GetNumTimeNodes(num_ee_));
 
+        qp_partials_.dl.setZero();
+        qp_partials_.du.setZero();
 
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int idx = 0; idx < contact_times_.at(ee).size(); idx++) {
@@ -141,7 +143,7 @@ namespace mpc {
                     }
                 }
 
-                dHdth(GetNumTimeNodes(ee) + idx) = dldPth.sum() + dldAth.sum() + dldGth.sum() +
+                dHdth(GetNumTimeNodes(ee) + idx) = dldGth.sum( )+ dldAth.sum() + dldPth.sum() +
                                                      qp_partials_.dl.dot(param_partial.dl) + qp_partials_.du.dot(param_partial.du) +
                                                      qp_partials_.dq.dot(param_partial.dq) + qp_partials_.db.dot(param_partial.db) +
                                                      qp_partials_.dh.dot(param_partial.dh);
@@ -149,8 +151,8 @@ namespace mpc {
             }
         }
 
-        std::cout << "max qp partial dA: " << qp_partials_.dA.coeffs().maxCoeff() << std::endl;
-        std::cout << "max qp partial dG: " << qp_partials_.dG.coeffs().maxCoeff() << std::endl;
+//        std::cout << "max qp partial dA: " << qp_partials_.dA.coeffs().maxCoeff() << std::endl;
+//        std::cout << "max qp partial dG: " << qp_partials_.dG.coeffs().maxCoeff() << std::endl;
         double max = -1e10;
         int max_row = -1;
         int max_col = -1;
@@ -165,7 +167,7 @@ namespace mpc {
             }
         }
 
-        std::cout << "dG max coeff row, col: " << max_row << ", " << max_col << std::endl;
+//        std::cout << "dG max coeff row, col: " << max_row << ", " << max_col << std::endl;
         std::cout << "gradient term: " << dHdth.transpose() << std::endl;
 
 //        dHdth.normalize();
@@ -336,6 +338,11 @@ namespace mpc {
 //        double step_len = 1e-3;
 //        step_(max_idx) = step_len;
 
+        // Finite differencing!
+        step_.setZero();
+        const double dt = 1e-5;     // TODO: Finite difference surprisingly sensitive to this (can I use it as ground truth?)
+        step_(3) = dt;
+
         xkp1_ = xk_ + step_;
 
         for (int ee = 0; ee < num_ee_; ee++) {
@@ -369,6 +376,8 @@ namespace mpc {
         std::cout << "Actual cost reduction (previous step): " << actual_red_cost << std::endl;
         std::cout << "Predicted cost reduction: " << pred_red_cost_ << std::endl;
         std::cout << "trust region size: " << Delta_ << std::endl;
+        std::cout << "finite difference: " << -actual_red_cost/dt << std::endl;
+        std::cout << std::endl;
 
         run_num_++;
     }

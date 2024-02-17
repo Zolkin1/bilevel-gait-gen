@@ -221,19 +221,19 @@ namespace mpc {
 //            }
 //        }
 
-        std::cout << "lam_ max: " << lam_.maxCoeff() << ", note: large value represents high sensitivity" << std::endl;
-        std::cout << "dlam max: " << dlam.maxCoeff() << std::endl;
+//        std::cout << "lam_ max: " << lam_.maxCoeff() << ", note: large value represents high sensitivity" << std::endl;
+//        std::cout << "dlam max: " << dlam.maxCoeff() << std::endl;
 //        for (int i = 0; i < lam_.size(); i++) {
 //            if (lam_.maxCoeff() == lam_(i)) {
 //                std::cout << "lam_ max occurs at index: " << i << std::endl;
 //            }
 //        }
 
-        std::cout << "dnu max: " << dnu.maxCoeff() << std::endl;
-        std::cout << "nu_ max: " << nu_.maxCoeff() << std::endl;
-
-        std::cout << "dz max: " << dz.maxCoeff() << std::endl;
-        std::cout << "primal max: " << primal_.maxCoeff() << std::endl;
+//        std::cout << "dnu max: " << dnu.maxCoeff() << std::endl;
+//        std::cout << "nu_ max: " << nu_.maxCoeff() << std::endl;
+//
+//        std::cout << "dz max: " << dz.maxCoeff() << std::endl;
+//        std::cout << "primal max: " << primal_.maxCoeff() << std::endl;
 
 //        qp_file << "dP: \n" << dP.toDense() << std::endl;
 //        qp_file << std::endl;
@@ -363,7 +363,7 @@ namespace mpc {
 
         assert(gen_idx == data.GetTotalNumConstraints());
 
-        G = -G; // TODO: What's up with this negative sign?
+//        G = -G; // TODO: What's up with this negative sign?
 
         utils::SparseMatrixBuilder mat_builder;
         mat_builder.Reserve(3*data.sparse_constraint_.nonZeros() +
@@ -414,9 +414,9 @@ namespace mpc {
                 non_zero_slacks++;
             }
         }
-        std::cout << "Nonzero lambda values: " << non_zero_lam << ", lambda length: " << lam_.size() << std::endl;
-        std::cout << "Nonzero inequality slack values: " << non_zero_slacks << ", slacks length: " << s_ineq.size() << std::endl;
-        std::cout << "Sum of nonzeros: " << non_zero_lam + non_zero_slacks << std::endl;
+//        std::cout << "Nonzero lambda values: " << non_zero_lam << ", lambda length: " << lam_.size() << std::endl;
+//        std::cout << "Nonzero inequality slack values: " << non_zero_slacks << ", slacks length: " << s_ineq.size() << std::endl;
+//        std::cout << "Sum of nonzeros: " << non_zero_lam + non_zero_slacks << std::endl;
 
 //        Eigen::JacobiSVD<matrix_t> svd(A);
 //        double cond = svd.singularValues()(0)
@@ -464,7 +464,7 @@ namespace mpc {
             }
         }
 
-        std::cout << "KKT mat max val: " << max << ", row: " << max_row << ", col: " << max_col << std::endl;
+//        std::cout << "KKT mat max val: " << max << ", row: " << max_row << ", col: " << max_col << std::endl;
 
         // Solve the system
         // The system solve is only about 1-2ms
@@ -477,7 +477,7 @@ namespace mpc {
         settings.A_tol = 1e-10;
         settings.b_tol = 1e-10;
         settings.damping = 0;
-        settings.conditioning_lim = 1e9;
+        settings.conditioning_lim = 1e15;
         settings.verbose = false;
 
         lsqr::LSQR lsqr(settings);
@@ -508,10 +508,13 @@ namespace mpc {
 
         vector_t temp2 = d_; //diff_mat.transpose()*d_;
 
-        // TODO: Can't solve the high tolerance problem with 50 nodes
-        solver.setTolerance(1e-10); // TODO: Higher tolerances make this much better! Ideally AT LEAST 1e-8!
-        // TODO: Note it seems more related to the conditioning of the problem rather than the tolerance.
-        solver.setMaxIterations(1*diff_mat.rows());
+        // TODO: Deal with/look into the tolerancing
+        // Lower tolerance (like 1e-6) seem give values closer to the finite differnce.
+        // Higher tolerance seem to make the values blow up (but only like 2x)
+        // The question is: at higher tolerance is the lin sys solve bad? Is the finite difference off?
+        // Am I missing a term on the gradient caluclation that would help (somewhere in the stack)?
+        solver.setTolerance(1e-6);
+        solver.setMaxIterations(50*diff_mat.rows());
 
         utils::Timer lscg_timer("lscg");
         lscg_timer.StartTimer();
@@ -524,22 +527,25 @@ namespace mpc {
         }
 
         vector_t x = solver.solve(temp2);
+        if (solver.info() != Eigen::Success) {
+            throw std::runtime_error("Could not solve the equation.");
+        }
         lscg_timer.StopTimer();
         lscg_timer.PrintElapsedTime();
 
         std::cout << "LSCG #iterations:     " << solver.iterations() << std::endl;
         std::cout << "LSCG estimated error: " << solver.error()      << std::endl;
-        std::cout << "LSQR convergence value: " << output.convergence << std::endl;
+//        std::cout << "LSQR convergence value: " << output.convergence << std::endl;
 //        std::cout << "max elemnt of d_ (lsqr): " << d_.maxCoeff() << std::endl;
 
-        std::cout << "LSCG error: " << (diff_mat*x - d_).norm() << std::endl;
-        std::cout << "LSCG norm: " << x.norm() << std::endl;
-        std::cout << "LSQR error: " << (diff_mat*output.x - d_).norm() << std::endl;
-        std::cout << "LSQR norm: " << output.x.norm() << std::endl;
+//        std::cout << "LSCG error: " << (diff_mat*x - d_).norm() << std::endl;
+//        std::cout << "LSCG norm: " << x.norm() << std::endl;
+//        std::cout << "LSQR error: " << (diff_mat*output.x - d_).norm() << std::endl;
+//        std::cout << "LSQR norm: " << output.x.norm() << std::endl;
 
         // TODO: Negative?
         // The LSQR solution seems to be much better behaved for the ill-conditioned problem, although maybe less accurate?
-        d_ = -x; //output.x;
+        d_ = -x; //output.x; // LSQR seems to be giving worse results
 
 
 //        std::cout << "d_: " << d_ << std::endl;
@@ -555,10 +561,10 @@ namespace mpc {
         num_equality_constraints_ = data.num_equality_;
         num_inequality_constraints_ = data.num_inequality_;
 
-        std::cout << "Force box constraints: " << data.num_force_box_constraints_ << std::endl;
-        std::cout << "Friction cone constraints: " << data.num_cone_constraints_ << std::endl;
-        std::cout << "EE box constraints: " << data.num_ee_location_constraints_ << std::endl;
-        std::cout << "EE start constraints: " << data.num_start_ee_constraints_ << std::endl;
+//        std::cout << "Force box constraints: " << data.num_force_box_constraints_ << std::endl;
+//        std::cout << "Friction cone constraints: " << data.num_cone_constraints_ << std::endl;
+//        std::cout << "EE box constraints: " << data.num_ee_location_constraints_ << std::endl;
+//        std::cout << "EE start constraints: " << data.num_start_ee_constraints_ << std::endl;
     }
 
     vector_t ClarabelInterface::Computedx(const Eigen::SparseMatrix<double>& P, const mpc::vector_t& q,
