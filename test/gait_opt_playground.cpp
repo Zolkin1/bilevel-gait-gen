@@ -45,7 +45,7 @@ double RunGaitOpt(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt, co
 
         gait_opt.OptimizeContactTimes(time, cost_red);
 
-        mpc.UpdateContactTimes(gait_opt.GetContactTimes());
+//        mpc.UpdateContactTimes(gait_opt.GetContactTimes()); // TODO: Put back
     } else {
         std::cerr << "Can't perform gait optimization because MPC was not solved to tolerance." << std::endl;
     }
@@ -79,7 +79,7 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
     const auto contact_sched = mpc.GetTrajectory().GetContactTimes();
     double total_cost = 0;
 
-    const int N = 300;
+    const int N = 200;
     for (int i = 0; i < N; i++) {
         double time = i*info.integrator_dt;
         if (fixed_pos) {
@@ -114,12 +114,17 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
         // TODO: Remove
 //        prev_cost = mpc.GetCost();
 
+        const mpc::QPData& data = mpc.GetQPData();
+        const mpc::QPData data1 = data;
         // Run next MPC
         if (fixed_pos) {
             prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(0), time, ee_locations, false);
         } else {
             prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
         }
+        const mpc::QPData& data2 = mpc.GetQPData();
+        assert(data1.num_decision_vars == data2.num_decision_vars);
+        assert(data1.GetTotalNumConstraints() == data2.GetTotalNumConstraints());
 //        std::cout << "MPC iteration cost change: " << prev_cost - mpc.GetCost() << std::endl;
         cost_red = prev_cost - mpc.GetCost();
         total_cost += mpc.GetCost();
@@ -271,7 +276,7 @@ int main() {
 
     // MPC w/ fixed position
 //    MPCWithFixedPosition(mpc1, gait_optimizer1, init_state, ee_locations, config.ParseString("robot_xml"), standing,
-//                         robot, info, config.ParseNumber<double>("viz_rate"), false, viz, false);
+//                         robot, info, config.ParseNumber<double>("viz_rate"), false, viz, true);
 
 
     MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,

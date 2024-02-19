@@ -31,7 +31,7 @@ namespace mpc {
         qp_solver_.settings()->setAbsoluteTolerance(1e-10);
         qp_solver_.settings()->setRelativeTolerance(1e-10);
         qp_solver_.settings()->setScaledTerimination(false);
-        qp_solver_.settings()->setMaxIteration(2000);
+        qp_solver_.settings()->setMaxIteration(3000);
         qp_solver_.settings()->setRho(.01);
         qp_solver_.settings()->setWarmStart(true);
         qp_solver_.settings()->setScaling(10);
@@ -39,7 +39,7 @@ namespace mpc {
 
         gamma_ = 0.5;
         eta_ = 0.75;
-        Delta_ = 1e-4; // 1e-4 and 1e-6 both seem to be close to working well
+        Delta_ = 1e-8; // 1e-4 and 1e-6 both seem to be close to working well
 
         run_num_ = 0;
         past_decision_vars_ = 0;
@@ -340,8 +340,9 @@ namespace mpc {
 
         // Finite differencing!
         step_.setZero();
-        const double dt = 1e-5;     // TODO: Finite difference surprisingly sensitive to this (can I use it as ground truth?)
-        step_(3) = dt;
+        const double dt = 1e-8;     // TODO: Finite difference surprisingly sensitive to this (can I use it as ground truth?)
+        const int step_idx = 4; // some are worse than others (i.e. 4)
+        step_(step_idx) = dt;
 
         xkp1_ = xk_ + step_;
 
@@ -377,6 +378,7 @@ namespace mpc {
         std::cout << "Predicted cost reduction: " << pred_red_cost_ << std::endl;
         std::cout << "trust region size: " << Delta_ << std::endl;
         std::cout << "finite difference: " << -actual_red_cost/dt << std::endl;
+        std::cout << "step idx: " << step_idx << std::endl;
         std::cout << std::endl;
 
         run_num_++;
@@ -443,10 +445,12 @@ namespace mpc {
             }
             A(nodes-1,nodes-1) = 1;
 
-            lb_(start_row + GetNumTimeNodes(ee) + nodes - 1) = -0.2; // TODO: Check this
+            lb_(start_row + GetNumTimeNodes(ee) + nodes - 1) = 0; //-0.2; // TODO: Check this
             ub_(start_row + GetNumTimeNodes(ee) + nodes - 1) = 0.2;
 
             assert(GetNumTimeNodes(ee) + nodes <= GetNumTimeNodes(num_ee_));
+
+//            PrintConstraints(A, lb_, ub_);
 
             A_builder_.SetMatrix(A, start_row + GetNumTimeNodes(ee), GetNumTimeNodes(ee));
             end_row += nodes;

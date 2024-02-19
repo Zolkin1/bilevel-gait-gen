@@ -67,7 +67,7 @@ namespace mpc {
         AddHessianApproxCost();
         AddGradientCost();
         AddFinalCost();
-//        AddDiagonalCost();
+        AddDiagonalCost();
 
 //        data_.cost_mat_.SetDiagonalMatrix(1, 0, 0, data_.num_decision_vars);
 
@@ -82,16 +82,6 @@ namespace mpc {
                     dynamics_timer.StopTimer();
                     break;
                 case Constraints::ForceBox:
-                    if (run_num_ == -1) {
-                        std::cout << "Dynamics constraints: " << data_.num_dynamics_constraints << std::endl;
-                        std::cout << "Force box constraints: " << data_.num_force_box_constraints_ << std::endl;
-                        std::cout << "Friction cone constraints: " << data_.num_cone_constraints_ << std::endl;
-                        std::cout << "EE location constraints: " << data_.num_ee_location_constraints_ << std::endl;
-                        std::cout << "Start EE constraints: " << data_.num_start_ee_constraints_ << std::endl;
-                        // No change in the negative direction (any amount), moving in the positive direction ANY amount gives the same change
-                        data_.constraint_mat_.SetDiagonalMatrix(1e-1, 82 + data_.num_dynamics_constraints, 284, 1);
-                        std::cout << "added slight modification" << std::endl;
-                    }
                     AddForceBoxConstraints();
                     break;
                 case Constraints::FrictionCone:
@@ -105,6 +95,17 @@ namespace mpc {
             }
         }
         constraint_costs_timer.StopTimer();
+
+        if (run_num_ == 20) {
+            std::cout << "Dynamics constraints: " << data_.num_dynamics_constraints << std::endl;
+            std::cout << "Force box constraints: " << data_.num_force_box_constraints_ << std::endl;
+            std::cout << "Friction cone constraints: " << data_.num_cone_constraints_ << std::endl;
+            std::cout << "EE location constraints: " << data_.num_ee_location_constraints_ << std::endl;
+            std::cout << "Start EE constraints: " << data_.num_start_ee_constraints_ << std::endl;
+            // No change in the negative direction (any amount), moving in the positive direction ANY amount gives the same change
+            data_.constraint_mat_.SetDiagonalMatrix(1e-8, 0, 750, 1);
+            std::cout << "added slight modification" << std::endl;
+        }
 
         data_.ConstructSparseMats();
         data_.ConstructVectors();
@@ -149,11 +150,12 @@ namespace mpc {
 
         utils::Timer line_search_timer("line search");
         double alpha = 1;
-        if (num_run_ >= 0 && sol.size() == prev_qp_sol.size()) {
-            line_search_timer.StartTimer();
-            alpha = LineSearch(p, state);
-            line_search_timer.StopTimer();
-        }
+        // TODO: Put back
+//        if (num_run_ >= 0 && sol.size() == prev_qp_sol.size()) {
+//            line_search_timer.StartTimer();
+//            alpha = LineSearch(p, state);
+//            line_search_timer.StopTimer();
+//        }
 
 //        if (run_num_ > 0){
 //            std::cout << (alpha*(qp_solver->GetDualSolution() - prev_dual_sol_) + prev_dual_sol_).lpNorm<Eigen::Infinity>() << std::endl;
@@ -233,6 +235,7 @@ namespace mpc {
 
         run_num_++;
 
+        std::cout << "Cost: " << std::setprecision(17) << GetCost() << std::endl;
 
         if (info_.verbose == Timing || info_.verbose == All) {
             constraint_costs_timer.PrintElapsedTime();

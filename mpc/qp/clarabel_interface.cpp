@@ -150,13 +150,13 @@ namespace mpc {
     }
 
     void ClarabelInterface::ConfigureForInitialRun() {
-        settings_.tol_gap_rel = 1e-11;
-        settings_.tol_gap_abs = 1e-11;
+        settings_.tol_gap_rel = 1e-15;
+        settings_.tol_gap_abs = 1e-15;
     }
 
     void ClarabelInterface::ConfigureForRealTime(double run_time_iters) {
-         settings_.tol_gap_rel = 1e-8; //1e-11;
-         settings_.tol_gap_abs = 1e-8; //1e-11;
+         settings_.tol_gap_rel = 1e-15; //1e-11; 1e-15 works well
+         settings_.tol_gap_abs = 1e-15; //1e-11;
     }
 
 
@@ -192,6 +192,10 @@ namespace mpc {
         dA.resize(nu_.size(), primal_.size());
         dG.resize(lam_.size(), primal_.size());
 
+        assert(dnu.size() == nu_.size());
+        assert(dlam.size() == lam_.size());
+        assert(dz.size() == primal_.size());
+
 //        std::cout << "dz*z^*: " << dz*primal_.transpose() << std::endl;
 
         utils::SparseMatrixBuilder P_builder;
@@ -203,6 +207,10 @@ namespace mpc {
         A_builder.Reserve(1000);
         A_builder.SetMatrix((dnu*primal_.transpose() + nu_*dz.transpose()), 0, 0);
         dA.setFromTriplets(A_builder.GetTriplet().begin(), A_builder.GetTriplet().end());
+
+        const int row = 0; // 1
+        const int col = 2; // 750
+        std::cout << "dA at (" << row << "," << col << "): " << dA.toDense()(row, col) << std::endl;
 
         utils::SparseMatrixBuilder G_builder;
         G_builder.Reserve(1000);
@@ -345,6 +353,26 @@ namespace mpc {
             }
         }
 
+        // Print slack and lambda
+//        std::cout << std::setw(15) << "slacks | " << std::setw(15) << "lambda" << std::endl;
+//        for (int i = 0; i < lam_.size(); i++) {
+//            std::cout << std::setw(15) << s_ineq(i) << " | " << std::setw(15) << lam_(i) << std::endl;
+//        }
+
+        // TODO: (2/18/2024)
+        // - The creation of the G, A, h, b mats/vecs appears to be correct
+        // - The gradient computation is incorrect (can compare against the optnet gradients)
+        // - There are three main options:
+        //   (1) The KKT matrix is being formed wrong
+        //   (2) The solvers used to solve the KKT matrix are bad
+        //   (3) maybe d_ is correct but the formation of the differential matricies are wrong, nu_ or lam_ could be wrong
+        //      - Probably NOT (3) (looks reasonable at a first glance)
+        // Some more notes: the derivative wrt the A matrix is really good by OptNet, (i.e. matches the finite
+        // difference really well), but the G matrix derivative does not look so good (relative to the finite difference).
+        // I suspect that this is due to the fact that I am actually getting a subgradient instead of a derivative and
+        // thus I can't expect them to line up perfectly. So I still need to get my A matrix derivatives to look good,
+        // but I also may want to look into using the subgradients before I fix the code
+
 //        qp_file.open("clarabel_qp_data.txt");
 //        qp_file << "A: \n" << A << std::endl;
 //        qp_file << std::endl;
@@ -358,12 +386,17 @@ namespace mpc {
 //        qp_file << std::endl;
 //        qp_file << "q: \n" << data.cost_linear << std::endl;
 //        qp_file << std::endl;
+//        qp_file << "x: \n" << primal_ << std::endl;
+//        qp_file << std::endl;
+//        qp_file << "dual: \n" << dual_ << std::endl;
+//        qp_file << std::endl;
 
         // TODO: Check that lam or eq constraint is always 0!
 
         assert(gen_idx == data.GetTotalNumConstraints());
 
-//        G = -G; // TODO: What's up with this negative sign?
+        assert(G.rows() == data.num_inequality_);
+        assert(A.rows() == data.num_equality_);
 
         utils::SparseMatrixBuilder mat_builder;
         mat_builder.Reserve(3*data.sparse_constraint_.nonZeros() +
@@ -371,14 +404,11 @@ namespace mpc {
 
         mat_builder.SetMatrix(data.sparse_cost_.toDense(), 0, 0);
 
-//        mat_builder.SetMatrix(G.transpose(), 0, data.num_decision_vars);
         mat_builder.SetMatrix(G.transpose()*lam_.asDiagonal(), 0, data.num_decision_vars);
 
         mat_builder.SetMatrix(A.transpose(),
                               0, data.num_decision_vars + G.rows());
 
-//        mat_builder.SetMatrix((lam_.asDiagonal()*G), data.num_decision_vars, 0);
-//        mat_builder.SetMatrix((G.array().colwise() * lam_.array()), data.num_decision_vars, 0);
         mat_builder.SetMatrix(G, data.num_decision_vars, 0);
 
         mat_builder.SetVectorDiagonally(s_ineq, data.num_decision_vars, data.num_decision_vars);
@@ -386,21 +416,10 @@ namespace mpc {
 
         assert(data.num_inequality_ + data.num_equality_ == data.GetTotalNumConstraints());
 
-//        mat_builder.SetDiagonalMatrix(1e-3, 0, 0, data.num_decision_vars + data.GetTotalNumConstraints());
-
         sp_matrix_t diff_mat(data.num_decision_vars + data.GetTotalNumConstraints(),
                             data.num_decision_vars + data.GetTotalNumConstraints());
 
         diff_mat.setFromTriplets(mat_builder.GetTriplet().begin(), mat_builder.GetTriplet().end());
-
-        // Getting some rank info
-//        Eigen::FullPivHouseholderQR<matrix_t> qr;
-//        qr.compute(A.transpose());
-//        std::cout << "A^T rank: " << qr.rank() << ", A^T rows: " << qr.rows() << ", A^T cols: " << qr.cols() << std::endl;
-//
-//
-//        qr.compute(G.transpose());
-//        std::cout << "G^T rank: " << qr.rank() << ", G^T rows: " << qr.rows() << ", G^T cols: " << qr.cols() << std::endl;
 
         int non_zero_lam = 0;
         int non_zero_slacks = 0;
@@ -414,113 +433,38 @@ namespace mpc {
                 non_zero_slacks++;
             }
         }
-//        std::cout << "Nonzero lambda values: " << non_zero_lam << ", lambda length: " << lam_.size() << std::endl;
-//        std::cout << "Nonzero inequality slack values: " << non_zero_slacks << ", slacks length: " << s_ineq.size() << std::endl;
-//        std::cout << "Sum of nonzeros: " << non_zero_lam + non_zero_slacks << std::endl;
+        std::cout << "Nonzero lambda values: " << non_zero_lam << ", lambda length: " << lam_.size() << std::endl;
+        std::cout << "Nonzero inequality slack values: " << non_zero_slacks << ", slacks length: " << s_ineq.size() << std::endl;
+        std::cout << "Sum of nonzeros: " << non_zero_lam + non_zero_slacks << std::endl;
+        std::cout << "A rows: " << A.rows() << std::endl;
+        std::cout << "Decision vars: " << data.num_decision_vars << std::endl;
 
-//        Eigen::JacobiSVD<matrix_t> svd(A);
-//        double cond = svd.singularValues()(0)
-//                      / svd.singularValues()(svd.singularValues().size()-1);
-//
-//        std::cout << "Equality constraint mat max svd value: " << svd.singularValues()(0) << std::endl;
-//        std::cout << "Equality constraint mat min svd value: " << svd.singularValues()(svd.singularValues().size()-1) << std::endl;
-//        std::cout << "Equality constraint mat Condition number: " << cond << std::endl;
-//
-//        Eigen::JacobiSVD<matrix_t> svd2(G);
-//        cond = svd2.singularValues()(0)
-//                      / svd2.singularValues()(svd2.singularValues().size()-1);
-//
-//        std::cout << "Inequality constraint mat max svd value: " << svd2.singularValues()(0) << std::endl;
-//        std::cout << "Inequality constraint mat min svd value: " << svd2.singularValues()(svd2.singularValues().size()-1) << std::endl;
-//        std::cout << "Inequality constraint mat Condition number: " << cond << std::endl;
-//
-//        Eigen::JacobiSVD<matrix_t> svd3(data.sparse_constraint_);
-//        cond = svd3.singularValues()(0)
-//                      / svd3.singularValues()(svd3.singularValues().size()-1);
-//
-//        std::cout << "Constraint mat max svd value: " << svd3.singularValues()(0) << std::endl;
-//        std::cout << "Constraint mat min svd value: " << svd3.singularValues()(svd3.singularValues().size()-1) << std::endl;
-//        std::cout << "Constraint mat Condition number: " << cond << std::endl;
-//
-//        Eigen::JacobiSVD<matrix_t> svd4(data.sparse_cost_);
-//        cond = svd4.singularValues()(0)
-//                      / svd4.singularValues()(svd4.singularValues().size()-1);
-//
-//        std::cout << "Cost mat max svd value: " << svd4.singularValues()(0) << std::endl;
-//        std::cout << "Cost mat min svd value: " << svd4.singularValues()(svd4.singularValues().size()-1) << std::endl;
-//        std::cout << "Cost mat Condition number: " << cond << std::endl;
-
-        double max = -1e10;
-        int max_row = -1;
-        int max_col = -1;
-        matrix_t mat = diff_mat.toDense();
-        for (int i = 0; i < diff_mat.rows(); i++) {
-            for (int j = 0; j < diff_mat.cols(); j++) {
-                if (mat(i,j) > max) {
-                    max = mat(i,j);
-                    max_row = i;
-                    max_col = j;
-                }
-            }
-        }
-
-//        std::cout << "KKT mat max val: " << max << ", row: " << max_row << ", col: " << max_col << std::endl;
 
         // Solve the system
         // The system solve is only about 1-2ms
         d_.resize(data.num_decision_vars + data.num_equality_ + data.num_inequality_);
         d_ << dx, vector_t::Zero(data.num_equality_ + data.num_inequality_);
 
-
-        lsqr::LSQRSettings settings{};
-        settings.max_iter = 1*diff_mat.rows(); //100000;
-        settings.A_tol = 1e-10;
-        settings.b_tol = 1e-10;
-        settings.damping = 0;
-        settings.conditioning_lim = 1e15;
-        settings.verbose = false;
-
-        lsqr::LSQR lsqr(settings);
-
-        utils::Timer lsqr_timer("lsqr");
-        lsqr_timer.StartTimer();
-        lsqr::LSQROutput output = lsqr.Solve(diff_mat, d_);
-        lsqr_timer.StopTimer();
-        lsqr_timer.PrintElapsedTime();
-
-        // TODO: Compare to LSCG
+//        diff_mat.pruned(1e-8); // doesn't make a big difference
 
         assert(diff_mat.rows() == diff_mat.cols());
 
-        sp_matrix_t temp = diff_mat.transpose()*diff_mat;
+        // Transpose method doesn't work well!
+//        sp_matrix_t temp = diff_mat.transpose()*diff_mat;
 
-        temp.makeCompressed();
+//        temp.makeCompressed();
 //        temp.pruned(1e-6);
 
-        // TODO: Might be bad as it wants the A^TA to be PD
-        Eigen::LeastSquaresConjugateGradient<sp_matrix_t> solver;
-//        Eigen::ConjugateGradient<sp_matrix_t, Eigen::Lower|Eigen::Upper> solver;
-//        Eigen::SimplicialLDLT<sp_matrix_t> solver;
+        Eigen::SparseLU<sp_matrix_t> solver; // works really well!
 
-//        solver.compute(temp);
 
-//        diff_mat.pruned(ZERO_THRESHOLD);
+        vector_t temp2 = d_;// diff_mat.transpose()*d_;
 
-        vector_t temp2 = d_; //diff_mat.transpose()*d_;
+        utils::Timer lu_timer("sparse lu");
+        solver.analyzePattern(diff_mat); // this is about 1-2ms of compute time
 
-        // TODO: Deal with/look into the tolerancing
-        // Lower tolerance (like 1e-6) seem give values closer to the finite differnce.
-        // Higher tolerance seem to make the values blow up (but only like 2x)
-        // The question is: at higher tolerance is the lin sys solve bad? Is the finite difference off?
-        // Am I missing a term on the gradient caluclation that would help (somewhere in the stack)?
-        solver.setTolerance(1e-6);
-        solver.setMaxIterations(50*diff_mat.rows());
-
-        utils::Timer lscg_timer("lscg");
-        lscg_timer.StartTimer();
-        // TODO: Check if I am row rank or column rank deficient and think about those implications
-        solver.analyzePattern(diff_mat);
-        solver.factorize(diff_mat);
+        lu_timer.StartTimer();
+        solver.factorize(diff_mat); // diff_mat
 
         if (solver.info() != Eigen::Success) {
             throw std::runtime_error("Could not factorize the differential matrix.");
@@ -530,41 +474,20 @@ namespace mpc {
         if (solver.info() != Eigen::Success) {
             throw std::runtime_error("Could not solve the equation.");
         }
-        lscg_timer.StopTimer();
-        lscg_timer.PrintElapsedTime();
+        lu_timer.StopTimer();
+        lu_timer.PrintElapsedTime();
 
-        std::cout << "LSCG #iterations:     " << solver.iterations() << std::endl;
-        std::cout << "LSCG estimated error: " << solver.error()      << std::endl;
-//        std::cout << "LSQR convergence value: " << output.convergence << std::endl;
-//        std::cout << "max elemnt of d_ (lsqr): " << d_.maxCoeff() << std::endl;
+        std::cout << "Sparse LU error norm: " << (diff_mat*x - d_).norm() << std::endl;
+        std::cout << "Sparse LU norm: " << x.norm() << std::endl;
 
-//        std::cout << "LSCG error: " << (diff_mat*x - d_).norm() << std::endl;
-//        std::cout << "LSCG norm: " << x.norm() << std::endl;
-//        std::cout << "LSQR error: " << (diff_mat*output.x - d_).norm() << std::endl;
-//        std::cout << "LSQR norm: " << output.x.norm() << std::endl;
+        d_ = -x;
 
-        // TODO: Negative?
-        // The LSQR solution seems to be much better behaved for the ill-conditioned problem, although maybe less accurate?
-        d_ = -x; //output.x; // LSQR seems to be giving worse results
-
-
-//        std::cout << "d_: " << d_ << std::endl;
-//        d_ = diff_mat.transpose()*d_;
-//        std::cout << "again d_: " << d_ << std::endl;
-//        if (solver.info() != Eigen::Success) {
-//            throw std::runtime_error("Could not solve the differential matrix");
-//        }
         timer.StopTimer();
 
         timer.PrintElapsedTime();
 
         num_equality_constraints_ = data.num_equality_;
         num_inequality_constraints_ = data.num_inequality_;
-
-//        std::cout << "Force box constraints: " << data.num_force_box_constraints_ << std::endl;
-//        std::cout << "Friction cone constraints: " << data.num_cone_constraints_ << std::endl;
-//        std::cout << "EE box constraints: " << data.num_ee_location_constraints_ << std::endl;
-//        std::cout << "EE start constraints: " << data.num_start_ee_constraints_ << std::endl;
     }
 
     vector_t ClarabelInterface::Computedx(const Eigen::SparseMatrix<double>& P, const mpc::vector_t& q,

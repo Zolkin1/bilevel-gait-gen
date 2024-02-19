@@ -945,7 +945,7 @@ namespace mpc {
         // Adds a positive small cost to every value so that Q is PD
         // TODO: 1e-2 seemed to work well!
         // TODO: The gradient descent appears to be better with this more PD!
-        data_.cost_mat_.SetDiagonalMatrix(1e-1,0,0,data_.num_decision_vars);
+        data_.cost_mat_.SetDiagonalMatrix(1e-3,0,0,data_.num_decision_vars);
     }
 
     const QPData& MPC::GetQPData() const {
