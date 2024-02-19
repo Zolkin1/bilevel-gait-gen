@@ -39,7 +39,7 @@ namespace mpc {
 
         gamma_ = 0.5;
         eta_ = 0.75;
-        Delta_ = 1e-8; // 1e-4 and 1e-6 both seem to be close to working well
+        Delta_ = 4e-2; // at 1e-8 I match predicted to actual perfectly!
 
         run_num_ = 0;
         past_decision_vars_ = 0;
@@ -189,10 +189,11 @@ namespace mpc {
             double rho = actual_red_cost / pred_red_cost_;
             std::cout << "rho: " << rho << std::endl;
             if (rho > eta_) {
-//                IncreaseTrustRegion(rho);
+                IncreaseTrustRegion(rho);
                 old_contact_times_ = contact_times_;
             } else {
-//                DecreaseTrustRegion(step_);
+                assert(old_contact_times_.size() == contact_times_.size());
+                DecreaseTrustRegion(step_);
 
 // TODO: Put trust region changing back
 
@@ -249,21 +250,22 @@ namespace mpc {
 
         UpdateLagrangianGradients(A);
 
-//        if (past_decision_vars_ == num_decision_vars) {
-//            AdjustBSize(num_decision_vars);
-//
-//            DampedBFGSUpdate();
-//
-//            const auto ldlt = Bk_.ldlt();
-//            if (ldlt.info() == Eigen::NumericalIssue) {
-//                std::cerr << "Bk is not PSD." << std::endl;
-//            }
-//        } else {
-//            Bk_ = matrix_t::Identity(num_decision_vars, num_decision_vars);
-//        }
+        // BFGS does appear to help
+        if (past_decision_vars_ == num_decision_vars) {
+            AdjustBSize(num_decision_vars);
+
+            DampedBFGSUpdate();
+
+            const auto ldlt = Bk_.ldlt();
+            if (ldlt.info() == Eigen::NumericalIssue) {
+                std::cerr << "Bk is not PSD." << std::endl;
+            }
+        } else {
+            Bk_ = matrix_t::Identity(num_decision_vars, num_decision_vars);
+        }
 
 
-        Bk_ = matrix_t::Zero(num_decision_vars, num_decision_vars);
+//        Bk_ = matrix_t::Zero(num_decision_vars, num_decision_vars);
 
         // TODO: Consider building a sparse matrix in the first place
         sp_matrix_t P = Bk_.sparseView();
@@ -339,10 +341,10 @@ namespace mpc {
 //        step_(max_idx) = step_len;
 
         // Finite differencing!
-        step_.setZero();
-        const double dt = 1e-8;     // TODO: Finite difference surprisingly sensitive to this (can I use it as ground truth?)
-        const int step_idx = 4; // some are worse than others (i.e. 4)
-        step_(step_idx) = dt;
+//        step_.setZero();
+//        const double dt = 1e-8;     // TODO: Finite difference surprisingly sensitive to this (can I use it as ground truth?)
+//        const int step_idx = 4; // some are worse than others (i.e. 4)
+//        step_(step_idx) = dt;
 
         xkp1_ = xk_ + step_;
 
@@ -375,10 +377,13 @@ namespace mpc {
 //        old_grad_ = dHdth;
 
         std::cout << "Actual cost reduction (previous step): " << actual_red_cost << std::endl;
+        if (actual_red_cost < 0) {
+            std::cerr << "Bad cost reduction!" << std::endl;
+        }
         std::cout << "Predicted cost reduction: " << pred_red_cost_ << std::endl;
         std::cout << "trust region size: " << Delta_ << std::endl;
-        std::cout << "finite difference: " << -actual_red_cost/dt << std::endl;
-        std::cout << "step idx: " << step_idx << std::endl;
+//        std::cout << "finite difference: " << -actual_red_cost/dt << std::endl;
+//        std::cout << "step idx: " << step_idx << std::endl;
         std::cout << std::endl;
 
         run_num_++;
@@ -561,15 +566,15 @@ namespace mpc {
     }
 
     void GaitOptimizer::IncreaseTrustRegion(double rho) {
-        if (rho > 0.75 && step_.lpNorm<Eigen::Infinity>() == Delta_) {
+        if (rho > 0.75 && step_.lpNorm<Eigen::Infinity>() >= Delta_) {
             Delta_ = std::min(2*Delta_, max_trust_region_);
         }
     }
 
     void GaitOptimizer::DecreaseTrustRegion(const vector_t& step) {
         Delta_ = gamma_*step.lpNorm<Eigen::Infinity>();
-        if (Delta_ <= 1e-6) {
-            Delta_ = 1e-6;
+        if (Delta_ <= 1e-5) {
+            Delta_ = 1e-5;
         }
     }
 

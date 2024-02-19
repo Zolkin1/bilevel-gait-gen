@@ -433,11 +433,11 @@ namespace mpc {
                 non_zero_slacks++;
             }
         }
-        std::cout << "Nonzero lambda values: " << non_zero_lam << ", lambda length: " << lam_.size() << std::endl;
-        std::cout << "Nonzero inequality slack values: " << non_zero_slacks << ", slacks length: " << s_ineq.size() << std::endl;
-        std::cout << "Sum of nonzeros: " << non_zero_lam + non_zero_slacks << std::endl;
-        std::cout << "A rows: " << A.rows() << std::endl;
-        std::cout << "Decision vars: " << data.num_decision_vars << std::endl;
+//        std::cout << "Nonzero lambda values: " << non_zero_lam << ", lambda length: " << lam_.size() << std::endl;
+//        std::cout << "Nonzero inequality slack values: " << non_zero_slacks << ", slacks length: " << s_ineq.size() << std::endl;
+//        std::cout << "Sum of nonzeros: " << non_zero_lam + non_zero_slacks << std::endl;
+//        std::cout << "A rows: " << A.rows() << std::endl;
+//        std::cout << "Decision vars: " << data.num_decision_vars << std::endl;
 
 
         // Solve the system
@@ -477,8 +477,8 @@ namespace mpc {
         lu_timer.StopTimer();
         lu_timer.PrintElapsedTime();
 
-        std::cout << "Sparse LU error norm: " << (diff_mat*x - d_).norm() << std::endl;
-        std::cout << "Sparse LU norm: " << x.norm() << std::endl;
+//        std::cout << "Sparse LU error norm: " << (diff_mat*x - d_).norm() << std::endl;
+//        std::cout << "Sparse LU norm: " << x.norm() << std::endl;
 
         d_ = -x;
 

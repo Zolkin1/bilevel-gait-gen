@@ -96,16 +96,16 @@ namespace mpc {
         }
         constraint_costs_timer.StopTimer();
 
-        if (run_num_ == 20) {
-            std::cout << "Dynamics constraints: " << data_.num_dynamics_constraints << std::endl;
-            std::cout << "Force box constraints: " << data_.num_force_box_constraints_ << std::endl;
-            std::cout << "Friction cone constraints: " << data_.num_cone_constraints_ << std::endl;
-            std::cout << "EE location constraints: " << data_.num_ee_location_constraints_ << std::endl;
-            std::cout << "Start EE constraints: " << data_.num_start_ee_constraints_ << std::endl;
-            // No change in the negative direction (any amount), moving in the positive direction ANY amount gives the same change
-            data_.constraint_mat_.SetDiagonalMatrix(1e-8, 0, 750, 1);
-            std::cout << "added slight modification" << std::endl;
-        }
+//        if (run_num_ == 20) {
+//            std::cout << "Dynamics constraints: " << data_.num_dynamics_constraints << std::endl;
+//            std::cout << "Force box constraints: " << data_.num_force_box_constraints_ << std::endl;
+//            std::cout << "Friction cone constraints: " << data_.num_cone_constraints_ << std::endl;
+//            std::cout << "EE location constraints: " << data_.num_ee_location_constraints_ << std::endl;
+//            std::cout << "Start EE constraints: " << data_.num_start_ee_constraints_ << std::endl;
+//            // No change in the negative direction (any amount), moving in the positive direction ANY amount gives the same change
+//            data_.constraint_mat_.SetDiagonalMatrix(1e-8, 0, 750, 1);
+//            std::cout << "added slight modification" << std::endl;
+//        }
 
         data_.ConstructSparseMats();
         data_.ConstructVectors();
@@ -127,6 +127,7 @@ namespace mpc {
         if (qp_solver->GetSolveQuality() != SolvedInacc && qp_solver->GetSolveQuality() != Solved
             && qp_solver->GetSolveQuality() != MaxIter) {
             std::cerr << "Warning: " << qp_solver->GetSolveQualityAsString() << std::endl;
+
             throw std::runtime_error("Bad solve.");
         }
 
@@ -235,7 +236,7 @@ namespace mpc {
 
         run_num_++;
 
-        std::cout << "Cost: " << std::setprecision(17) << GetCost() << std::endl;
+//        std::cout << "Cost: " << std::setprecision(17) << GetCost() << std::endl;
 
         if (info_.verbose == Timing || info_.verbose == All) {
             constraint_costs_timer.PrintElapsedTime();

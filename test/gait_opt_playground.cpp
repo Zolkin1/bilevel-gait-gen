@@ -45,7 +45,7 @@ double RunGaitOpt(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt, co
 
         gait_opt.OptimizeContactTimes(time, cost_red);
 
-//        mpc.UpdateContactTimes(gait_opt.GetContactTimes()); // TODO: Put back
+        mpc.UpdateContactTimes(gait_opt.GetContactTimes());
     } else {
         std::cerr << "Can't perform gait optimization because MPC was not solved to tolerance." << std::endl;
     }
@@ -275,8 +275,8 @@ int main() {
     robot->SetSimModel(viz.GetModel());
 
     // MPC w/ fixed position
-//    MPCWithFixedPosition(mpc1, gait_optimizer1, init_state, ee_locations, config.ParseString("robot_xml"), standing,
-//                         robot, info, config.ParseNumber<double>("viz_rate"), false, viz, true);
+    MPCWithFixedPosition(mpc1, gait_optimizer1, init_state, ee_locations, config.ParseString("robot_xml"), standing,
+                         robot, info, config.ParseNumber<double>("viz_rate"), false, viz, true);
 
 
     MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
