@@ -88,6 +88,8 @@ namespace mpc {
          */
         void OptimizeContactTimes(double time, double actual_red_cost);
 
+        void OptimizeContactTimes(double time, double actual_red_cost, double alpha, bool adapt_trust_region); // Using for debugging/plotting and line searching!
+
         /**
          * @return the current computed contact times
          */
@@ -100,6 +102,12 @@ namespace mpc {
         void SetContactTimes(const std::vector<time_v>& contact_times);
 
         void ModifyQPPartials(const vector_t& xstar);
+
+        double GetStepNorm() const; // Returns the 2-norm of the cost function
+
+        void ResetBFGSCondition();
+
+        std::vector<time_v> GetContactTimes(double alpha) const;
 
     protected:
     private:

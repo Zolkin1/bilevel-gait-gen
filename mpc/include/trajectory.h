@@ -30,7 +30,7 @@ namespace mpc {
                    const std::vector<std::vector<double>>& switching_times, double node_dt,
                    double swing_height, double foot_offset);
 
-        Trajectory& operator=(const Trajectory& traj);
+//        Trajectory& operator=(const Trajectory& traj);
 
         std::vector<vector_t> GetStates() const;
 
@@ -133,7 +133,7 @@ namespace mpc {
 
         void UpdateForceSplineVarsCount();
 
-        const bool using_joints_;
+        bool using_joints_;
 
         std::vector<vector_t> states_;
 //        Inputs inputs_;

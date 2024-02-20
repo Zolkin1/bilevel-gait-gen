@@ -45,25 +45,25 @@ namespace mpc {
         }
     }
 
-    Trajectory& Trajectory::operator=(const Trajectory& traj) {
-        if (this == &traj) {
-            return *this;
-        }
-
-        this->pos_spline_vars_ = traj.pos_spline_vars_;
-        this->force_spline_vars_ = traj.force_spline_vars_;
-        this->swing_height_ = traj.swing_height_;
-        this->foot_offset_ = traj.foot_offset_;
-        this->states_ = traj.states_;
-        this->fk_traj_ = traj.fk_traj_;
-        this->node_dt_ = traj.node_dt_;
-        this->full_config_ = traj.full_config_;
-        this->full_velocity_ = traj.full_velocity_;
-        this->init_time_ = traj.init_time_;
-        this->ee_splines_ = traj.ee_splines_;
-
-        return *this;
-    }
+//    Trajectory& Trajectory::operator=(const Trajectory& traj) {
+//        if (this == &traj) {
+//            return *this;
+//        }
+//
+//        this->pos_spline_vars_ = traj.pos_spline_vars_;
+//        this->force_spline_vars_ = traj.force_spline_vars_;
+//        this->swing_height_ = traj.swing_height_;
+//        this->foot_offset_ = traj.foot_offset_;
+//        this->states_ = traj.states_;
+//        this->fk_traj_ = traj.fk_traj_;
+//        this->node_dt_ = traj.node_dt_;
+//        this->full_config_ = traj.full_config_;
+//        this->full_velocity_ = traj.full_velocity_;
+//        this->init_time_ = traj.init_time_;
+//        this->ee_splines_ = traj.ee_splines_;
+//
+//        return *this;
+//    }
 
     std::vector<vector_t> Trajectory::GetStates() const {
         return states_;
@@ -221,10 +221,15 @@ namespace mpc {
     }
 
     void Trajectory::AddPolys(double final_time) {
+        int ee = 0;
         for (auto & ee_spline : ee_splines_) {
             while (ee_spline.GetEndTime() < final_time) {
-                ee_spline.AddPoly(0.2);    // TODO: Make not hard coded, 0.2
+                const std::vector<time_v>& contact_times = GetContactTimes();
+                double last_diff = contact_times.at(ee).at(contact_times.at(ee).size()-1).GetTime()
+                        - contact_times.at(ee).at(contact_times.at(ee).size()-2).GetTime();
+                ee_spline.AddPoly(last_diff);    // TODO: Make not hard coded, 0.2
             }
+            ee++;
         }
         SetSwingPosZ();
         UpdateSplineVarsCount();

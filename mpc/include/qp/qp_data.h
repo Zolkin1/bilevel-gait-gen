@@ -24,9 +24,10 @@ namespace mpc {
     };
 
     struct QPSettings {
-        const bool constraint_projection_;
-        const int constraint_mat_nnz_;
-        const int cost_mat_nnz_;
+        // All three were const
+        bool constraint_projection_;
+        int constraint_mat_nnz_;
+        int cost_mat_nnz_;
 
         QPSettings(bool constraint_projection, int constraint_mat_nnz, int cost_mat_nnz);
     };
@@ -46,7 +47,7 @@ namespace mpc {
     struct QPData {
         QPSettings settings_;
         QPConstraintProjection constraint_projections_;
-        const std::vector<Constraints> constraints_;
+        std::vector<Constraints> constraints_; // TODO: was constant
 
         // Eigen triplet for filling the sparse matrix
         utils::SparseMatrixBuilder constraint_mat_;

@@ -50,6 +50,10 @@ namespace mpc {
     public:
         ClarabelInterface(const QPData& data, bool verbose);
 
+        ClarabelInterface(const ClarabelInterface& other);
+
+        ClarabelInterface& operator=(const ClarabelInterface& other);
+
         void SetupQP(QPData& data, const vector_t& warm_start) override;
 
         vector_t Solve(const QPData& data) override;

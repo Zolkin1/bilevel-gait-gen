@@ -33,6 +33,10 @@ namespace mpc {
         Model(const std::string& robot_urdf, const std::vector<std::string>& frames,
               int discretization_steps, double dt, bool uses_joints, const std::vector<Constraints>& constraints);
 
+        Model(const Model& other);
+
+        Model& operator=(const Model& model);
+
         // TODO: Make it so that this function takes in a trajectory instead of an input
 //        virtual void GetLinearDiscreteDynamics(const vector_t& state, const vector_t& ref_state, const Inputs& input,
 //                                       double time, matrix_t& A, matrix_t& B, matrix_t& C) = 0;
@@ -74,7 +78,7 @@ namespace mpc {
     protected:
         virtual void ConvertMPCStateToPinocchioState(const vector_t& state, Eigen::Ref<vector_t> q_pin) const = 0;
 
-        const bool uses_joints_;
+        bool uses_joints_; // was const
 
 
         // pinocchio model
@@ -85,7 +89,7 @@ namespace mpc {
 
         double robot_mass_;
 
-        const int num_ee_;
+        int num_ee_; // was const
 
         int discretization_steps_;
 
@@ -97,7 +101,7 @@ namespace mpc {
 
         const Eigen::Vector3d GRAVITY;
 
-        const std::vector<Constraints> constraints_;
+        std::vector<Constraints> constraints_; // was const
     private:
         void CreateFrameMap(const std::vector<std::string>& frames);
 

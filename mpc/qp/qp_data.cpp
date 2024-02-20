@@ -144,7 +144,9 @@ namespace mpc {
         cost_linear = vector_t::Zero(num_decision_vars);
 
         lb_.resize(GetTotalNumConstraints());
+        lb_.setZero(); // TODO: should not need this
         ub_.resize(GetTotalNumConstraints());
+        ub_.setZero(); // TODO: should not need this
     }
 
     void QPData::ConstructSparseMats() {

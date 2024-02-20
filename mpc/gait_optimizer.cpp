@@ -26,8 +26,8 @@ namespace mpc {
 
         qp_solver_.settings()->setVerbosity(false);
         qp_solver_.settings()->setPolish(true);
-        qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-6);
-        qp_solver_.settings()->setDualInfeasibilityTolerance(1e-6);
+        qp_solver_.settings()->setPrimalInfeasibilityTolerance(1e-8);
+        qp_solver_.settings()->setDualInfeasibilityTolerance(1e-8);
         qp_solver_.settings()->setAbsoluteTolerance(1e-10);
         qp_solver_.settings()->setRelativeTolerance(1e-10);
         qp_solver_.settings()->setScaledTerimination(false);
@@ -39,7 +39,7 @@ namespace mpc {
 
         gamma_ = 0.5;
         eta_ = 0.75;
-        Delta_ = 4e-2; // at 1e-8 I match predicted to actual perfectly!
+        Delta_ = 1; // at 1e-8 I match predicted to actual perfectly!
 
         run_num_ = 0;
         past_decision_vars_ = 0;
@@ -174,6 +174,10 @@ namespace mpc {
     }
 
     void GaitOptimizer::OptimizeContactTimes(double time, double actual_red_cost) {
+        OptimizeContactTimes(time, actual_red_cost, 1, true);
+    }
+
+    void GaitOptimizer::OptimizeContactTimes(double time, double actual_red_cost, double alpha, bool adapt_trust_region) {
         // ------------------- Setup ------------------- //
         int num_decision_vars = GetNumTimeNodes(num_ee_);
         int num_constraints = num_decision_vars + num_decision_vars + 3*num_ee_;
@@ -185,15 +189,15 @@ namespace mpc {
         //       so acceptance and trust region sizes are based only on the cost function
         // Note: this happens here (rather than after the QP solve) because we can't get the new cost
         //       until after an MPC solve. So we update the trust region here.
-        if (run_num_ > 0) {
+        if (run_num_ > 0 && adapt_trust_region) {
             double rho = actual_red_cost / pred_red_cost_;
             std::cout << "rho: " << rho << std::endl;
             if (rho > eta_) {
-                IncreaseTrustRegion(rho);
+//                IncreaseTrustRegion(rho);
                 old_contact_times_ = contact_times_;
             } else {
                 assert(old_contact_times_.size() == contact_times_.size());
-                DecreaseTrustRegion(step_);
+//                DecreaseTrustRegion(step_);
 
 // TODO: Put trust region changing back
 
@@ -248,24 +252,25 @@ namespace mpc {
 //            dHdth = old_grad_;  // TODO: Will this stick me in a loop somehow?
 //        }
 
-        UpdateLagrangianGradients(A);
+//        UpdateLagrangianGradients(A);
+//
+////         BFGS does appear to help
+//        if (past_decision_vars_ == num_decision_vars) {
+//            AdjustBSize(num_decision_vars);
+//
+//            DampedBFGSUpdate();
+//
+//            const auto ldlt = Bk_.ldlt();
+//            if (ldlt.info() == Eigen::NumericalIssue) {
+//                std::cerr << "Bk is not PSD." << std::endl;
+//            }
+//        } else {
+//            Bk_ = matrix_t::Identity(num_decision_vars, num_decision_vars);
+//        }
 
-        // BFGS does appear to help
-        if (past_decision_vars_ == num_decision_vars) {
-            AdjustBSize(num_decision_vars);
 
-            DampedBFGSUpdate();
-
-            const auto ldlt = Bk_.ldlt();
-            if (ldlt.info() == Eigen::NumericalIssue) {
-                std::cerr << "Bk is not PSD." << std::endl;
-            }
-        } else {
-            Bk_ = matrix_t::Identity(num_decision_vars, num_decision_vars);
-        }
-
-
-//        Bk_ = matrix_t::Zero(num_decision_vars, num_decision_vars);
+        Bk_ = matrix_t::Zero(num_decision_vars, num_decision_vars);
+        std::cout << "No BFGS" << std::endl;
 
         // TODO: Consider building a sparse matrix in the first place
         sp_matrix_t P = Bk_.sparseView();
@@ -346,6 +351,7 @@ namespace mpc {
 //        const int step_idx = 4; // some are worse than others (i.e. 4)
 //        step_(step_idx) = dt;
 
+        step_ = alpha*step_; // used for line-search/debugging
         xkp1_ = xk_ + step_;
 
         for (int ee = 0; ee < num_ee_; ee++) {
@@ -376,12 +382,15 @@ namespace mpc {
 
 //        old_grad_ = dHdth;
 
-        std::cout << "Actual cost reduction (previous step): " << actual_red_cost << std::endl;
-        if (actual_red_cost < 0) {
-            std::cerr << "Bad cost reduction!" << std::endl;
-        }
-        std::cout << "Predicted cost reduction: " << pred_red_cost_ << std::endl;
-        std::cout << "trust region size: " << Delta_ << std::endl;
+//        std::cout << "Actual cost reduction (previous step): " << actual_red_cost << std::endl;
+//        if (actual_red_cost < 0) {
+//            std::cerr << "Bad cost reduction!" << std::endl;
+//        }
+//        std::cout << "Predicted cost reduction: " << pred_red_cost_ << std::endl;
+//        std::cout << "trust region size: " << Delta_ << std::endl;
+//        std::cout << "gradient norm: " << dHdth.norm() << std::endl;
+        std::cout << "step norm: " << step_.norm() << std::endl;
+
 //        std::cout << "finite difference: " << -actual_red_cost/dt << std::endl;
 //        std::cout << "step idx: " << step_idx << std::endl;
         std::cout << std::endl;
@@ -634,4 +643,33 @@ namespace mpc {
         }
     }
 
+    double GaitOptimizer::GetStepNorm() const {
+        return step_.norm();
+    }
+
+    void GaitOptimizer::ResetBFGSCondition() {
+        past_decision_vars_ = 0;
+    }
+
+    std::vector<time_v> GaitOptimizer::GetContactTimes(double alpha) const {
+        vector_t new_times = xk_ + alpha*step_;
+
+        std::vector<time_v> contacts = contact_times_;
+
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int idx = 0; idx < contacts.at(ee).size(); idx++) {
+                contacts.at(ee).at(idx).SetTime(new_times(GetNumTimeNodes(ee) + idx));
+
+                if (idx > 0) {
+                    if (contacts.at(ee).at(idx-1).GetTime() - contacts.at(ee).at(idx).GetTime() <= 1e-3
+                        && contacts.at(ee).at(idx-1).GetTime() - contacts.at(ee).at(idx).GetTime() > 0) {
+                        contacts.at(ee).at(idx) = contacts.at(ee).at(idx-1);
+                    }
+                    assert(contacts.at(ee).at(idx-1).GetTime() <= contacts.at(ee).at(idx).GetTime());
+                }
+            }
+        }
+
+        return contacts;
+    }
 }

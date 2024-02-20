@@ -43,7 +43,6 @@ namespace mpc {
                CreateDefaultSwitchingTimes(info.num_switches, num_ee_,
                     info.integrator_dt*(info.num_nodes)),
                     info.integrator_dt, info.swing_height, info.foot_offset),
-        constraint_projection_(false),
         data_(false, 25000, 2000, model_.GetApplicableConstraints()),
         integrator_(info.integrator_dt),
         using_clarabel_(true) {
@@ -105,6 +104,8 @@ namespace mpc {
 
     void MPC::SetWarmStartTrajectory(const mpc::Trajectory &trajectory) {
         prev_traj_ = trajectory;
+
+        UpdateNumInputs();
 
         prev_qp_sol = ConvertTrajToQPVec(prev_traj_);
     }
@@ -352,6 +353,8 @@ namespace mpc {
             extra_runs = 2;
         }
 
+        constexpr double FB_LB = 0.0;
+
         const std::vector<time_v> contact_times = prev_traj_.GetContactTimes();
         for (int j = 0; j < extra_runs; j++) {
             for (int ee = 0; ee < num_ee_; ee++) {
@@ -382,7 +385,7 @@ namespace mpc {
                             }
 
                             if (j == 0) {
-                                data_.force_box_lb_(row_idx) = 0.0;
+                                data_.force_box_lb_(row_idx) = FB_LB;
                                 data_.force_box_ub_(row_idx) = info_.force_bound;
                             }
 
@@ -557,12 +560,27 @@ namespace mpc {
 //                times.push_back((j+1)*horizon/num_switches);
 //            }
 //            for (int ee = 0; ee < num_ee_; ee++) {
-                times.push_back(0);
-                times.push_back(0.2);
-                times.push_back(0.4);
-                times.push_back(0.6);
-                times.push_back(0.8);
-                times.push_back(1);
+
+//            times.push_back(0);
+//            times.push_back(0.15);
+//            times.push_back(0.3);
+//            times.push_back(0.45);
+//            times.push_back(0.6);
+//            times.push_back(0.75);
+//            times.push_back(0.9);
+//            times.push_back(1.05);
+
+//            times.push_back(0);
+//            times.push_back(0.4);
+//            times.push_back(0.8);
+//            times.push_back(1.2);
+
+            times.push_back(0);
+            times.push_back(0.2);
+            times.push_back(0.4);
+            times.push_back(0.6);
+            times.push_back(0.8);
+            times.push_back(1);
 //            }
 
             switching_times.push_back(times);
@@ -757,7 +775,11 @@ namespace mpc {
         Q_forces_.resize(num_forces, num_forces);
         Q_forces_.setZero();        // TODO: Note. Without this my performance was totally shot and occasional errors
         for (int i = 0; i < num_forces; i++) {
-            Q_forces_(i,i) = weight;
+            double weight1 = weight;
+            if (i < prev_traj_.GetTotalForceSplineVars()/num_ee_) {
+                weight1 = weight1 * 1;
+            }
+            Q_forces_(i,i) = weight1;
         }
     }
 
@@ -978,5 +1000,52 @@ namespace mpc {
         }
 
         return num_constraints;
+    }
+
+    void MPC::SetQPData(const mpc::QPData& data) {
+        data_ = data;
+    }
+
+    MPC& MPC::operator=(const mpc::MPC& mpc) {
+        if (this != &mpc) {
+            model_ = mpc.model_;
+            data_ = mpc.data_;
+            info_ = mpc.info_;
+            num_states_ = mpc.num_states_;
+            num_ee_ = mpc.num_ee_;
+            num_inputs_ = mpc.num_inputs_;
+            friction_pyramid_ = mpc.friction_pyramid_;
+            qp_solver = std::make_unique<ClarabelInterface>(*mpc.qp_solver.get());
+            prev_traj_ = mpc.prev_traj_;
+            Q_ = mpc.Q_;
+            w_ = mpc.w_;
+            Phi_ = mpc.Phi_;
+            Phi_w_ = mpc.Phi_w_;
+            Q_forces_ = mpc.Q_forces_;
+            prev_qp_sol = mpc.prev_qp_sol;
+            init_time_ = mpc.init_time_;
+            force_weight_ = mpc.force_weight_;
+            run_num_ = mpc.run_num_;
+            line_search_res_ = mpc.line_search_res_;
+            prev_dual_sol_ = mpc.prev_dual_sol_;
+            mu_ = mpc.mu_;
+
+            // TODO: Do the recording stuff
+
+            in_real_time_ = mpc.in_real_time_;
+            A_ = mpc.A_;
+            B_ = mpc.B_;
+            C_ = mpc.C_;
+            C2_ = mpc.C2_;
+            using_clarabel_ = mpc.using_clarabel_;
+            integrator_ = mpc.integrator_;
+        }
+
+        return *this;
+    }
+
+    MPC::MPC(const mpc::MPC& other) : model_(other.model_), prev_traj_(other.prev_traj_),
+        integrator_(other.integrator_) {
+        *this = other;
     }
 } // mpc

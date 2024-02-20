@@ -30,7 +30,7 @@ double RunGaitOpt(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt, co
 
         gait_opt.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
         gait_opt.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
-        prev_cost = mpc.GetCost();
+        prev_cost = mpc.GetModifiedCost(45);
 
         mpc.GetQPPartials(gait_opt.GetQPPartials());
         for (int ee = 0; ee < 4; ee++) {
@@ -72,8 +72,10 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
     mpc.PrintStats();
     mpc::Trajectory prev_traj = mpc.GetTrajectory();
 
+    const int num_nodes_cost = 45;
+
     vector_t state = standing;
-    double prev_cost = mpc.GetCost();
+    double prev_cost = mpc.GetModifiedCost(num_nodes_cost);
     double cost_red = 0; // TODO: Pick a better number
 
     const auto contact_sched = mpc.GetTrajectory().GetContactTimes();
@@ -122,12 +124,14 @@ void MPCWithFixedPosition(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait
         } else {
             prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
         }
+//        std::cout << "i: " << i << std::endl;
         const mpc::QPData& data2 = mpc.GetQPData();
         assert(data1.num_decision_vars == data2.num_decision_vars);
         assert(data1.GetTotalNumConstraints() == data2.GetTotalNumConstraints());
 //        std::cout << "MPC iteration cost change: " << prev_cost - mpc.GetCost() << std::endl;
-        cost_red = prev_cost - mpc.GetCost();
-        total_cost += mpc.GetCost();
+        cost_red = prev_cost - mpc.GetModifiedCost(num_nodes_cost);
+        total_cost += mpc.GetModifiedCost(num_nodes_cost);
+        std::cout << "modified cost: " << mpc.GetModifiedCost(num_nodes_cost) << std::endl;
     }
 
     // Print the final trajectory to a file for viewing
@@ -167,6 +171,85 @@ mpc::MPCSingleRigidBody CreateMPC(const mpc::MPCInfo& info, utils::ConfigParser&
     mpc.SetLinearFinalCost(-1*Q*des_alg);
 
     return mpc;
+}
+
+void MPCLineSearch(utils::ConfigParser& config, const std::vector<vector_t>& warm_start,
+                   const vector_t& mpc_des_state, mpc::GaitOptimizer& gait_opt, const vector_t& init_state,
+                   std::vector<Eigen::Vector3d> ee_locations, const std::string& robot_xml,
+                   const vector_t& standing, const std::unique_ptr<simulator::SimulationRobot>& robot,
+                   const mpc::MPCInfo& info, double viz_rate, simulation::Visualizer viz) {
+
+
+    vector_t state = standing;
+    double cost_red = 0; // TODO: Pick a better number
+    double total_cost = 0;
+    double time = 0;
+
+    const int num_nodes_cost = 45;
+
+    std::ofstream cost_file("cost_file.txt");
+
+    const int N = 30;
+
+    for (int i = -N; i < N; i++) {
+        mpc::MPCSingleRigidBody mpc = CreateMPC(info, config, warm_start, mpc_des_state, init_state, ee_locations);
+        mpc::GaitOptimizer gait_optimizer2(4, 10, 10, 10, 1, 0.05);
+
+        mpc.CreateInitialRun(init_state, ee_locations);
+        mpc::Trajectory prev_traj = mpc.GetTrajectory();
+        double prev_cost = mpc.GetCost();
+
+        gait_optimizer2.ResetBFGSCondition();
+
+        // Can move a few step if I want
+        const int j_max = 0;
+        for (int j = 0; j < j_max; j++) {
+            RunGaitOpt(mpc, gait_optimizer2, prev_traj, cost_red, time);
+            time = j * info.integrator_dt;
+            double cost = mpc.GetModifiedCost(num_nodes_cost);
+            prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
+            cost_red = cost - mpc.GetModifiedCost(num_nodes_cost);
+        }
+
+        time = j_max*info.integrator_dt;
+
+        if (!mpc.ComputeDerivativeTerms()) {
+            throw std::runtime_error("mpc not solved to convergence.");
+        }
+
+        gait_optimizer2.SetContactTimes(prev_traj.GetContactTimes());
+        gait_optimizer2.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
+        prev_cost = mpc.GetModifiedCost(num_nodes_cost);
+
+        mpc.GetQPPartials(gait_optimizer2.GetQPPartials());
+        for (int ee = 0; ee < 4; ee++) {
+            gait_optimizer2.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
+            for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {
+                mpc.ComputeParamPartialsClarabel(prev_traj, gait_optimizer2.GetParameterPartials(ee, idx), ee, idx);
+            }
+        }
+
+        gait_optimizer2.ModifyQPPartials(mpc.GetQPSolution());
+        gait_optimizer2.ComputeCostFcnDerivWrtContactTimes();
+
+        double alpha = (i + 1.0) / (N);
+        gait_optimizer2.OptimizeContactTimes(time, cost_red, alpha, false);
+
+        mpc.UpdateContactTimes(gait_optimizer2.GetContactTimes());
+
+        mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
+
+        cost_file << mpc.GetModifiedCost(num_nodes_cost) << ", " << alpha << ", " << gait_optimizer2.GetStepNorm() << std::endl;
+        std::cout << mpc.GetModifiedCost(num_nodes_cost) << ", " << alpha << ", " << gait_optimizer2.GetStepNorm() << std::endl;
+
+        PrintContactSched(mpc.GetTrajectory().GetContactTimes());
+
+        // Reset the trajectory.
+        mpc.SetWarmStartTrajectory(prev_traj);
+    }
+
+
+    cost_file.close();
 }
 
 
@@ -278,11 +361,12 @@ int main() {
     MPCWithFixedPosition(mpc1, gait_optimizer1, init_state, ee_locations, config.ParseString("robot_xml"), standing,
                          robot, info, config.ParseNumber<double>("viz_rate"), false, viz, true);
 
-
     MPCWithFixedPosition(mpc2, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
                          robot, info, config.ParseNumber<double>("viz_rate"), true, viz, true);
 
     // MPC w/ fixed position + line search
+//    MPCLineSearch(config, warm_start, mpc_des_state, gait_optimizer2, init_state, ee_locations, config.ParseString("robot_xml"), standing,
+//                         robot, info, config.ParseNumber<double>("viz_rate"), viz);
 
     // MPC w/ high precision solves
 

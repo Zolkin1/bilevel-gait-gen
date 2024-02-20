@@ -40,6 +40,10 @@ add_executable(gait_opt_playground gait_opt_playground.cpp)
 target_link_libraries(gait_opt_playground utils)
 target_link_libraries(gait_opt_playground mpc)
 target_link_libraries(gait_opt_playground simulator)
-#target_link_libraries(spline_test PRIVATE Catch2::Catch2WithMain)
+
+add_executable(gait_opt_ls gait_opt_line_search.cpp)
+target_link_libraries(gait_opt_ls utils)
+target_link_libraries(gait_opt_ls mpc)
+target_link_libraries(gait_opt_ls simulator)
 
 #catch_discover_tests(gait_opt_playground.cpp)

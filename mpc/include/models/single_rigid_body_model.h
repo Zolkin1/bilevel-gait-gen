@@ -30,6 +30,10 @@ namespace mpc {
         SingleRigidBodyModel(const std::string& robot_urdf, const std::vector<std::string>& frames,
                              int discretization_steps, double dt, const vector_t& nom_state);
 
+        SingleRigidBodyModel(const SingleRigidBodyModel& other) = default;
+
+        SingleRigidBodyModel& operator=(const SingleRigidBodyModel& model);
+
         void GetLinearDynamics(const vector_t& state,
                                const vector_t& ref_state,
                                const Trajectory& traj,
@@ -89,8 +93,9 @@ namespace mpc {
                                   int id, Eigen::Matrix<double, 6, Eigen::Dynamic>& J,
                                   bool is_frame);
 
-        const int num_tangent_states_;
-        const int num_manifold_states_;
+        // Was const
+        int num_tangent_states_;
+        int num_manifold_states_;
 
         matrix_33t Ir_;   // Rotational inertia
         matrix_33t Ir_inv_;

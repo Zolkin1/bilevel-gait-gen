@@ -532,6 +532,18 @@ namespace mpc {
 //        }
     }
 
+    SingleRigidBodyModel& SingleRigidBodyModel::operator=(const mpc::SingleRigidBodyModel& model) {
+        if (this != &model) {
+            num_tangent_states_ = model.num_tangent_states_;
+            num_manifold_states_ = model.num_manifold_states_;
+            Ir_ = model.Ir_;
+            Ir_inv_ = model.Ir_inv_;
+        }
+
+        return *this;
+    }
+
+
 //    vector_t SingleRigidBodyModel::VelocityInverseKinematics(const vector_t& config,
 //                                                             const std::vector<vector_3t>& end_effector_velocity,
 //                                                             const vector_t& vel_guess) {

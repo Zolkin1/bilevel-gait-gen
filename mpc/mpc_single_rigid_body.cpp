@@ -6,13 +6,6 @@
 
 namespace mpc {
 
-    /*
-     * TODO:
-     * - Determine why the QP is easier to solve when we have 24 position variables and 96 force variables
-     *      this is the pattern of full solves vs inaccurate solves. We can also see jumps in the trajectory
-     *      at certain places. I suspect this is realted to this problem.
-     */
-
     MPCSingleRigidBody::MPCSingleRigidBody(const mpc::MPCInfo& info, const std::string& robot_urdf) :
     MPC(info, robot_urdf) {
         InitalizeQPData();
@@ -54,7 +47,7 @@ namespace mpc {
         UpdateQPSizes();
         data_.InitQPMats();
 
-        prev_traj_.SetState(0, state);
+        prev_traj_.SetState(0, state); // if i change to 1 I still get errors, removing this entirely is also less error
         prev_qp_sol = ConvertTrajToQPVec(prev_traj_);
         data_update_timer.StopTimer();
 
@@ -78,7 +71,7 @@ namespace mpc {
             switch (constraint) {
                 case Constraints::Dynamics:
                     dynamics_timer.StartTimer();
-                    AddDynamicsConstraints(state);
+                    AddDynamicsConstraints(prev_traj_.GetState(0));
                     dynamics_timer.StopTimer();
                     break;
                 case Constraints::ForceBox:
@@ -128,7 +121,7 @@ namespace mpc {
             && qp_solver->GetSolveQuality() != MaxIter) {
             std::cerr << "Warning: " << qp_solver->GetSolveQualityAsString() << std::endl;
 
-            throw std::runtime_error("Bad solve.");
+//            throw std::runtime_error("Bad solve.");
         }
 
         if (info_.verbose == All) {
@@ -152,11 +145,11 @@ namespace mpc {
         utils::Timer line_search_timer("line search");
         double alpha = 1;
         // TODO: Put back
-//        if (num_run_ >= 0 && sol.size() == prev_qp_sol.size()) {
-//            line_search_timer.StartTimer();
-//            alpha = LineSearch(p, state);
-//            line_search_timer.StopTimer();
-//        }
+        if (num_run_ >= 0 && sol.size() == prev_qp_sol.size()) {
+            line_search_timer.StartTimer();
+            alpha = LineSearch(p, prev_traj_.GetState(0));
+            line_search_timer.StopTimer();
+        }
 
 //        if (run_num_ > 0){
 //            std::cout << (alpha*(qp_solver->GetDualSolution() - prev_dual_sol_) + prev_dual_sol_).lpNorm<Eigen::Infinity>() << std::endl;
@@ -164,9 +157,9 @@ namespace mpc {
 
         prev_dual_sol_ = qp_solver->GetDualSolution();
 
-        prev_qp_sol = ((alpha * p) + prev_qp_sol).eval();
+        prev_qp_sol = ((alpha * p) + prev_qp_sol).eval(); // TODO: Remove eval?
 
-        prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, state);
+        prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, prev_traj_.GetState(0));
 //        if (run_num_ == 50) {
 //            std::cout << "ee location: " << prev_traj_.GetEndEffectorLocation(1, init_time).transpose() << std::endl;
 //            std::cout << "lin vars: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).transpose() << std::endl;
@@ -230,7 +223,7 @@ namespace mpc {
 
         utils::Timer stats_timer("recording stats");
         stats_timer.StartTimer();
-        RecordStats(alpha, p, qp_solver->GetSolveQuality(), state,
+        RecordStats(alpha, p, qp_solver->GetSolveQuality(), prev_traj_.GetState(0),
                     solve_timer.GetElapsedTimeMilliseconds(), GetCostValue(prev_qp_sol)); //GetCostValue(sol));
         stats_timer.StopTimer();
 
@@ -258,7 +251,7 @@ namespace mpc {
 //            std::cout << "Node: " << i << ", net force: " << net_force.transpose() << std::endl;
 //        }
 
-        prev_traj_.PrintTrajectoryToFile("mpc_demo_traj.txt");
+//        prev_traj_.PrintTrajectoryToFile("mpc_demo_traj.txt");
 
         num_run_++;
 
@@ -311,7 +304,7 @@ namespace mpc {
 
             data_.dynamics_constants.segment(constraint_idx_ + (node + 1) * num_states_, num_states_) = -C_;
         }
-        constraint_idx_ = (info_.num_nodes+1)*num_states_;
+        constraint_idx_ += (info_.num_nodes+1)*num_states_; // note the += rather than =
     }
 
     int MPCSingleRigidBody::GetForceSplineStartIdx() const {
@@ -378,7 +371,7 @@ namespace mpc {
 //        data_.num_cone_constraints_ = (info_.num_nodes+1)*4*num_ee_;
         if (using_clarabel_) {
             data_.num_force_box_constraints_ = GetNumForceBoxConstraints(); //2*GetNodeIntersectMutableForces();
-            data_.num_ee_location_constraints_ = 2*(info_.num_nodes-1)*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
+            data_.num_ee_location_constraints_ = 2*(info_.num_nodes-(EE_NODE_START-1))*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
         } else {
             data_.num_force_box_constraints_ = GetNodeIntersectMutableForces(); // TODO: Change
             data_.num_ee_location_constraints_ = (info_.num_nodes+1)*2*num_ee_;
@@ -445,7 +438,7 @@ namespace mpc {
         }
         int idx = 0;
         for (int i = 0; i < extra_runs; i++) {
-            for (int node = 2; node < info_.num_nodes + 1; node++) {
+            for (int node = EE_NODE_START; node < info_.num_nodes + 1; node++) {
                 for (int ee = 0; ee < num_ee_; ee++) {
                     if (i == 0) {
                         data_.ee_location_ub_.segment<CONSTRAINT_COORDS>(idx) =
@@ -745,7 +738,7 @@ namespace mpc {
                     // ----------- Inequality contribution ----------- //
                     const int spline_offset = GetPosSplineStartIdx();
                     int idx = 2*ee; //* (data_.num_ee_location_constraints_ / (2*num_ee_));
-                    for (int node = 2; node < info_.num_nodes + 1; node++) {
+                    for (int node = EE_NODE_START; node < info_.num_nodes + 1; node++) {
                         const double time = GetTime(node);
                         for (int coord = 0; coord < 2; coord++) {
                             int vars_index, vars_affecting;
@@ -821,5 +814,11 @@ namespace mpc {
 
     double MPCSingleRigidBody::GetCost() const {
         return GetCostValue(prev_qp_sol);
+    }
+
+    double MPCSingleRigidBody::GetModifiedCost(int num_nodes) const {
+        vector_t temp = prev_qp_sol;
+//        temp.tail(temp.size() - num_states_*num_nodes).setZero();
+        return GetCostValue(temp);
     }
 } // mpc

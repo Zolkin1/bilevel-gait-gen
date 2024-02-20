@@ -32,6 +32,8 @@ namespace mpc {
 
         double GetCost() const;
 
+        double GetModifiedCost(int num_nodes) const;
+
     protected:
         void AddDynamicsConstraints(const vector_t& state) override;
 
@@ -45,6 +47,8 @@ namespace mpc {
         void InitalizeQPData();
 
         int num_run_;
+
+        static constexpr int EE_NODE_START = 4;
     private:
     };
 } // mpc

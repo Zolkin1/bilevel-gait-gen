@@ -70,6 +70,10 @@ namespace mpc {
     public:
         MPC(const MPCInfo& info, const std::string& robot_urdf);
 
+        MPC(const MPC& other);
+
+        MPC& operator=(const MPC& mpc);
+
         // TODO: Figure out how to not explicitly pass the ee location
         Trajectory CreateInitialRun(const vector_t& state, const std::vector<vector_3t>& ee_start_locations);
 
@@ -149,6 +153,9 @@ namespace mpc {
 
         const QPData& GetQPData() const;
 
+        // TODO: Maybe delete this one
+        void SetQPData(const QPData& data);
+
     protected:
         // ---------------- Protected Member Functions ---------------- //
         // Assumes flat ground and constant coef of friction
@@ -221,16 +228,16 @@ namespace mpc {
         int GetNumFricConeConstraints() const;
 
         // ---------------- Member Variables ---------------- //
-        // Centroidal model
+        // model
         SingleRigidBodyModel model_;
 
         QPData data_;
 
         // MPC info
-        const MPCInfo info_;
+        MPCInfo info_; // was const
 
-        const int num_states_;    // number of states in the MPC model, not in the underlying pinocchio model
-        const int num_ee_;
+        int num_states_; // was const   // number of states in the MPC model, not in the underlying pinocchio model
+        int num_ee_; // was const
         int num_inputs_;
 
         // friction pyramid
@@ -289,9 +296,7 @@ namespace mpc {
         matrix_t A_, B_;
         vector_t C_, C2_;
 
-        const bool constraint_projection_;
-
-        const bool using_clarabel_;
+        bool using_clarabel_; // was const
 
         RKIntegrator integrator_;
 

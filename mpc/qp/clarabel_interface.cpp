@@ -20,6 +20,7 @@ namespace mpc {
         settings_.verbose = verbose;
         settings_.tol_gap_rel = 1e-8;
         settings_.tol_gap_abs = 1e-8;
+        settings_.tol_feas = 1e-9;
 //        settings_.linesearch_backtrack_step = 0.2;
 //        settings_.min_switch_step_length = 1e-2;
 //        settings_.max_iter = 10;
@@ -103,6 +104,8 @@ namespace mpc {
         primal_ = sol.x;
 
         if (solve_quality_ == PrimalInfeasible) {
+            primal_ = vector_t::Constant(sol.x.size(), 1e10);
+
             vector_t temp = data.sparse_constraint_*primal_ + slacks_ - data.ub_;
             vector_t primal_product = data.sparse_constraint_*primal_;
 
@@ -493,7 +496,32 @@ namespace mpc {
     vector_t ClarabelInterface::Computedx(const Eigen::SparseMatrix<double>& P, const mpc::vector_t& q,
                                       const mpc::vector_t& xstar) {
         dx_.noalias() = P*xstar + q;
+
+        // TODO: This is making it only consider the state tracking costs
+//        dx_.tail(dx_.size() - 12*45).setZero(); // not using all the states (only the first 45 nodes)
+
         return dx_;
+    }
+
+    ClarabelInterface& ClarabelInterface::operator=(const mpc::ClarabelInterface& other) {
+        settings_ = other.settings_;
+        cones_ = other.cones_;
+        solve_quality_ = other.solve_quality_;
+        num_equality_constraints_ = other.num_equality_constraints_;
+        num_inequality_constraints_ = other.num_inequality_constraints_;
+        dual_ = other.dual_;
+        primal_ = other.primal_;
+        slacks_ = other.slacks_;
+        d_ = other.d_;
+        dx_ = other.dx_;
+        lam_ = other.lam_;
+        nu_ = other.nu_;
+
+        return *this;
+    }
+
+    ClarabelInterface::ClarabelInterface(const mpc::ClarabelInterface& other) : QPInterface(other.prev_qp_sol_.size()){
+        *this = other;
     }
 
 } // mpc

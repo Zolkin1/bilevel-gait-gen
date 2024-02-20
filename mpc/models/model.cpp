@@ -158,4 +158,21 @@ namespace mpc {
     vector_t Model::GetNonlinearEffects(const mpc::vector_t& q, const mpc::vector_t& v) {
         return pinocchio::nonLinearEffects(pin_model_, *pin_data_, q, v);
     }
+
+    Model& Model::operator=(const mpc::Model& model) {
+        if (this != &model) {
+            uses_joints_ = model.uses_joints_;
+            pin_model_ = model.pin_model_;
+            pin_data_ = std::make_unique<pinocchio::Data>(model.pin_data_.operator*());
+            robot_mass_ = model.robot_mass_;
+            num_ee_ = model.num_ee_;
+            frame_map_ = model.frame_map_;
+            frames_ = model.frames_;
+            constraints_ = model.constraints_;
+        }
+    }
+
+    Model::Model(const mpc::Model& other) {
+        *this = other;
+    }
 } // mpc
