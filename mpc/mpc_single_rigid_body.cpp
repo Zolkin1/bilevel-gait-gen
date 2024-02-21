@@ -241,6 +241,9 @@ namespace mpc {
             std::cout << "-----------" << std::endl;
         }
 
+        solve_timer.PrintElapsedTime();
+
+
 //        for (int i = 0; i < info_.num_nodes; i++) {
 //            vector_3t net_force;
 //            net_force << 0, 0, -9.81* model_.GetMass();

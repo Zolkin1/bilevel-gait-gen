@@ -169,12 +169,14 @@ namespace mpc {
             frame_map_ = model.frame_map_;
             frames_ = model.frames_;
             constraints_ = model.constraints_;
+            discretization_steps_ = model.discretization_steps_;
         }
 
         return *this;
     }
 
-    Model::Model(const mpc::Model& other) {
+    Model::Model(const mpc::Model& other) : GRAVITY(0., 0., -9.81) {
         *this = other;
+
     }
 } // mpc

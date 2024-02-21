@@ -158,8 +158,9 @@ namespace mpc {
     }
 
     void ClarabelInterface::ConfigureForRealTime(double run_time_iters) {
-         settings_.tol_gap_rel = 1e-15; //1e-11; 1e-15 works well
-         settings_.tol_gap_abs = 1e-15; //1e-11;
+        // Note: the higher quality definetly shows
+         settings_.tol_gap_rel = 1e-15; //1e-15;
+         settings_.tol_gap_abs = 1e-15; //1e-15;
     }
 
 
@@ -211,9 +212,9 @@ namespace mpc {
         A_builder.SetMatrix((dnu*primal_.transpose() + nu_*dz.transpose()), 0, 0);
         dA.setFromTriplets(A_builder.GetTriplet().begin(), A_builder.GetTriplet().end());
 
-        const int row = 0; // 1
-        const int col = 2; // 750
-        std::cout << "dA at (" << row << "," << col << "): " << dA.toDense()(row, col) << std::endl;
+//        const int row = 0; // 1
+//        const int col = 2; // 750
+//        std::cout << "dA at (" << row << "," << col << "): " << dA.toDense()(row, col) << std::endl;
 
         utils::SparseMatrixBuilder G_builder;
         G_builder.Reserve(1000);

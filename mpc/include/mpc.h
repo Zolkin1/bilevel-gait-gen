@@ -15,7 +15,7 @@
 #include "qp/qp_data.h"
 #include "controller.h"
 #include "timer.h"
-#include "gait_optimizer.h"
+#include "qp/qp_partials.h"
 #include "models/single_rigid_body_model.h"
 #include "rk_integrator.h"
 #include "qp/clarabel_interface.h"

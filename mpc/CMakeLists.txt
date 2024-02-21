@@ -16,7 +16,8 @@ set(MPC_HEADER_LIST "include/mpc.h"
         "include/mpc_centroidal.h"
         "include/spline/spline_node.h"
         "include/spline/end_effector_splines.h"
-        "include/qp/clarabel_interface.h")
+        "include/qp/clarabel_interface.h"
+        "include/qp/qp_partials.h")
 
 add_library(mpc mpc.cpp
         qp/qp_interface.cpp
@@ -85,3 +86,7 @@ target_link_libraries(mpc PUBLIC clarabel)
 message(STATUS "CMAKE_MODULE_PATH: ${CMAKE_MODULE_PATH}")
 find_package(lsqr-cpp REQUIRED)
 target_link_libraries(mpc PUBLIC lsqr-cpp::lsqr-cpp)
+
+# OpenMP
+find_package(OpenMP REQUIRED)
+target_link_libraries(mpc PUBLIC OpenMP::OpenMP_CXX)

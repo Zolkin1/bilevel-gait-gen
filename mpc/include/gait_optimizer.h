@@ -9,6 +9,8 @@
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 
+#include "mpc_single_rigid_body.h"
+#include "qp/qp_partials.h"
 #include "OsqpEigen/OsqpEigen.h"
 #include "sparse_matrix_builder.h"
 #include "spline/end_effector_splines.h"
@@ -17,28 +19,6 @@ namespace mpc {
     using matrix_t = Eigen::MatrixXd;
     using vector_t = Eigen::VectorXd;
     using sp_matrix_t = Eigen::SparseMatrix<double>;
-
-    struct QPPartials {
-        sp_matrix_t dA;
-        sp_matrix_t dP;
-        sp_matrix_t dG;
-        vector_t dl;
-        vector_t du;
-        vector_t dq;
-        vector_t db;
-        vector_t dh;
-
-        void SetZero() {
-            dP.setZero();
-            dA.setZero();
-            dG.setZero();
-            dq.setZero();
-            dl.setZero();
-            du.setZero();
-            db.setZero();
-            dh.setZero();
-        }
-    };
 
     class GaitOptimizer {
     public:
@@ -109,6 +89,8 @@ namespace mpc {
 
         std::vector<time_v> GetContactTimes(double alpha) const;
 
+        std::pair<std::vector<time_v>, double> LineSearch(const MPCSingleRigidBody& mpc);
+
     protected:
     private:
         int GetNumTimeNodes(int ee) const;
@@ -139,6 +121,9 @@ namespace mpc {
 
         std::string GetSolveQualityAsString() const;
 
+        // Assumes there are as many contacts as we currently have
+        std::vector<time_v> ConvertQPVecToContactTimes(const vector_t& vec) const;
+
         std::vector<time_v> contact_times_;
         std::vector<time_v> old_contact_times_;
         std::vector<std::vector<double>> contact_times_lb_, contact_times_ub_;
@@ -147,20 +132,8 @@ namespace mpc {
 
         std::vector<std::vector<QPPartials>> param_partials_;
 
-//        std::vector<std::vector<sp_matrix_t>> dAdth;         // partial deriv of A wrt contact times
-//        std::vector<std::vector<sp_matrix_t>> dPdth;         // partial deriv of P wrt contact times
-//        std::vector<std::vector<vector_t>> dlbdth;        // partial deriv of lb wrt contact times
-//        std::vector<std::vector<vector_t>> dubdth;        // partial deriv of ub wrt contact times
-//        std::vector<std::vector<vector_t>> dqdth;         // partial deriv of q wrt contact times
-
-
         QPPartials qp_partials_;
 
-//        sp_matrix_t dldA;          // partial deriv of cost fcn wrt A
-//        sp_matrix_t dldP;          // partial deriv of cost fcn wrt P
-//        vector_t dldq;          // partial deriv of cost fcn wrt q
-//        vector_t dldlb;         // partial deriv of cost fcn wrt lb
-//        vector_t dldub;         // partial deriv of cost fcn wrt ub
         vector_t dldx;          // partial deriv of cost fcn wrt x
 
         const int num_ee_;
@@ -186,6 +159,8 @@ namespace mpc {
         vector_t dual_;
         matrix_t Bk_;
         vector_t step_, last_step_;
+
+        static constexpr int LS_SIZE = 20; // TODO: Can tune this value
 
         double pred_red_cost_;
         double gamma_; // Trust region shrinking scalar

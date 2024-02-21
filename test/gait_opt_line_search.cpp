@@ -72,55 +72,10 @@ double GaitOptLS(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt,
 
         gait_opt.OptimizeContactTimes(time, cost_red);
 
-        // Now we linesearch
-        constexpr int LS_SIZE = 20;
-        std::array<double, LS_SIZE> costs{};
-        std::array<int, LS_SIZE> indx{};
-
-        for (int i = 0; i < LS_SIZE; i++) {
-            // TODO: Copy constructor does not work!
-            MPCSingleRigidBody mpc_ls = CreateMPC(info, config, warm_start, mpc_des_state, prev_traj.GetState(0), ee_locations);
-            mpc_ls = mpc;
-            std::vector<time_v> contact_times = gait_opt.GetContactTimes((static_cast<double>(i)/LS_SIZE));
-            mpc_ls.UpdateContactTimes(contact_times);
-
-            // Compute the MPC as if you were at the next state
-            if (fixed_pos) {
-                mpc_ls.GetRealTimeUpdate(prev_traj.GetState(0), time,
-                                         ee_locations, false);
-            } else {
-                mpc_ls.GetRealTimeUpdate(prev_traj.GetState(1), time,
-                                         ee_locations, false);
-            }
-
-            costs.at(i) = mpc_ls.GetCost();
-            indx.at(i) = i;
-
-//            mpc.SetWarmStartTrajectory(prev_traj);
-//            mpc.UpdateContactTimes(contact_times);
-//            mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
-//            if (std::abs(mpc.GetCost() - mpc_ls.GetCost()) > 1e-1) {
-//                std::cerr << "MPC MISMATCH at time " << time << std::endl;
-// //                throw std::runtime_error("mpc mismatch!");
-//            }
-//            mpc.SetWarmStartTrajectory(prev_traj);
-
-        }
-
-        int indx_min = -1;
-        double cost_min = 0;
-        for (int i = 0; i < LS_SIZE; i++) {
-            if (costs.at(i) < cost_min) {
-                cost_min = costs.at(i);
-                indx_min = i;
-            }
-        }
-
-        const double alpha = static_cast<double>(indx_min)/LS_SIZE;
-        std::cout << "Smallest cost: " << cost_min << ", alpha: " << alpha << ". Cost decrease: " << -cost_min + original_cost << std::endl;
-
         // Apply the minimizing contact time
-        std::vector<time_v> contact_times = gait_opt.GetContactTimes(alpha);
+        std::vector<time_v> contact_times;
+        double cost_min;
+        std::tie(contact_times, cost_min) = gait_opt.LineSearch(mpc);
         mpc.UpdateContactTimes(contact_times);
 
         return cost_min;
@@ -152,7 +107,7 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
     double prev_cost = 0;
     double cost_red = 0;
 
-    const int N = 200;
+    const int N = 300;
     for (int i = 0; i < N; i++) {
         double time = i*info.integrator_dt;
         if (fixed_pos) {
@@ -173,7 +128,7 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
         viz.UpdateViz(viz_rate);
 
         // Gait optimization
-        if (!(i % 2)) {
+        if (!(i % 5)) {
             prev_cost = GaitOptLS(mpc, gait_opt, cost_red, time, info, config, mpc_des_state,
                                   ee_locations, warm_start, fixed_pos);
  //            std::cout << "Time: " << time << std::endl;

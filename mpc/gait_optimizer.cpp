@@ -5,6 +5,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cassert>
+#include <omp.h>
 
 #include "gait_optimizer.h"
 
@@ -168,7 +169,7 @@ namespace mpc {
         }
 
 //        std::cout << "dG max coeff row, col: " << max_row << ", " << max_col << std::endl;
-        std::cout << "gradient term: " << dHdth.transpose() << std::endl;
+//        std::cout << "gradient term: " << dHdth.transpose() << std::endl;
 
 //        dHdth.normalize();
     }
@@ -191,7 +192,7 @@ namespace mpc {
         //       until after an MPC solve. So we update the trust region here.
         if (run_num_ > 0 && adapt_trust_region) {
             double rho = actual_red_cost / pred_red_cost_;
-            std::cout << "rho: " << rho << std::endl;
+//            std::cout << "rho: " << rho << std::endl;
             if (rho > eta_) {
 //                IncreaseTrustRegion(rho);
                 old_contact_times_ = contact_times_;
@@ -270,7 +271,7 @@ namespace mpc {
 
 
         Bk_ = matrix_t::Zero(num_decision_vars, num_decision_vars);
-        std::cout << "No BFGS" << std::endl;
+//        std::cout << "No BFGS" << std::endl;
 
         // TODO: Consider building a sparse matrix in the first place
         sp_matrix_t P = Bk_.sparseView();
@@ -354,25 +355,7 @@ namespace mpc {
         step_ = alpha*step_; // used for line-search/debugging
         xkp1_ = xk_ + step_;
 
-        for (int ee = 0; ee < num_ee_; ee++) {
-            for (int idx = 0; idx < contact_times_.at(ee).size(); idx++) {
-                contact_times_.at(ee).at(idx).SetTime(xkp1_(GetNumTimeNodes(ee) + idx));
-
-                if (idx > 0) {
-                    if (contact_times_.at(ee).at(idx-1).GetTime() - contact_times_.at(ee).at(idx).GetTime() <= 1e-3
-                        && contact_times_.at(ee).at(idx-1).GetTime() - contact_times_.at(ee).at(idx).GetTime() > 0) {
-                        contact_times_.at(ee).at(idx) = contact_times_.at(ee).at(idx-1);
-                    }
-                    assert(contact_times_.at(ee).at(idx-1).GetTime() <= contact_times_.at(ee).at(idx).GetTime());
-                }
-            }
-        }
-
-//        std::cout << "approx grad: ";
-//        for (int i = 0; i < last_step_.size(); i++) {
-//            std::cout << actual_red_cost/last_step_(i) << ", ";
-//        }
-//        std::cout << std::endl;
+        contact_times_ = ConvertQPVecToContactTimes(xkp1_);
 
         last_step_ = step_;
 
@@ -389,7 +372,7 @@ namespace mpc {
 //        std::cout << "Predicted cost reduction: " << pred_red_cost_ << std::endl;
 //        std::cout << "trust region size: " << Delta_ << std::endl;
 //        std::cout << "gradient norm: " << dHdth.norm() << std::endl;
-        std::cout << "step norm: " << step_.norm() << std::endl;
+//        std::cout << "step norm: " << step_.norm() << std::endl;
 
 //        std::cout << "finite difference: " << -actual_red_cost/dt << std::endl;
 //        std::cout << "step idx: " << step_idx << std::endl;
@@ -444,7 +427,7 @@ namespace mpc {
 
     int GaitOptimizer::CreatePolytopeConstraint(int start_row) {
         // Each node is constrained to be between the node before and after it. At the ends there are constant bounds
-        double constexpr MIN_TIME = 0.1;
+        double constexpr MIN_TIME = 0.12;
 
         int end_row = start_row;
         for (int ee = 0; ee < num_ee_; ee++) {
@@ -654,11 +637,15 @@ namespace mpc {
     std::vector<time_v> GaitOptimizer::GetContactTimes(double alpha) const {
         vector_t new_times = xk_ + alpha*step_;
 
+        return ConvertQPVecToContactTimes(new_times);
+    }
+
+    std::vector<time_v> GaitOptimizer::ConvertQPVecToContactTimes(const mpc::vector_t& vec) const {
         std::vector<time_v> contacts = contact_times_;
 
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int idx = 0; idx < contacts.at(ee).size(); idx++) {
-                contacts.at(ee).at(idx).SetTime(new_times(GetNumTimeNodes(ee) + idx));
+                contacts.at(ee).at(idx).SetTime(vec(GetNumTimeNodes(ee) + idx));
 
                 if (idx > 0) {
                     if (contacts.at(ee).at(idx-1).GetTime() - contacts.at(ee).at(idx).GetTime() <= 1e-3
@@ -671,5 +658,60 @@ namespace mpc {
         }
 
         return contacts;
+    }
+
+    std::pair<std::vector<time_v>, double>  GaitOptimizer::LineSearch(const MPCSingleRigidBody& mpc) {
+        utils::Timer ls_timer("gait opt line search");
+        ls_timer.StartTimer();
+        std::array<double, LS_SIZE> costs{};
+        std::array<int, LS_SIZE> idx{};
+
+        // Parallize
+        omp_set_num_threads(LS_SIZE);
+//        for (int i = 0; i < LS_SIZE; i++) {
+        #pragma omp parallel
+        {
+            const int i = omp_get_thread_num(); // TODO: Do this differently?
+            MPCSingleRigidBody mpc_ls = mpc;    // takes around 0.1ms.
+            std::vector<time_v> contact_times = GetContactTimes((static_cast<double>(i) / LS_SIZE));
+            mpc_ls.UpdateContactTimes(contact_times);
+
+            // Compute the MPC as if you were at the next state
+
+            // Get mpc trajectory to get some information from it
+            const Trajectory& prev_traj = mpc.GetTrajectory();
+            const double time = prev_traj.GetTime(1);
+
+            std::vector<vector_3t> ee_locations(num_ee_);
+            for (int j = 0; j < ee_locations.size(); j++) {
+                ee_locations.at(j) = prev_traj.GetEndEffectorLocation(j, time);
+            }
+
+            utils::Timer mpc_ls_timer("ls mpc");
+            mpc_ls_timer.StartTimer();
+            mpc_ls.GetRealTimeUpdate(prev_traj.GetState(1), time,
+                                     ee_locations, false);
+            mpc_ls_timer.StopTimer();
+//            mpc_ls_timer.PrintElapsedTime();
+
+            costs.at(i) = mpc_ls.GetCost();
+            idx.at(i) = i;
+        }
+
+        int indx_min = -1;
+        double cost_min = 0;
+        for (int i = 0; i < LS_SIZE; i++) {
+            if (costs.at(i) < cost_min) {
+                cost_min = costs.at(i);
+                indx_min = i;
+            }
+        }
+
+        const double alpha = static_cast<double>(indx_min)/LS_SIZE;
+
+        ls_timer.StopTimer();
+        ls_timer.PrintElapsedTime();
+
+        return std::make_pair(GetContactTimes(alpha), cost_min);
     }
 }
