@@ -527,7 +527,7 @@ namespace mpc {
         // Angular momentum depends on force and position
 //        for (int coord = 0; coord < POS_VARS; coord++) {
             // position and force
-        dC.segment<POS_VARS>(ANG_VEL_START).noalias() +=
+        dC.segment<POS_VARS>(ANG_VEL_START) +=
                     ee_pos_wrt_com.cross(force_partial) + position_partial.cross(force);
 //        }
     }

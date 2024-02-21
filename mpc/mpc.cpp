@@ -108,6 +108,8 @@ namespace mpc {
         UpdateNumInputs();
 
         prev_qp_sol = ConvertTrajToQPVec(prev_traj_);
+
+        init_time_ = trajectory.GetTime(0);
     }
 
     void MPC::SetQuadraticCostTerm(const matrix_t& Q) {
@@ -931,7 +933,7 @@ namespace mpc {
         }
     }
 
-    bool MPC::GetQPPartials(QPPartials& partials) const {
+    bool MPC::GetQPPartials(QPPartialsDense& partials) const {
         if (solve_type_.at(solve_type_.size()-1) == Solved) {
             partials.SetZero();
 
@@ -1052,5 +1054,17 @@ namespace mpc {
 
         UpdateNumInputs();
 
+    }
+
+    void MPC::SetVerbosityLevel(mpc::MPCVerbosityLevel verbosity) {
+        info_.verbose = verbosity;
+
+        if (qp_solver != nullptr) {
+            if (info_.verbose == Optimization || info_.verbose == All) {
+                qp_solver->SetVerbosity(true);
+            } else {
+                qp_solver->SetVerbosity(false);
+            }
+        }
     }
 } // mpc

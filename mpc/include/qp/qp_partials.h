@@ -33,6 +33,29 @@ namespace mpc {
             dh.setZero();
         }
     };
+
+    struct QPPartialsDense {
+        matrix_t dA;
+        matrix_t dP;
+        matrix_t dG;
+        vector_t dl;
+        vector_t du;
+        vector_t dq;
+        vector_t db;
+        vector_t dh;
+
+        void SetZero() {
+            dP.setZero();
+            dA.setZero();
+            dG.setZero();
+            dq.setZero();
+            dl.setZero();
+            du.setZero();
+            db.setZero();
+            dh.setZero();
+        }
+    };
+
 } // mpc
 
 #endif //BILEVEL_GAIT_GEN_QPPARTIALS_H

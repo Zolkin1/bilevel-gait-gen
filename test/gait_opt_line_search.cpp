@@ -49,6 +49,9 @@ double GaitOptLS(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt,
                  double cost_red, double time, const MPCInfo& info, utils::ConfigParser& config,
                  const vector_t& mpc_des_state, const std::vector<Eigen::Vector3d>& ee_locations,
                  const std::vector<vector_t>& warm_start, bool fixed_pos) {
+    utils::Timer gait_opt_timer("gait opt + derivatives");
+    gait_opt_timer.StartTimer();
+
     double prev_cost = INFINITY;
     const Trajectory prev_traj = mpc.GetTrajectory();
 
@@ -59,16 +62,31 @@ double GaitOptLS(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt,
         gait_opt.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
         double original_cost = mpc.GetCost();
 
+        utils::Timer qp_partials_timer("qp partials");
+        qp_partials_timer.StartTimer();
         mpc.GetQPPartials(gait_opt.GetQPPartials());
+        qp_partials_timer.StopTimer();
+        qp_partials_timer.PrintElapsedTime();
+
+
+        utils::Timer partials_timer("param partials");
+        partials_timer.StartTimer();
         for (int ee = 0; ee < 4; ee++) {
             gait_opt.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
             for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {
                 mpc.ComputeParamPartialsClarabel(prev_traj, gait_opt.GetParameterPartials(ee, idx), ee, idx);
             }
         }
+        partials_timer.StopTimer();
+        partials_timer.PrintElapsedTime();
 
         gait_opt.ModifyQPPartials(mpc.GetQPSolution());
+
+        utils::Timer cost_fcn_timer("cost fcn gradient");
+        cost_fcn_timer.StartTimer();
         gait_opt.ComputeCostFcnDerivWrtContactTimes();
+        cost_fcn_timer.StopTimer();
+        cost_fcn_timer.PrintElapsedTime();
 
         gait_opt.OptimizeContactTimes(time, cost_red);
 
@@ -76,11 +94,16 @@ double GaitOptLS(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt,
         std::vector<time_v> contact_times;
         double cost_min;
         std::tie(contact_times, cost_min) = gait_opt.LineSearch(mpc);
-        mpc.UpdateContactTimes(contact_times);
+//        mpc.UpdateContactTimes(contact_times);
+
+        gait_opt_timer.StopTimer();
+        gait_opt_timer.PrintElapsedTime();
 
         return cost_min;
     } else {
         std::cerr << "Can't perform gait optimization because MPC was not solved to tolerance." << std::endl;
+        gait_opt_timer.StopTimer();
+        gait_opt_timer.PrintElapsedTime();
         return 1e30;
     }
 
@@ -128,22 +151,32 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
         viz.UpdateViz(viz_rate);
 
         // Gait optimization
-        if (!(i % 5)) {
+        if (!(i % 2)) {
             prev_cost = GaitOptLS(mpc, gait_opt, cost_red, time, info, config, mpc_des_state,
                                   ee_locations, warm_start, fixed_pos);
+
+            prev_traj = mpc.GetTrajectory();
+//            prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
+
+        std::cout << "---------" << std::endl;
+
+//            std::cout << "cost diff: " << prev_cost - mpc.GetCost() << std::endl;
+
  //            std::cout << "Time: " << time << std::endl;
  //            PrintContactSched(mpc.GetTrajectory().GetContactTimes());
-        }
-
-        // Run next MPC
-        if (fixed_pos) {
-            prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(0), time, ee_locations, false);
         } else {
             prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
         }
 
+        // Run next MPC
+//        if (fixed_pos) {
+//            prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(0), time, ee_locations, false);
+//        } else {
+//            prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
+//        }
+
         cost_red = prev_cost - mpc.GetCost();
-        std::cout << "cost error (should be 0 if gait optimized): " << cost_red << std::endl;
+//        std::cout << "cost error (should be 0 if gait optimized): " << cost_red << std::endl;
         total_cost += mpc.GetCost();
     }
 
@@ -151,9 +184,6 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
     mpc::Trajectory traj = mpc.GetTrajectory();
 
     mpc.PrintStats();
-
-    std::cout << "Original contact schedule: " << std::endl;
-    PrintContactSched(mpc.GetTrajectory().GetContactTimes());
 
     std::cout << "Optimized contact schedule: " << std::endl;
     PrintContactSched(mpc.GetTrajectory().GetContactTimes());

@@ -89,22 +89,8 @@ namespace mpc {
         }
         constraint_costs_timer.StopTimer();
 
-//        if (run_num_ == 20) {
-//            std::cout << "Dynamics constraints: " << data_.num_dynamics_constraints << std::endl;
-//            std::cout << "Force box constraints: " << data_.num_force_box_constraints_ << std::endl;
-//            std::cout << "Friction cone constraints: " << data_.num_cone_constraints_ << std::endl;
-//            std::cout << "EE location constraints: " << data_.num_ee_location_constraints_ << std::endl;
-//            std::cout << "Start EE constraints: " << data_.num_start_ee_constraints_ << std::endl;
-//            // No change in the negative direction (any amount), moving in the positive direction ANY amount gives the same change
-//            data_.constraint_mat_.SetDiagonalMatrix(1e-8, 0, 750, 1);
-//            std::cout << "added slight modification" << std::endl;
-//        }
-
         data_.ConstructSparseMats();
         data_.ConstructVectors();
-//        if (constraint_projection_) {
-//            data_.ApplyProjection();
-//        }
 
         // ----------------------- Solve ------------------------- //
         qp_solver->SetupQP(data_, prev_qp_sol);
@@ -130,14 +116,15 @@ namespace mpc {
 
         // TODO: DMA
         const vector_t p = sol - prev_qp_sol;
-        double max = 0;
-        int max_idx = 0;
-        for (int i = 0; i < p.size(); i++) {
-            if (std::abs(sol(i) - prev_qp_sol(i)) > max) {
-                max = std::abs(sol(i) - prev_qp_sol(i));
-                max_idx = i;
-            }
-        }
+
+//        double max = 0;
+//        int max_idx = 0;
+//        for (int i = 0; i < p.size(); i++) {
+//            if (std::abs(sol(i) - prev_qp_sol(i)) > max) {
+//                max = std::abs(sol(i) - prev_qp_sol(i));
+//                max_idx = i;
+//            }
+//        }
 //        std::cout << "max difference is: " << max << " and occurs at index: " << max_idx << std::endl;
 //        std::cout << "force variables start: " << num_states_*(info_.num_nodes+1) << std::endl;
 //        std::cout << "position variables start: " << GetPosSplineStartIdx() << std::endl;
@@ -151,73 +138,11 @@ namespace mpc {
             line_search_timer.StopTimer();
         }
 
-//        if (run_num_ > 0){
-//            std::cout << (alpha*(qp_solver->GetDualSolution() - prev_dual_sol_) + prev_dual_sol_).lpNorm<Eigen::Infinity>() << std::endl;
-//        }
-
         prev_dual_sol_ = qp_solver->GetDualSolution();
 
         prev_qp_sol = ((alpha * p) + prev_qp_sol).eval(); // TODO: Remove eval?
 
         prev_traj_ = ConvertQPSolToTrajectory(prev_qp_sol, prev_traj_.GetState(0));
-//        if (run_num_ == 50) {
-//            std::cout << "ee location: " << prev_traj_.GetEndEffectorLocation(1, init_time).transpose() << std::endl;
-//            std::cout << "lin vars: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).transpose() << std::endl;
-//            int vars_index, vars_affecting;
-//            std::tie(vars_index, vars_affecting) = prev_traj_.GetPositionSplineIndex(1, init_time, 0);
-//            std::cout << "vars index, affecting: " << vars_index << ", " << vars_affecting << std::endl;
-//            std::cout << "qp solve vars: " << sol.segment(GetPosSplineStartIdx() + vars_index - vars_affecting, vars_affecting).transpose() << std::endl;
-//            std::cout << "product: " << prev_traj_.GetSplineLin(Trajectory::Position, 1, 0, init_time).dot(
-//                    sol.segment(GetPosSplineStartIdx() + vars_index - vars_affecting, vars_affecting)) << std::endl;
-//            std::cout << "ee start constraints: \n" << data_.sparse_constraint_.bottomRows<8>()*sol - data_.start_ee_constants_ << std::endl;
-//            std::cout << "constraint mat: " << data_.sparse_constraint_.block(data_.GetTotalNumConstraints() - data_.num_start_ee_constraints_,
-//                                                                              GetPosSplineStartIdx(), data_.num_start_ee_constraints_, prev_traj_.GetTotalPosSplineVars());
-//            std::cout << "solution val: " << sol(GetPosSplineStartIdx() + vars_index - vars_affecting) << std::endl;
-//        }
-
-//        std::cout << "ee location ub constraints: \n" << data_.sparse_constraint_.middleRows(
-//                data_.GetTotalNumConstraints() - data_.num_ee_location_constraints_,
-//                data_.num_ee_location_constraints_)*sol - data_.ee_location_ub_ << std::endl;
-//
-//        std::cout << "ee location lb constraints: \n" << -data_.sparse_constraint_.middleRows(
-//                data_.GetTotalNumConstraints() - data_.num_ee_location_constraints_,
-//                data_.num_ee_location_constraints_)*sol + data_.ee_location_lb_ << std::endl;
-
-//        std::cout << "constraint mat: \n" << data_.sparse_constraint_.middleRows(
-//                data_.GetTotalNumConstraints() - (data_.num_ee_location_constraints_ + data_.num_start_ee_constraints_),
-//                data_.num_ee_location_constraints_) << std::endl;
-
-//        vector_t part_con = data_.sparse_constraint_.middleRows(
-//                data_.GetTotalNumConstraints() - (data_.num_ee_location_constraints_ + data_.num_start_ee_constraints_),
-//                data_.num_ee_location_constraints_)*sol;
-//        double max_ub = 0, max_lb = 0;
-//        int max_idx_ub = -1, max_idx_lb = -1;
-//        for (int i = 0; i < data_.num_ee_location_constraints_; i++) {
-//            if (part_con(i) - data_.ee_location_ub_(i) >= max_ub) {
-//                max_ub = part_con(i);
-//                max_idx_ub = i;
-//            }
-//
-//            if (-part_con(i) + data_.ee_location_lb_(i) >= max_lb) {
-//                max_lb = part_con(i);
-//                max_idx_lb = i;
-//            }
-//        }
-//        std::cout << "max upper bound violation: " << max_ub << ", at index " << max_idx_ub <<
-//        "\n max lower bound violation: " << max_lb << ", at index " << max_idx_lb << std::endl;
-
-
-        // TODO: Turn into unit test
-//        vector_t temp = ConvertTrajToQPVec(prev_traj_);
-//        assert(temp.size() == prev_qp_sol.size());
-//        for (int i = 0; i < temp.size(); i++) {
-//            if (std::abs(temp(i) - prev_qp_sol(i)) > 1e-4) {
-//                std::cout << "i: " << i << " error: " << std::abs(temp(i) - prev_qp_sol(i)) << std::endl;
-//                std::cout << "traj->vec: " << temp(i) << std::endl;
-//                std::cout << "vec: " << prev_qp_sol(i) << std::endl;
-//                std::cout << "----------" << std::endl;
-//            }
-//        }
 
         solve_timer.StopTimer();
 
@@ -240,9 +165,6 @@ namespace mpc {
             solve_timer.PrintElapsedTime();
             std::cout << "-----------" << std::endl;
         }
-
-        solve_timer.PrintElapsedTime();
-
 
 //        for (int i = 0; i < info_.num_nodes; i++) {
 //            vector_3t net_force;
@@ -689,7 +611,9 @@ namespace mpc {
 
             // For now the cost terms are not effected by the contact times
 
-            partials.dP.resize(data_.num_decision_vars, data_.num_decision_vars);
+            // This is zero, so skip it for speed for now
+//            partials.dP.resize(data_.num_decision_vars, data_.num_decision_vars);
+
             partials.dq.resize(data_.num_decision_vars);
             partials.dA.resize(data_.num_equality_, data_.num_decision_vars);
             partials.dG.resize(data_.num_inequality_, data_.num_decision_vars);
@@ -702,16 +626,20 @@ namespace mpc {
             // Cone constraints have on effect
 
             // -------------- Dynamics constraints have an effect -------------- //
+
             utils::SparseMatrixBuilder A_builder;
             A_builder.Reserve(data_.sparse_constraint_.nonZeros()); // TODO: Reserves too much
 
             utils::SparseMatrixBuilder G_builder;
             G_builder.Reserve(data_.sparse_constraint_.nonZeros()); // TODO: Reserves too much
 
+
             int eq_idx = 0;
             int ineq_idx = 0;
             for (int i = 0; i < data_.constraints_.size(); i++) {
                 if (data_.constraints_.at(i) == Dynamics) {
+                    utils::Timer dyn_partials_timer("param partials dynamics");
+                    dyn_partials_timer.StartTimer();
                     matrix_t Adyn_deriv, Bdyn_deriv;
                     vector_t Cdyn_deriv;
 
@@ -733,6 +661,8 @@ namespace mpc {
                         partials.db.segment(eq_idx + (node + 1) * num_states_, num_states_) = -Cdyn_deriv;
                     }
                     eq_idx += data_.num_dynamics_constraints;
+                    dyn_partials_timer.StopTimer();
+//                    dyn_partials_timer.PrintElapsedTime();
                 } else if (data_.constraints_.at(i) == JointForwardKinematics) {
                     throw std::runtime_error("Joint Forward Kinematics not implemented with Carabel yet.");
 

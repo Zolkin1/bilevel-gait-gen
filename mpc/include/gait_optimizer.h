@@ -27,7 +27,7 @@ namespace mpc {
 
         void Setdx(const vector_t& dx);
 
-        QPPartials& GetQPPartials();
+        QPPartialsDense& GetQPPartials();
 
         /**
          * Computes the partial derivative of the cost function wrt all the QP parameters:
@@ -35,7 +35,7 @@ namespace mpc {
          *
          * @note Setdx MUST be called first.
          */
-        void SetCostFcnPartials(const QPPartials& partials);
+        void SetCostFcnPartials(const QPPartialsDense& partials);
 
 
         /**
@@ -89,7 +89,7 @@ namespace mpc {
 
         std::vector<time_v> GetContactTimes(double alpha) const;
 
-        std::pair<std::vector<time_v>, double> LineSearch(const MPCSingleRigidBody& mpc);
+        std::pair<std::vector<time_v>, double> LineSearch(MPCSingleRigidBody& mpc);
 
     protected:
     private:
@@ -132,7 +132,7 @@ namespace mpc {
 
         std::vector<std::vector<QPPartials>> param_partials_;
 
-        QPPartials qp_partials_;
+        QPPartialsDense qp_partials_;
 
         vector_t dldx;          // partial deriv of cost fcn wrt x
 

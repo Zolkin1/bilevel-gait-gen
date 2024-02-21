@@ -135,7 +135,7 @@ namespace mpc {
 
         bool ComputeDerivativeTerms();
 
-        bool GetQPPartials(QPPartials& partials) const;
+        bool GetQPPartials(QPPartialsDense& partials) const;
 
         /**
          * Computes how each term in the QP changes wrt the impact time given by ee and idx
@@ -155,6 +155,8 @@ namespace mpc {
 
         // TODO: Maybe delete this one
         void SetQPData(const QPData& data);
+
+        void SetVerbosityLevel(MPCVerbosityLevel verbosity);
 
     protected:
         // ---------------- Protected Member Functions ---------------- //

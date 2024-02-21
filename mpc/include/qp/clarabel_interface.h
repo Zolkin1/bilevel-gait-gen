@@ -68,7 +68,7 @@ namespace mpc {
         void SetupDerivativeCalcs(vector_t& dx, vector_t& dy_l, vector_t& dy_u,
                                   const QPData& data);
 
-        void CalcDerivativeWrtMats(sp_matrix_t& dP, sp_matrix_t& dA, sp_matrix_t& dG);
+        void CalcDerivativeWrtMats(matrix_t& dP, matrix_t& dA, matrix_t& dG);
 
         void CalcDerivativeWrtVecs(vector_t& dq, vector_t& db, vector_t& dh);
 
@@ -78,6 +78,8 @@ namespace mpc {
         vector_t Getdx() const;
 
         SolveQuality GetSolveQuality() const override;
+
+        void SetVerbosity(bool verbose);
 
     protected:
     private:

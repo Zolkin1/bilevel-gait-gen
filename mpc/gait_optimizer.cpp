@@ -49,6 +49,7 @@ namespace mpc {
     void GaitOptimizer::UpdateSizes(int num_decision_vars, int num_constraints) {
         num_decision_vars_ = num_decision_vars;
         num_constraints_ = num_constraints;
+        param_partials_ = {};
 
 //        qp_partials_.dA.resize(num_constraints_, num_decision_vars_);
 //        qp_partials_.dP.resize(num_decision_vars_, num_decision_vars_);
@@ -80,7 +81,7 @@ namespace mpc {
         }
     }
 
-    void GaitOptimizer::SetCostFcnPartials(const QPPartials& partials) {
+    void GaitOptimizer::SetCostFcnPartials(const QPPartialsDense& partials) {
         qp_partials_ = partials;
     }
 
@@ -92,7 +93,9 @@ namespace mpc {
 
         sp_matrix_t dldAth(qp_partials_.dA.rows(), qp_partials_.dA.cols());
         sp_matrix_t dldGth(qp_partials_.dG.rows(), qp_partials_.dG.cols());
-        sp_matrix_t dldPth(num_decision_vars_, num_decision_vars_);
+
+        // For now dP is always 0 so we can ignore it for speed
+//        sp_matrix_t dldPth(num_decision_vars_, num_decision_vars_);
         dHdth = vector_t::Zero(GetNumTimeNodes(num_ee_));
 
         qp_partials_.dl.setZero();
@@ -120,31 +123,31 @@ namespace mpc {
 
                 dldAth = qp_partials_.dA.cwiseProduct(param_partial.dA);
                 dldGth = qp_partials_.dG.cwiseProduct(param_partial.dG);
-                dldPth = qp_partials_.dP.cwiseProduct(param_partial.dP);
+//                dldPth = qp_partials_.dP.cwiseProduct(param_partial.dP);
 
-                matrix_t A = dldAth.toDense();
-                matrix_t P = param_partial.dP.toDense();
+//                matrix_t A = dldAth.toDense(); // the toDense is very expensive
+//                matrix_t P = param_partial.dP.toDense();
 
-                for (int i = 0; i < param_partial.dl.size(); i++) {
-                    assert(!isnanl(param_partial.dl(i)));
-                    assert(!isnanl(param_partial.du(i)));
-                    for (int j = 0; j < param_partial.dA.cols(); j++) {
-                        if(isnanl(A(i, j))) {
-                            std::cout << "qp partials: " << qp_partials_.dA.toDense()(i,j) << std::endl;
-                            std::cout << "param partials: " << param_partial.dA.toDense()(i,j) << std::endl;
-                            throw std::runtime_error("A partials have a NaN.");
-                        }
-                    }
-                }
+//                for (int i = 0; i < param_partial.dl.size(); i++) {
+//                    assert(!isnanl(param_partial.dl(i)));
+//                    assert(!isnanl(param_partial.du(i)));
+//                    for (int j = 0; j < param_partial.dA.cols(); j++) {
+//                        if(isnanl(A(i, j))) {
+//                            std::cout << "qp partials: " << qp_partials_.dA.toDense()(i,j) << std::endl;
+//                            std::cout << "param partials: " << param_partial.dA.toDense()(i,j) << std::endl;
+//                            throw std::runtime_error("A partials have a NaN.");
+//                        }
+//                    }
+//                }
+//
+//                for (int i = 0; i < param_partial.dq.size(); i++) {
+//                    assert(!isnanl(param_partial.dq(i)));
+//                    for (int j = 0; j < param_partial.dP.cols(); j++) {
+//                        assert(!isnanl(P(i, j)));
+//                    }
+//                }
 
-                for (int i = 0; i < param_partial.dq.size(); i++) {
-                    assert(!isnanl(param_partial.dq(i)));
-                    for (int j = 0; j < param_partial.dP.cols(); j++) {
-                        assert(!isnanl(P(i, j)));
-                    }
-                }
-
-                dHdth(GetNumTimeNodes(ee) + idx) = dldGth.sum( )+ dldAth.sum() + dldPth.sum() +
+                dHdth(GetNumTimeNodes(ee) + idx) = dldGth.sum( )+ dldAth.sum() + //dldPth.sum() +
                                                      qp_partials_.dl.dot(param_partial.dl) + qp_partials_.du.dot(param_partial.du) +
                                                      qp_partials_.dq.dot(param_partial.dq) + qp_partials_.db.dot(param_partial.db) +
                                                      qp_partials_.dh.dot(param_partial.dh);
@@ -154,19 +157,19 @@ namespace mpc {
 
 //        std::cout << "max qp partial dA: " << qp_partials_.dA.coeffs().maxCoeff() << std::endl;
 //        std::cout << "max qp partial dG: " << qp_partials_.dG.coeffs().maxCoeff() << std::endl;
-        double max = -1e10;
-        int max_row = -1;
-        int max_col = -1;
-        matrix_t dG = qp_partials_.dG.toDense();
-        for (int i = 0; i < qp_partials_.dG.rows(); i++) {
-            for (int j = 0; j < qp_partials_.dG.cols(); j++) {
-                if (dG(i,j) > max) {
-                    max = qp_partials_.dG.toDense()(i,j);
-                    max_row = i;
-                    max_col = j;
-                }
-            }
-        }
+//        double max = -1e10;
+//        int max_row = -1;
+//        int max_col = -1;
+//        matrix_t dG = qp_partials_.dG.toDense();
+//        for (int i = 0; i < qp_partials_.dG.rows(); i++) {
+//            for (int j = 0; j < qp_partials_.dG.cols(); j++) {
+//                if (dG(i,j) > max) {
+//                    max = qp_partials_.dG.toDense()(i,j);
+//                    max_row = i;
+//                    max_col = j;
+//                }
+//            }
+//        }
 
 //        std::cout << "dG max coeff row, col: " << max_row << ", " << max_col << std::endl;
 //        std::cout << "gradient term: " << dHdth.transpose() << std::endl;
@@ -179,6 +182,8 @@ namespace mpc {
     }
 
     void GaitOptimizer::OptimizeContactTimes(double time, double actual_red_cost, double alpha, bool adapt_trust_region) {
+        utils::Timer timer("gait opt");
+        timer.StartTimer();
         // ------------------- Setup ------------------- //
         int num_decision_vars = GetNumTimeNodes(num_ee_);
         int num_constraints = num_decision_vars + num_decision_vars + 3*num_ee_;
@@ -201,10 +206,6 @@ namespace mpc {
 //                DecreaseTrustRegion(step_);
 
 // TODO: Put trust region changing back
-
-//                contact_times_ = old_contact_times_;
-//                num_decision_vars = GetNumTimeNodes(num_ee_);
-//                num_constraints = num_decision_vars + num_decision_vars + 3*num_ee_;
             }
         }
 
@@ -255,7 +256,7 @@ namespace mpc {
 
 //        UpdateLagrangianGradients(A);
 //
-////         BFGS does appear to help
+// //         BFGS does appear to help
 //        if (past_decision_vars_ == num_decision_vars) {
 //            AdjustBSize(num_decision_vars);
 //
@@ -324,11 +325,6 @@ namespace mpc {
             assert(!isnanl(step_(i)));
         }
 
-
-        // Note: the step is always accepted since I can't get the actual cost reduction without an MPC solve.
-        //      so for now we should just start with a small trust region and expand out because when the region
-        //      is small enough we guaruntee to have some reduction.
-
         xk_ = xkp1_;
 
         // TODO: Remove after finish debugging
@@ -341,17 +337,6 @@ namespace mpc {
             }
         }
 
-//        std::cout << "Max gradient occurs at: " << max_idx << " with value: " << dHdth(max_idx) << std::endl;
-//        step_.setZero();
-//        double step_len = 1e-3;
-//        step_(max_idx) = step_len;
-
-        // Finite differencing!
-//        step_.setZero();
-//        const double dt = 1e-8;     // TODO: Finite difference surprisingly sensitive to this (can I use it as ground truth?)
-//        const int step_idx = 4; // some are worse than others (i.e. 4)
-//        step_(step_idx) = dt;
-
         step_ = alpha*step_; // used for line-search/debugging
         xkp1_ = xk_ + step_;
 
@@ -363,29 +348,18 @@ namespace mpc {
 
         past_decision_vars_ = num_decision_vars;
 
-//        old_grad_ = dHdth;
-
-//        std::cout << "Actual cost reduction (previous step): " << actual_red_cost << std::endl;
-//        if (actual_red_cost < 0) {
-//            std::cerr << "Bad cost reduction!" << std::endl;
-//        }
-//        std::cout << "Predicted cost reduction: " << pred_red_cost_ << std::endl;
-//        std::cout << "trust region size: " << Delta_ << std::endl;
-//        std::cout << "gradient norm: " << dHdth.norm() << std::endl;
-//        std::cout << "step norm: " << step_.norm() << std::endl;
-
-//        std::cout << "finite difference: " << -actual_red_cost/dt << std::endl;
-//        std::cout << "step idx: " << step_idx << std::endl;
         std::cout << std::endl;
 
         run_num_++;
+        timer.StopTimer();
+        timer.PrintElapsedTime();
     }
 
     std::vector<time_v>& GaitOptimizer::GetContactTimes() {
         return contact_times_;
     }
 
-    QPPartials& GaitOptimizer::GetQPPartials() {
+    QPPartialsDense& GaitOptimizer::GetQPPartials() {
         return qp_partials_;
     }
 
@@ -427,7 +401,7 @@ namespace mpc {
 
     int GaitOptimizer::CreatePolytopeConstraint(int start_row) {
         // Each node is constrained to be between the node before and after it. At the ends there are constant bounds
-        double constexpr MIN_TIME = 0.12;
+        double constexpr MIN_TIME = 0.12; // 0.12
 
         int end_row = start_row;
         for (int ee = 0; ee < num_ee_; ee++) {
@@ -526,7 +500,7 @@ namespace mpc {
     }
 
     void GaitOptimizer::ModifyQPPartials(const vector_t& xstar) {
-        qp_partials_.dP = qp_partials_.dP + 0.5*xstar*xstar.transpose();
+//        qp_partials_.dP = qp_partials_.dP + 0.5*xstar*xstar.transpose();
         qp_partials_.dq += xstar;
     }
 
@@ -660,19 +634,31 @@ namespace mpc {
         return contacts;
     }
 
-    std::pair<std::vector<time_v>, double>  GaitOptimizer::LineSearch(const MPCSingleRigidBody& mpc) {
+    std::pair<std::vector<time_v>, double>  GaitOptimizer::LineSearch(MPCSingleRigidBody& mpc) {
         utils::Timer ls_timer("gait opt line search");
         ls_timer.StartTimer();
         std::array<double, LS_SIZE> costs{};
         std::array<int, LS_SIZE> idx{};
 
+        // TODO: Do this better
+        std::vector<Trajectory> trajectories;
+        for (int i = 0; i < LS_SIZE; i++) {
+            trajectories.emplace_back(mpc.GetTrajectory());
+        }
+
         // Parallize
         omp_set_num_threads(LS_SIZE);
-//        for (int i = 0; i < LS_SIZE; i++) {
+        // This appears to compute quicker if the thread is already "warmed up"
         #pragma omp parallel
         {
             const int i = omp_get_thread_num(); // TODO: Do this differently?
-            MPCSingleRigidBody mpc_ls = mpc;    // takes around 0.1ms.
+            utils::Timer mpc_creation_timer("mpc creation");
+            mpc_creation_timer.StartTimer();
+            MPCSingleRigidBody mpc_ls = mpc; // takes around 0.2 - 0.5 ms.
+            mpc_creation_timer.StopTimer();
+//            mpc_creation_timer.PrintElapsedTime();
+
+            mpc_ls.SetVerbosityLevel(Nothing);
             std::vector<time_v> contact_times = GetContactTimes((static_cast<double>(i) / LS_SIZE));
             mpc_ls.UpdateContactTimes(contact_times);
 
@@ -696,10 +682,11 @@ namespace mpc {
 
             costs.at(i) = mpc_ls.GetCost();
             idx.at(i) = i;
+            trajectories.at(i) = mpc_ls.GetTrajectory();
         }
 
         int indx_min = -1;
-        double cost_min = 0;
+        double cost_min = 1e10;
         for (int i = 0; i < LS_SIZE; i++) {
             if (costs.at(i) < cost_min) {
                 cost_min = costs.at(i);
@@ -707,7 +694,11 @@ namespace mpc {
             }
         }
 
+        // TODO: Return the solved MPC solution!
+
         const double alpha = static_cast<double>(indx_min)/LS_SIZE;
+
+        mpc.SetWarmStartTrajectory(trajectories.at(indx_min));
 
         ls_timer.StopTimer();
         ls_timer.PrintElapsedTime();
