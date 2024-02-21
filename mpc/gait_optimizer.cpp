@@ -310,6 +310,7 @@ namespace mpc {
             && qp_solver_.getStatus() != OsqpEigen::Status::MaxIterReached) {
             std::cerr << "Could not solve the gait optimization problem." << std::endl;
             std::cerr << "Solve type: " << GetSolveQualityAsString() << std::endl;
+            step_.setZero();
             throw std::runtime_error("Bad gait optimization solve");
         }
 
@@ -401,7 +402,7 @@ namespace mpc {
 
     int GaitOptimizer::CreatePolytopeConstraint(int start_row) {
         // Each node is constrained to be between the node before and after it. At the ends there are constant bounds
-        double constexpr MIN_TIME = 0.12; // 0.12
+        double constexpr MIN_TIME = 0.15; // 0.12, 0.19
 
         int end_row = start_row;
         for (int ee = 0; ee < num_ee_; ee++) {

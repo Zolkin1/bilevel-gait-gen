@@ -107,7 +107,8 @@ namespace mpc {
 
         UpdateNumInputs();
 
-        prev_qp_sol = ConvertTrajToQPVec(prev_traj_);
+        // TODO: Might want to put this back
+//        prev_qp_sol = ConvertTrajToQPVec(prev_traj_);
 
         init_time_ = trajectory.GetTime(0);
     }
@@ -573,14 +574,15 @@ namespace mpc {
 //            times.push_back(1.05);
 
 //            times.push_back(0);
-//            times.push_back(0.4);
-//            times.push_back(0.8);
+//            times.push_back(0.3);
+//            times.push_back(0.6);
+//            times.push_back(0.9);
 //            times.push_back(1.2);
 
             times.push_back(0);
             times.push_back(0.2);
             times.push_back(0.4);
-            times.push_back(0.6);
+            times.push_back(0.65);
             times.push_back(0.8);
             times.push_back(1);
 //            }
