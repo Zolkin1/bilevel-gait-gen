@@ -170,6 +170,8 @@ namespace mpc {
             frames_ = model.frames_;
             constraints_ = model.constraints_;
         }
+
+        return *this;
     }
 
     Model::Model(const mpc::Model& other) {

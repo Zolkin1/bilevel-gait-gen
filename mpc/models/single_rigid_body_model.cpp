@@ -543,6 +543,10 @@ namespace mpc {
         return *this;
     }
 
+    SingleRigidBodyModel::SingleRigidBodyModel(const mpc::SingleRigidBodyModel& other) : Model(other) {
+        *this = other;
+    }
+
 
 //    vector_t SingleRigidBodyModel::VelocityInverseKinematics(const vector_t& config,
 //                                                             const std::vector<vector_3t>& end_effector_velocity,

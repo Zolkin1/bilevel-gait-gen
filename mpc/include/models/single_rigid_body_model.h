@@ -30,7 +30,7 @@ namespace mpc {
         SingleRigidBodyModel(const std::string& robot_urdf, const std::vector<std::string>& frames,
                              int discretization_steps, double dt, const vector_t& nom_state);
 
-        SingleRigidBodyModel(const SingleRigidBodyModel& other) = default;
+        SingleRigidBodyModel(const SingleRigidBodyModel& other);
 
         SingleRigidBodyModel& operator=(const SingleRigidBodyModel& model);
 

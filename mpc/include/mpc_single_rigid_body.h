@@ -12,6 +12,8 @@ namespace mpc {
     public:
         MPCSingleRigidBody(const MPCInfo& info, const std::string& robot_urdf);
 
+        MPCSingleRigidBody(const MPCSingleRigidBody& other);
+
         Trajectory Solve(const vector_t& state, double init_time,
                          const std::vector<vector_3t>& ee_start_locations) override;
 
@@ -48,7 +50,7 @@ namespace mpc {
 
         int num_run_;
 
-        static constexpr int EE_NODE_START = 4;
+        static constexpr int EE_NODE_START = 2;
     private:
     };
 } // mpc

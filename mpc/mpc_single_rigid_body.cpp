@@ -821,4 +821,9 @@ namespace mpc {
 //        temp.tail(temp.size() - num_states_*num_nodes).setZero();
         return GetCostValue(temp);
     }
+
+    MPCSingleRigidBody::MPCSingleRigidBody(const mpc::MPCSingleRigidBody& other) : MPC(other) {
+        *this = other;
+        InitalizeQPData();
+    }
 } // mpc

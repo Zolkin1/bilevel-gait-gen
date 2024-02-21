@@ -1015,7 +1015,7 @@ namespace mpc {
             num_ee_ = mpc.num_ee_;
             num_inputs_ = mpc.num_inputs_;
             friction_pyramid_ = mpc.friction_pyramid_;
-            qp_solver = std::make_unique<ClarabelInterface>(*mpc.qp_solver.get());
+            qp_solver = std::make_unique<ClarabelInterface>(*mpc.qp_solver);
             prev_traj_ = mpc.prev_traj_;
             Q_ = mpc.Q_;
             w_ = mpc.w_;
@@ -1039,6 +1039,8 @@ namespace mpc {
             C2_ = mpc.C2_;
             using_clarabel_ = mpc.using_clarabel_;
             integrator_ = mpc.integrator_;
+            constraint_idx_ = mpc.constraint_idx_;
+            num_ineq_fk_ = mpc.num_ineq_fk_;
         }
 
         return *this;
@@ -1047,5 +1049,8 @@ namespace mpc {
     MPC::MPC(const mpc::MPC& other) : model_(other.model_), prev_traj_(other.prev_traj_),
         integrator_(other.integrator_) {
         *this = other;
+
+        UpdateNumInputs();
+
     }
 } // mpc

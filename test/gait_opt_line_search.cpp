@@ -78,13 +78,11 @@ double GaitOptLS(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt,
         std::array<int, LS_SIZE> indx{};
 
         for (int i = 0; i < LS_SIZE; i++) {
+            // TODO: Copy constructor does not work!
             MPCSingleRigidBody mpc_ls = CreateMPC(info, config, warm_start, mpc_des_state, prev_traj.GetState(0), ee_locations);
             mpc_ls = mpc;
             std::vector<time_v> contact_times = gait_opt.GetContactTimes((static_cast<double>(i)/LS_SIZE));
             mpc_ls.UpdateContactTimes(contact_times);
-
-            // Trying to move state over
-//            mpc_ls.SetQPData(mpc.GetQPData());
 
             // Compute the MPC as if you were at the next state
             if (fixed_pos) {
@@ -123,9 +121,7 @@ double GaitOptLS(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt,
 
         // Apply the minimizing contact time
         std::vector<time_v> contact_times = gait_opt.GetContactTimes(alpha);
-//        mpc.SetWarmStartTrajectory(prev_traj);
         mpc.UpdateContactTimes(contact_times);
-//        mpc.GetRealTimeUpdate(prev_traj.GetState(0), time, ee_locations, false);
 
         return cost_min;
     } else {
