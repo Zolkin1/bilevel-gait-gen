@@ -115,17 +115,19 @@ namespace controller {
         ee_locations_ = ee_locations;
         state_time_mut_.unlock();
 
-        mpc_res_mut_.lock();
+        // For now, single thread everything
+
+        // Get MPC update (not gait opt yet)
+        mpc::Trajectory traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
+
+
+//        mpc_res_mut_.lock();
         GetTargetsFromTraj(traj_, time_);
         Contact contact1 = traj_.GetDesiredContacts(time);  // TODO: Implement
-        mpc_res_mut_.unlock();
+//        mpc_res_mut_.unlock();
 
-        // TODO: DMA
         vector_t control_action = vector_t::Zero(3*num_inputs_);    // joints, joint velocities, torques
-//        control_action.head(num_inputs_) << -0.02, 0.3, -0.977, 0.02, 0.2, -0.977, 0.08, 0.45, -1.03, -0.08, 0.45, -1.03; //= q_des_.tail(num_inputs_);
-//        control_action.head(pin_model_.nq) = q_des_;
 
-        // Configurations look ok (still need more checking), but need to focus on torques first
         control_action.head(num_inputs_) = q_des_.tail(num_inputs_);
         control_action.segment(num_inputs_, num_inputs_) = vector_t::Zero(12); //v_des_.tail(num_inputs_);
 
@@ -135,7 +137,7 @@ namespace controller {
             if (contact1.in_contact_.at(ee)) {
                 control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeGroundForceTorques(ee); // TODO: Make not hard coded
             } else {
-//                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeSwingTorques(ee); // TODO: Make not hard coded
+                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeSwingTorques(ee); // TODO: Make not hard coded
             }
         }
 
@@ -145,9 +147,7 @@ namespace controller {
         return control_action;
 
         // Recover torques using ID
-
 //        qp_controller_.UpdateDesiredContacts(contact1);
-
 //        return qp_controller_.ComputeControlAction(q, v, a, contact, time);
     }
 
@@ -172,21 +172,9 @@ namespace controller {
         state(mpc::SingleRigidBodyModel::ORIENTATION_START + 2) = quat.z();
         state(mpc::SingleRigidBodyModel::ORIENTATION_START + 3) = quat.w();
 
-//        state.segment<mpc::SingleRigidBodyModel::QUAT_SIZE>(mpc::SingleRigidBodyModel::ORIENTATION_START) =
-//                q.segment<mpc::SingleRigidBodyModel::QUAT_SIZE>(POS_VARS);
-
         // Angular Momentum
-        state.segment<POS_VARS>(mpc::SingleRigidBodyModel::ANG_VEL_START) =
+        state.segment<POS_VARS>(mpc::SingleRigidBodyModel::ANG_VEL_START + 1) =
                 v.segment<POS_VARS>(mpc::SingleRigidBodyModel::QUAT_SIZE);
-
-//        state.segment<3>(3) = v.segment<3>(3) * mpc_.GetModel()->GetMass();
-
-
-//
-//        state.segment<mpc::CentroidalModel::POS_VARS>(mpc::CentroidalModel::MOMENTUM_OFFSET) = q.head<mpc::CentroidalModel::POS_VARS>();
-//
-//        state.tail(q.size() - mpc::CentroidalModel::FLOATING_VEL_OFFSET) =
-//                q.tail(q.size() - mpc::CentroidalModel::FLOATING_VEL_OFFSET);
 
         return state;
     }
@@ -205,31 +193,31 @@ namespace controller {
     }
 
     void MPCController::MPCUpdate() {
-        vector_t state;
-        double time = -1;
-        std::vector<mpc::vector_3t> ee_locations(4);
-
-        while(true) {
-            state_time_mut_.lock();
-            double time_act = time_;
-            state_time_mut_.unlock();
-            if (time_act - time >= 0.1) {
-                state_time_mut_.lock();
-                state = state_;
-                time = time_;
-                ee_locations = ee_locations_;
-                state_time_mut_.unlock();
-
-                mpc::Trajectory traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
-
-                // ----------------------- IK On Trajectory ----------------------- //
-                FullBodyTrajUpdate(traj);
-                // ----------------------- ----------------------- //
-
-                mpc_res_mut_.lock();
-                traj_ = traj;
-                UpdateTrajViz();
-                mpc_res_mut_.unlock();
+//        vector_t state;
+//        double time = -1;
+//        std::vector<mpc::vector_3t> ee_locations(4);
+//
+//        while(true) {
+//            state_time_mut_.lock();
+//            double time_act = time_;
+//            state_time_mut_.unlock();
+//            if (time_act - time >= 0.1) {
+//                state_time_mut_.lock();
+//                state = state_;
+//                time = time_;
+//                ee_locations = ee_locations_;
+//                state_time_mut_.unlock();
+//
+//                mpc::Trajectory traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
+//
+//                // ----------------------- IK On Trajectory ----------------------- //
+//                FullBodyTrajUpdate(traj);
+//                // ----------------------- ----------------------- //
+//
+//                mpc_res_mut_.lock();
+//                traj_ = traj;
+//                UpdateTrajViz();
+//                mpc_res_mut_.unlock();
 
 //                gait_optimizer_.UpdateSizes(mpc_.GetNumDecisionVars(), mpc_.GetNumConstraints());
 //                mpc_.ComputeDerivativeTerms();
@@ -243,8 +231,8 @@ namespace controller {
 
 //                mpc_.UpdateContactTimes(gait_optimizer_.GetContactTimes());
 
-            }
-        }
+//            }
+//        }
     }
 
     std::vector<std::vector<Eigen::Vector3d>> MPCController::GetTrajViz() {
@@ -262,7 +250,7 @@ namespace controller {
 
     void MPCController::FullBodyTrajUpdate(mpc::Trajectory& traj) {
         vector_t state_guess = q_des_;
-        for (int i = 0; i < 50; i++) {
+        for (int i = 0; i < traj.GetStates().size(); i++) {
             std::vector<mpc::vector_3t> traj_ee_locations(4);
             for (int ee = 0; ee < 4; ee++) {
                 // Grab state and end effector locations at that time
@@ -293,9 +281,6 @@ namespace controller {
         }
 
         int node = traj.GetNode(time)+1;
-//        if (node > 19) {
-//            node = 19;
-//        }
 
         q_des_ = traj.GetFullConfig(node);
         v_des_ = traj.GetFullVelocity(node);
@@ -338,6 +323,11 @@ namespace controller {
                 //(C*v_des_).segment<3>(6 + 3*end_effector) + G.segment<3>(6 + 3*end_effector);   // TODO: Check the indexing
 
         return torques;
+    }
+
+    std::vector<Eigen::Vector2d> MPCController::GetEEBoxCenter() const {
+        // TODO: Deal with multithreading
+        return mpc_.GetEEBoxCenter();
     }
 
 } // controller

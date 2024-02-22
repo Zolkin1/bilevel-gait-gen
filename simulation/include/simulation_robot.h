@@ -69,6 +69,7 @@ namespace simulator {
         int GetNumContacts() const;
 
         std::vector<std::vector<Eigen::Vector3d>> GetTrajViz();
+        std::vector<Eigen::Vector2d> GetEEBoxCenter() const;
 
         Eigen::VectorXd ConvertMujocoConfigToPinocchio(const mjData* data) const;
         Eigen::VectorXd ConvertMujocoVelToPinocchio(const mjData* data) const;

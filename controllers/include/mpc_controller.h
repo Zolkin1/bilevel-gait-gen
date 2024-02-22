@@ -50,6 +50,8 @@ namespace controller {
 
         void UpdateTrajViz();
 
+        std::vector<Eigen::Vector2d> GetEEBoxCenter() const override;
+
     protected:
     private:
         vector_t ReconstructState(const vector_t& q, const vector_t& v, const vector_t& a) const;

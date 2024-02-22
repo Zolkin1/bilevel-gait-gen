@@ -326,4 +326,8 @@ namespace simulator {
         return low_level_controller_->GetTrajViz();
     }
 
+    std::vector<Eigen::Vector2d> SimulationRobot::GetEEBoxCenter() const {
+        return low_level_controller_->GetEEBoxCenter();
+    }
+
 } // simulator

@@ -46,4 +46,9 @@ target_link_libraries(gait_opt_ls utils)
 target_link_libraries(gait_opt_ls mpc)
 target_link_libraries(gait_opt_ls simulator)
 
+add_executable(sim_mpc simulation_mpc.cpp)
+target_link_libraries(sim_mpc utils)
+target_link_libraries(sim_mpc mpc)
+target_link_libraries(sim_mpc simulator)
+
 #catch_discover_tests(gait_opt_playground.cpp)

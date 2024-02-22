@@ -104,4 +104,8 @@ namespace controller {
         return {};
     }
 
+    std::vector<Eigen::Vector2d> Controller::GetEEBoxCenter() const {
+        return {};
+    }
+
 } // controller
