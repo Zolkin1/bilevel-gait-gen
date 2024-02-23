@@ -787,6 +787,16 @@ namespace mpc {
         return coef_partials;
     }
 
+    bool EndEffectorSplines::IsInContact(double time) const {
+        int lower_node = GetLowerNodeIdx(Position, 0, time);
+        int upper_node = GetUpperNodeIdx(Position, 0, time);
+        if (times_.at(lower_node).GetType() == TouchDown && times_.at(upper_node).GetType() == LiftOff) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     void EndEffectorSplines::SetVars(SplineType type, int coord, int node_idx, const vector_2t& vars) {
         // Force NoDerivs can only be zeros
         // Position NoDerivs need to be paired
@@ -1003,6 +1013,35 @@ namespace mpc {
         }
 
         return times;
+    }
+
+    double EndEffectorSplines::GetNextTouchDownTime(double time) const {
+        const int upper_node = GetUpperNodeIdx(Position, 0, time);
+        if (times_.at(upper_node).GetType() == TouchDown) {
+            return times_.at(upper_node).GetTime();
+        } else {
+            return times_.at(GetUpperNodeIdx(Position, 0, times_.at(upper_node).GetTime() + 0.001)).GetTime();
+        }
+    }
+
+    void EndEffectorSplines::SetToTouchdown(double time) {
+        const int upper_node = GetUpperNodeIdx(Position, 0, time);
+        if (times_.at(upper_node).GetType() != TouchDown) {
+            throw std::runtime_error("Attempting to change a lift off to a touchdown node.");
+        }
+
+        if (std::abs(times_.at(upper_node).GetTime() - time) > 1e-1) {
+            throw std::runtime_error("Attempting to change a touchdown node too far away from the current time.");
+        }
+
+        const int upper_node2 = GetUpperNodeIdx(Position, 0, times_.at(upper_node).GetTime() + 0.001);
+        assert(upper_node2 > upper_node);
+        const double time2 = times_.at(upper_node2).GetTime();
+
+        times_.at(upper_node).SetTime(time);
+        for (int i = 1; i < num_force_polys_; i++) {
+            times_.at(upper_node + i).SetTime(i*(time2 - time)/num_force_polys_ + time);
+        }
     }
 
     int EndEffectorSplines::GetLowerNodeIdx(SplineType type, int coord, double time) const {

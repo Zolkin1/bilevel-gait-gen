@@ -63,6 +63,8 @@ namespace controller {
 //        contact2.in_contact_ = {true, true, true, true};
 //        contact2.contact_frames_ = contact.contact_frames_;
         contact2 = des_contact_;
+//        des_contact_ = contact2;
+
         UpdateConstraintsAndCost(q, v, a, contact2);
 
         // Solve qp
@@ -131,7 +133,8 @@ namespace controller {
 
     void QPControl::AddDynamicsConstraints(const Eigen::VectorXd& v, const Contact& contact) {
         // Add equality constraints to the solver params
-        lb_.head(FLOATING_VEL_OFFSET) = -(pin_data_->g.head(FLOATING_VEL_OFFSET) +
+        // TODO: g really causes a lot of problems
+        lb_.head(FLOATING_VEL_OFFSET) = -(//pin_data_->g.head(FLOATING_VEL_OFFSET) +
                 (pin_data_->C*v).head(FLOATING_VEL_OFFSET));
         ub_.head(FLOATING_VEL_OFFSET) = lb_.head(FLOATING_VEL_OFFSET);
 
@@ -139,13 +142,18 @@ namespace controller {
                 pin_data_->M.topLeftCorner(FLOATING_VEL_OFFSET, num_vel_);
 
 //        A_.topRightCorner(FLOATING_VEL_OFFSET, CONSTRAINT_PER_FOOT*GetNumBothContacts(contact, des_contact_)) =
-          A_.block(0, num_vel_, FLOATING_VEL_OFFSET, CONSTRAINT_PER_FOOT* GetNumBothContacts(contact, des_contact_)) =
-                -Js_.transpose().topLeftCorner(FLOATING_VEL_OFFSET, Js_.rows());
+        A_.block(0, num_vel_, FLOATING_VEL_OFFSET,
+               CONSTRAINT_PER_FOOT* GetNumBothContacts(contact, des_contact_)) =
+            -Js_.transpose().topLeftCorner(FLOATING_VEL_OFFSET, Js_.rows());
     }
 
     void QPControl::AddContactMotionConstraints(const Eigen::VectorXd& v) {
         // Assign to solver params
+        // TODO: This appears to be wrong
         if (Js_.size() > 0) {
+            std::cout << "Jsdot: \n" << Jsdot_ << std::endl;
+            std::cout << "Js: \n" << Js_ << std::endl;
+
             lb_.segment(FLOATING_VEL_OFFSET, Js_.rows()) = -Jsdot_ * v;
             ub_.segment(FLOATING_VEL_OFFSET, Js_.rows()) = lb_.segment(FLOATING_VEL_OFFSET, Js_.rows());
 
@@ -167,9 +175,9 @@ namespace controller {
         }
 
         lb_.segment(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT * num_contacts, num_actuators_) =
-               -(pin_data_->C*v + pin_data_->g).segment(FLOATING_VEL_OFFSET, num_actuators_) - torque_bounds_;
+               -(pin_data_->C*v).segment(FLOATING_VEL_OFFSET, num_actuators_) - torque_bounds_; // removed + pin_data_->g
         ub_.segment(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT * num_contacts, num_actuators_) =
-                -(pin_data_->C*v + pin_data_->g).segment(FLOATING_VEL_OFFSET, num_actuators_) + torque_bounds_;
+                -(pin_data_->C*v).segment(FLOATING_VEL_OFFSET, num_actuators_) + torque_bounds_; // removed + pin_data_->g
     }
 
     void QPControl::AddFrictionConeConstraints(const Contact& contact) {
@@ -262,12 +270,14 @@ namespace controller {
         w_ = Eigen::VectorXd::Zero(num_decision_vars_);
 
         // TODO: Change. For now assuming we are always trying to apply 0 contact force
-        force_target_ = Eigen::VectorXd::Constant(3*num_contacts, 0);
+//        force_target_ = Eigen::VectorXd::Constant(3*num_contacts, 0);
 
         // Add the constraints to the matricies
         ComputeDynamicsTerms(q, v, contact);
+        acc_target_ = pin_data_->M*a; //pinocchio::nonLinearEffects(pin_model_, *pin_data_, q, v) +
+
         AddDynamicsConstraints(v, contact);
-        AddContactMotionConstraints(v);
+//        AddContactMotionConstraints(v); // TODO: Fix
         AddTorqueConstraints(v, contact);
         AddFrictionConeConstraints(contact);
 
@@ -326,10 +336,17 @@ namespace controller {
     void QPControl::RecoverControlInputs(const Eigen::VectorXd& qp_sol, const Eigen::VectorXd& v,
                                          Eigen::VectorXd& control, const Contact& contact) {
         // Recover torques using ID
+        // TODO: Grav comp is wrong!
+        // TODO: Look into velocity being wrong
+        // Note: We need to use negative g!
+//        vector_t v_temp = v;
+//        v_temp.setZero();
         Eigen::VectorXd tau =
                 (pin_data_->M*qp_sol.head(num_vel_) - Js_.transpose()*qp_sol.tail(CONSTRAINT_PER_FOOT*
                                                               GetNumBothContacts(contact, des_contact_))
-                                                      + pin_data_->C*v + pin_data_->g).tail(num_inputs_);
+                                                      + pin_data_->C*v).tail(num_inputs_); // - pin_data_->g
+
+        std::cout << "tau: \n" << tau << std::endl;
 
         for (int i = 2*num_inputs_; i < 3*num_inputs_; i++) {
             control(i) = tau(i - 2*num_inputs_);

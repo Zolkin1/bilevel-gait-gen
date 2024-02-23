@@ -66,6 +66,7 @@ namespace mpc {
 
         vector_t ComputeCoefPartialWrtTime(SplineType type, int coord, double time, int time_idx) const; // Note: time_idx is only of contact times
 
+        bool IsInContact(double time) const;
 
         // ------------------ Setters ------------------ //
         void SetVars(SplineType type, int coord, int node_idx, const vector_2t& vars);
@@ -94,6 +95,10 @@ namespace mpc {
         std::vector<double> GetContactTimeValues() const;
 
         time_v GetContactTimes() const;
+
+        double GetNextTouchDownTime(double time) const;
+
+        void SetToTouchdown(double time);
 
         // Function list:
         // - Spline Value

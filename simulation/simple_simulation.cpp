@@ -203,10 +203,44 @@ namespace simulation {
             if (!pause) {
                 double time = d->time;
                 // Allows for multiple steps before the controller is re-computed
+
+                // Set for debugging
+
+
                 while (d->time < time + dt) {
+//                    d->qpos[0] = 0;
+//                    d->qpos[1] = 0;
+//                    d->qpos[2] = 0.34;
+//                    d->qpos[3] = 1;
+//                    d->qpos[4] = 0;
+//                    d->qpos[5] = 0;
+//                    d->qpos[6] = 0;
+//
+//                    d->qvel[0] = 0;
+//                    d->qvel[1] = 0;
+//                    d->qvel[2] = 0;
+//                    d->qvel[3] = 0;
+//                    d->qvel[4] = 0;
+//                    d->qvel[5] = 0;
+
                     mj_step(m, d);
                 }
             }
+
+//            d->qpos[0] = 0;
+//            d->qpos[1] = 0;
+//            d->qpos[2] = 0.34;
+//            d->qpos[3] = 1;
+//            d->qpos[4] = 0;
+//            d->qpos[5] = 0;
+//            d->qpos[6] = 0;
+//
+//            d->qvel[0] = 0;
+//            d->qvel[1] = 0;
+//            d->qvel[2] = 0;
+//            d->qvel[3] = 0;
+//            d->qvel[4] = 0;
+//            d->qvel[5] = 0;
 
             // get framebuffer viewport
             mjrRect viewport = {0, 0, 0, 0};
@@ -215,6 +249,21 @@ namespace simulation {
             // update scene and render
             mjv_updateScene(m, d, &opt, NULL, &cam, mjCAT_ALL, &scn);
             UpdateTrajViz();
+            for (int i = 0; i < d->ncon; i++) {
+                mjv_addGeoms(m, d, &opt, NULL, mjCAT_DECOR, &scn);
+                mjtNum force[6];
+                mj_contactForce(m, d, i, force);
+                mjtNum force3[3];
+                force3[0] = .005; //force[0];
+                force3[1] = .005;//force[1];
+                force3[2] = .01*std::sqrt(std::pow(force[0],2) + std::pow(force[1],2) + std::pow(force[2],2));//force[2];
+
+                const float color[4] = {0.5, 0.75, 0.5, 1};
+
+                scn.ngeom += 1;
+                mjv_initGeom(&scn.geoms[scn.ngeom - 1], mjtGeom::mjGEOM_ARROW,
+                             force3, d->contact[i].pos, nullptr, color); //d->contact[i].frame
+            }
             mjr_render(viewport, &scn, &con);
 
             // swap OpenGL buffers (blocking call due to v-sync)
@@ -316,6 +365,10 @@ namespace simulation {
 
     const mjModel* SimpleSimulation::GetModelPointer() const {
         return m;
+    }
+
+    void SimpleSimulation::PauseSim() {
+        pause = true;
     }
 
 } // simulation

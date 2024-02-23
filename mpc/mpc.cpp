@@ -1069,4 +1069,14 @@ namespace mpc {
             }
         }
     }
+
+    void MPC::AdjustForCurrentContacts(double time, const controller::Contact& contact) {
+        const controller::Contact& traj_contact = prev_traj_.GetDesiredContacts(time);
+        for (int ee = 0; ee < num_ee_; ee++) {
+            if (contact.in_contact_.at(ee) && !traj_contact.in_contact_.at(ee) &&
+            std::abs(prev_traj_.GetNextContactTime(ee, time) - time) < 5e-2) {
+                prev_traj_.SetEEInContact(ee, time);
+            }
+        }
+    }
 } // mpc

@@ -158,6 +158,8 @@ namespace mpc {
 
         void SetVerbosityLevel(MPCVerbosityLevel verbosity);
 
+        void AdjustForCurrentContacts(double time, const controller::Contact& contact);
+
     protected:
         // ---------------- Protected Member Functions ---------------- //
         // Assumes flat ground and constant coef of friction

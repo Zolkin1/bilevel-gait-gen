@@ -28,6 +28,7 @@ namespace simulation {
         void GetTrajViz(const std::vector<std::vector<Eigen::Vector3d>>& traj_viz,
                         const Eigen::Vector2d& box_sides,
                         const std::vector<Eigen::Vector2d>& box_centers);
+        void PauseSim();
 
     private:
         void UpdateTrajViz();

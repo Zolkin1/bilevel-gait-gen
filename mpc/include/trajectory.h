@@ -123,6 +123,10 @@ namespace mpc {
 
         void UpdateContactTimes(std::vector<time_v>& contact_times);
 
+        double GetNextContactTime(int ee, double time) const;
+
+        void SetEEInContact(int ee, double time);
+
     protected:
     private:
         void UpdateSplineVarsCount();
@@ -154,8 +158,8 @@ namespace mpc {
 
 //        std::vector<std::vector<double>> contact_times_;
 
-        std::array<vector_t, 50> full_config_;
-        std::array<vector_t, 50> full_velocity_;
+        std::array<vector_t, 51> full_config_;
+        std::array<vector_t, 51> full_velocity_;
 
         double init_time_;
 

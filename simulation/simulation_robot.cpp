@@ -300,7 +300,7 @@ namespace simulator {
         Eigen::VectorXd muj_q(q.size());
         muj_q.tail(muj_model_->nv - FLOATING_VEL_OFFSET) =
                 ConvertPinocchioJointToMujoco(q.tail(muj_model_->nv - FLOATING_VEL_OFFSET));
-        muj_q.head(3) = q.head(3);
+        muj_q.head(3) << q.head(3);
 
         // floating base quaternion, note pinocchio uses (x,y,z,w_) and mujoco uses (w_,x,y,z)
         muj_q(3) = q(6);

@@ -1,16 +1,18 @@
 <mujoco model="a1_description">
     <compiler angle="radian" meshdir="meshes/" />
     <size njmax="500" nconmax="100" />
-    <option gravity='0 0 -9.806' iterations='50' solver='Newton' timestep='0.002'/>
+    <option gravity='0 0 -9.806' iterations='50' solver='Newton' timestep='0.001'/> <!-- 0.002 -->
+    <option cone="elliptic" impratio="100"/>
 
     <default>
-        <geom contype="1" conaffinity="1" friction="1 0.003 0.003" rgba="0.5 0.6 0.7 1" margin="0.001" group="0"/>
+        <!-- solimp="0.01 1 0.02 0.9 6" solref="-0.5 -2000" -->
+        <geom contype="1" conaffinity="1" solimp="0.01 1 0.02 0.9 4" solref="-0.005 -2500" condim="6"
+              friction="1.8 0.02 0.01" rgba="0.5 0.6 0.7 1" margin="0.001" group="0"/>
 
         <light castshadow="false" diffuse="1 1 1"/>
         <motor ctrlrange="-33.5 33.5" ctrllimited="true"/>
         <camera fovy="60"/>
         <joint damping="0.01" armature="0.01" frictionloss="0.2" />
-    
     </default>
 
     <asset>
@@ -41,7 +43,7 @@
         <camera name="track" mode="trackcom" pos="0 -1.3 1.6" xyaxes="1 0 0 0 0.707 0.707"/>
         <geom name="floor" size="0 0 .05" type="plane" material="plane" condim="3"/>
 
-        <body name="trunk" pos="0 0 .4">
+        <body name="trunk" pos="0 0 .4" gravcomp="0">
 <!--            <inertial pos="0.0127283 0.00218554 0.000514891" quat="0.00186575 0.711506 0.000389649 0.702677" mass="4.714" diaginertia="0.0648213 0.0565803 0.0169323" />-->
             <inertial pos="0.0127283 0.00218554 0.000514891" quat="0.00186575 0.711506 0.000389649 0.702677" mass="6.001" diaginertia="0.0648213 0.0565803 0.0169323" />
             <joint type="free" />
@@ -52,17 +54,17 @@
             <site name="imu" pos="0 0 0"/>
             <light name="top" pos="0 0 2" mode="trackcom" />
 
-            <body name="FR_hip" pos="0.183 -0.047 0">
+            <body name="FR_hip" pos="0.183 -0.047 0" gravcomp="0">
                 <inertial pos="-0.003311 -0.000635 3.1e-05" quat="0.507528 0.506268 0.491507 0.494499" mass="0.696" diaginertia="0.000807752 0.00055293 0.000468983" />
                 <joint name="FR_hip_joint" pos="0 0 0" axis="1 0 0" limited="true" range="-0.802851 0.802851" />
                 <geom quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="hip" />
                 <geom size="0.04 0.04" pos="0 -0.055 0" quat="0.707107 0.707107 0 0" type="cylinder" material="body" />
-                <body name="FR_thigh" pos="0 -0.08505 0">
+                <body name="FR_thigh" pos="0 -0.08505 0" gravcomp="0">
                     <inertial pos="-0.003237 0.022327 -0.027326" quat="0.999125 -0.00256393 -0.0409531 -0.00806091" mass="1.013" diaginertia="0.00555739 0.00513936 0.00133944" />
                     <joint name="FR_thigh_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-1.0472 4.18879" />
                     <geom type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="thigh_mirror" />
                     <geom size="0.1 0.01225 0.017" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" material="body" />
-                    <body name="FR_calf" pos="0 0 -0.2">
+                    <body name="FR_calf" pos="0 0 -0.2" gravcomp="0"> <!-- gravcomp="1" -->
                         <inertial pos="0.00472659 0 -0.131975" quat="0.706886 0.017653 0.017653 0.706886" mass="0.226" diaginertia="0.00340344 0.00339393 3.54834e-05" />
                         <joint name="FR_calf_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-2.69653 -0.916298" />
                         <geom type="mesh" contype="0" conaffinity="0" group="1" material="trunk" mesh="calf" />
@@ -72,17 +74,17 @@
                     </body>
                 </body>
             </body>
-            <body name="FL_hip" pos="0.183 0.047 0">
+            <body name="FL_hip" pos="0.183 0.047 0" gravcomp="0">
                 <inertial pos="-0.003311 0.000635 3.1e-05" quat="0.494499 0.491507 0.506268 0.507528" mass="0.696" diaginertia="0.000807752 0.00055293 0.000468983" />
                 <joint name="FL_hip_joint" pos="0 0 0" axis="1 0 0" limited="true" range="-0.802851 0.802851" />
                 <geom type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="hip" />
                 <geom size="0.04 0.04" pos="0 0.055 0" quat="0.707107 0.707107 0 0" type="cylinder" material="body" />
-                <body name="FL_thigh" pos="0 0.08505 0">
+                <body name="FL_thigh" pos="0 0.08505 0" gravcomp="0">
                     <inertial pos="-0.003237 -0.022327 -0.027326" quat="0.999125 0.00256393 -0.0409531 0.00806091" mass="1.013" diaginertia="0.00555739 0.00513936 0.00133944" />
                     <joint name="FL_thigh_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-1.0472 4.18879" />
                     <geom type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="thigh" />
                     <geom size="0.1 0.01225 0.017" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" material="body" />
-                    <body name="FL_calf" pos="0 0 -0.2">
+                    <body name="FL_calf" pos="0 0 -0.2" gravcomp="0">
                         <inertial pos="0.00472659 0 -0.131975" quat="0.706886 0.017653 0.017653 0.706886" mass="0.226" diaginertia="0.00340344 0.00339393 3.54834e-05" />
                         <joint name="FL_calf_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-2.69653 -0.916298" />
                         <geom type="mesh" contype="0" conaffinity="0" group="1" material="trunk" mesh="calf" />
@@ -92,17 +94,17 @@
                     </body>
                 </body>
             </body>
-            <body name="RR_hip" pos="-0.183 -0.047 0">
+            <body name="RR_hip" pos="-0.183 -0.047 0" gravcomp="0">
                 <inertial pos="0.003311 -0.000635 3.1e-05" quat="0.491507 0.494499 0.507528 0.506268" mass="0.696" diaginertia="0.000807752 0.00055293 0.000468983" />
                 <joint name="RR_hip_joint" pos="0 0 0" axis="1 0 0" limited="true" range="-0.802851 0.802851" />
                 <geom quat="0 0 0 -1" type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="hip" />
                 <geom size="0.04 0.04" pos="0 -0.055 0" quat="0.707107 0.707107 0 0" type="cylinder" material="body" />
-                <body name="RR_thigh" pos="0 -0.08505 0">
+                <body name="RR_thigh" pos="0 -0.08505 0" gravcomp="0">
                     <inertial pos="-0.003237 0.022327 -0.027326" quat="0.999125 -0.00256393 -0.0409531 -0.00806091" mass="1.013" diaginertia="0.00555739 0.00513936 0.00133944" />
                     <joint name="RR_thigh_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-1.0472 4.18879" />
                     <geom type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="thigh_mirror" />
                     <geom size="0.1 0.01225 0.017" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" material="body" />
-                    <body name="RR_calf" pos="0 0 -0.2">
+                    <body name="RR_calf" pos="0 0 -0.2" gravcomp="0">
                         <inertial pos="0.00472659 0 -0.131975" quat="0.706886 0.017653 0.017653 0.706886" mass="0.226" diaginertia="0.00340344 0.00339393 3.54834e-05" />
                         <joint name="RR_calf_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-2.69653 -0.916298" />
                         <geom type="mesh" contype="0" conaffinity="0" group="1" material="trunk" mesh="calf" />
@@ -112,17 +114,17 @@
                     </body>
                 </body>
             </body>
-            <body name="RL_hip" pos="-0.183 0.047 0">
+            <body name="RL_hip" pos="-0.183 0.047 0" gravcomp="0">
                 <inertial pos="0.003311 0.000635 3.1e-05" quat="0.506268 0.507528 0.494499 0.491507" mass="0.696" diaginertia="0.000807752 0.00055293 0.000468983" />
                 <joint name="RL_hip_joint" pos="0 0 0" axis="1 0 0" limited="true" range="-0.802851 0.802851" />
                 <geom quat="0 0 1 0" type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="hip" />
                 <geom size="0.04 0.04" pos="0 0.055 0" quat="0.707107 0.707107 0 0" type="cylinder" material="body" />
-                <body name="RL_thigh" pos="0 0.08505 0">
+                <body name="RL_thigh" pos="0 0.08505 0" gravcomp="0">
                     <inertial pos="-0.003237 -0.022327 -0.027326" quat="0.999125 0.00256393 -0.0409531 0.00806091" mass="1.013" diaginertia="0.00555739 0.00513936 0.00133944" />
                     <joint name="RL_thigh_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-1.0472 4.18879" />
                     <geom type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="thigh" />
                     <geom size="0.1 0.01225 0.017" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" material="body" />
-                    <body name="RL_calf" pos="0 0 -0.2">
+                    <body name="RL_calf" pos="0 0 -0.2" gravcomp="0">
                         <inertial pos="0.00472659 0 -0.131975" quat="0.706886 0.017653 0.017653 0.706886" mass="0.226" diaginertia="0.00340344 0.00339393 3.54834e-05" />
                         <joint name="RL_calf_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-2.69653 -0.916298" />
                         <geom type="mesh" contype="0" conaffinity="0" group="1" material="trunk" mesh="calf" />
@@ -137,73 +139,74 @@
     <actuator>       
         <!-- position commands -->
         <!-- kp = 25, kv = 7 works ok, at kp = 20, PD needs FF to work -->
-<!--        <position name="FR_hip_p"       kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FR_hip_joint"/>-->
-<!--        <position name="FR_thigh_p"     kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FR_thigh_joint"/>-->
-<!--        <position name="FR_calf_p"      kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FR_calf_joint"/>-->
-<!--        <position name="FL_hip_p"       kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FL_hip_joint"/>-->
-<!--        <position name="FL_thigh_p"     kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FL_thigh_joint"/>-->
-<!--        <position name="FL_calf_p"      kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FL_calf_joint"/>-->
-<!--        <position name="RR_hip_p"       kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RR_hip_joint"/>-->
-<!--        <position name="RR_thigh_p"     kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RR_thigh_joint"/>-->
-<!--        <position name="RR_calf_p"      kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RR_calf_joint" />-->
-<!--        <position name="RL_hip_p"       kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RL_hip_joint"/>-->
-<!--        <position name="RL_thigh_p"     kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RL_thigh_joint"/>-->
-<!--        <position name="RL_calf_p"      kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RL_calf_joint"/>-->
-
-<!--        &lt;!&ndash; velocity commands &ndash;&gt;-->
-<!--        <velocity name="FR_hip_v"       kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FR_hip_joint"/>-->
-<!--        <velocity name="FR_thigh_v"     kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FR_thigh_joint"/>-->
-<!--        <velocity name="FR_calf_v"      kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FR_calf_joint"/>-->
-<!--        <velocity name="FL_hip_v"       kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FL_hip_joint"/>-->
-<!--        <velocity name="FL_thigh_v"     kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FL_thigh_joint"/>-->
-<!--        <velocity name="FL_calf_v"      kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FL_calf_joint"/>-->
-<!--        <velocity name="RR_hip_v"       kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RR_hip_joint"/>-->
-<!--        <velocity name="RR_thigh_v"     kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RR_thigh_joint"/>-->
-<!--        <velocity name="RR_calf_v"      kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RR_calf_joint" />-->
-<!--        <velocity name="RL_hip_v"       kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RL_hip_joint"/>-->
-<!--        <velocity name="RL_thigh_v"     kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RL_thigh_joint"/>-->
-<!--        <velocity name="RL_calf_v"      kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RL_calf_joint"/>-->
-
-        <position name="FR_hip_p"       kp="1" ctrllimited="true" ctrlrange="-75 75" joint="FR_hip_joint"/>
-        <position name="FR_thigh_p"     kp="1" ctrllimited="true" ctrlrange="-75 75" joint="FR_thigh_joint"/>
-        <position name="FR_calf_p"      kp="1" ctrllimited="true" ctrlrange="-75 75" joint="FR_calf_joint"/>
+        <position name="FR_hip_p"       kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FR_hip_joint"/>
+        <position name="FR_thigh_p"     kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FR_thigh_joint"/>
+        <position name="FR_calf_p"      kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FR_calf_joint"/>
         <position name="FL_hip_p"       kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FL_hip_joint"/>
         <position name="FL_thigh_p"     kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FL_thigh_joint"/>
         <position name="FL_calf_p"      kp="0" ctrllimited="true" ctrlrange="-75 75" joint="FL_calf_joint"/>
         <position name="RR_hip_p"       kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RR_hip_joint"/>
         <position name="RR_thigh_p"     kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RR_thigh_joint"/>
         <position name="RR_calf_p"      kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RR_calf_joint" />
-        <position name="RL_hip_p"       kp="10" ctrllimited="true" ctrlrange="-75 75" joint="RL_hip_joint"/>
-        <position name="RL_thigh_p"     kp="10" ctrllimited="true" ctrlrange="-75 75" joint="RL_thigh_joint"/>
-        <position name="RL_calf_p"      kp="10" ctrllimited="true" ctrlrange="-75 75" joint="RL_calf_joint"/>
+        <position name="RL_hip_p"       kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RL_hip_joint"/>
+        <position name="RL_thigh_p"     kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RL_thigh_joint"/>
+        <position name="RL_calf_p"      kp="0" ctrllimited="true" ctrlrange="-75 75" joint="RL_calf_joint"/>
 
         <!-- velocity commands -->
-        <velocity name="FR_hip_v"       kv="2" ctrllimited="true" ctrlrange="-50 50" joint="FR_hip_joint"/>
-        <velocity name="FR_thigh_v"     kv="2" ctrllimited="true" ctrlrange="-50 50" joint="FR_thigh_joint"/>
-        <velocity name="FR_calf_v"      kv="2" ctrllimited="true" ctrlrange="-50 50" joint="FR_calf_joint"/>
-        <velocity name="FL_hip_v"       kv="2" ctrllimited="true" ctrlrange="-50 50" joint="FL_hip_joint"/>
-        <velocity name="FL_thigh_v"     kv="2" ctrllimited="true" ctrlrange="-50 50" joint="FL_thigh_joint"/>
-        <velocity name="FL_calf_v"      kv="2" ctrllimited="true" ctrlrange="-50 50" joint="FL_calf_joint"/>
-        <velocity name="RR_hip_v"       kv="2" ctrllimited="true" ctrlrange="-50 50" joint="RR_hip_joint"/>
-        <velocity name="RR_thigh_v"     kv="2" ctrllimited="true" ctrlrange="-50 50" joint="RR_thigh_joint"/>
-        <velocity name="RR_calf_v"      kv="2" ctrllimited="true" ctrlrange="-50 50" joint="RR_calf_joint" />
-        <velocity name="RL_hip_v"       kv="2" ctrllimited="true" ctrlrange="-50 50" joint="RL_hip_joint"/>
-        <velocity name="RL_thigh_v"     kv="2" ctrllimited="true" ctrlrange="-50 50" joint="RL_thigh_joint"/>
-        <velocity name="RL_calf_v"      kv="2" ctrllimited="true" ctrlrange="-50 50" joint="RL_calf_joint"/>
+        <velocity name="FR_hip_v"       kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FR_hip_joint"/>
+        <velocity name="FR_thigh_v"     kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FR_thigh_joint"/>
+        <velocity name="FR_calf_v"      kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FR_calf_joint"/>
+        <velocity name="FL_hip_v"       kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FL_hip_joint"/>
+        <velocity name="FL_thigh_v"     kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FL_thigh_joint"/>
+        <velocity name="FL_calf_v"      kv="0" ctrllimited="true" ctrlrange="-50 50" joint="FL_calf_joint"/>
+        <velocity name="RR_hip_v"       kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RR_hip_joint"/>
+        <velocity name="RR_thigh_v"     kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RR_thigh_joint"/>
+        <velocity name="RR_calf_v"      kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RR_calf_joint" />
+        <velocity name="RL_hip_v"       kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RL_hip_joint"/>
+        <velocity name="RL_thigh_v"     kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RL_thigh_joint"/>
+        <velocity name="RL_calf_v"      kv="0" ctrllimited="true" ctrlrange="-50 50" joint="RL_calf_joint"/>
+
+<!--        <position name="FR_hip_p"       kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FR_hip_joint"/>-->
+<!--        <position name="FR_thigh_p"     kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FR_thigh_joint"/>-->
+<!--        <position name="FR_calf_p"      kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FR_calf_joint"/>-->
+<!--        <position name="FL_hip_p"       kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FL_hip_joint"/>-->
+<!--        <position name="FL_thigh_p"     kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FL_thigh_joint"/>-->
+<!--        <position name="FL_calf_p"      kp="20" ctrllimited="true" ctrlrange="-75 75" joint="FL_calf_joint"/>-->
+<!--        <position name="RR_hip_p"       kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RR_hip_joint"/>-->
+<!--        <position name="RR_thigh_p"     kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RR_thigh_joint"/>-->
+<!--        <position name="RR_calf_p"      kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RR_calf_joint" />-->
+<!--        <position name="RL_hip_p"       kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RL_hip_joint"/>-->
+<!--        <position name="RL_thigh_p"     kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RL_thigh_joint"/>-->
+<!--        <position name="RL_calf_p"      kp="20" ctrllimited="true" ctrlrange="-75 75" joint="RL_calf_joint"/>-->
+
+<!--        &lt;!&ndash; velocity commands &ndash;&gt;-->
+<!--        <velocity name="FR_hip_v"       kv="1" ctrllimited="true" ctrlrange="-50 50" joint="FR_hip_joint"/>-->
+<!--        <velocity name="FR_thigh_v"     kv="1" ctrllimited="true" ctrlrange="-50 50" joint="FR_thigh_joint"/>-->
+<!--        <velocity name="FR_calf_v"      kv="1" ctrllimited="true" ctrlrange="-50 50" joint="FR_calf_joint"/>-->
+<!--        <velocity name="FL_hip_v"       kv="1" ctrllimited="true" ctrlrange="-50 50" joint="FL_hip_joint"/>-->
+<!--        <velocity name="FL_thigh_v"     kv="1" ctrllimited="true" ctrlrange="-50 50" joint="FL_thigh_joint"/>-->
+<!--        <velocity name="FL_calf_v"      kv="1" ctrllimited="true" ctrlrange="-50 50" joint="FL_calf_joint"/>-->
+<!--        <velocity name="RR_hip_v"       kv="1" ctrllimited="true" ctrlrange="-50 50" joint="RR_hip_joint"/>-->
+<!--        <velocity name="RR_thigh_v"     kv="1" ctrllimited="true" ctrlrange="-50 50" joint="RR_thigh_joint"/>-->
+<!--        <velocity name="RR_calf_v"      kv="1" ctrllimited="true" ctrlrange="-50 50" joint="RR_calf_joint" />-->
+<!--        <velocity name="RL_hip_v"       kv="1" ctrllimited="true" ctrlrange="-50 50" joint="RL_hip_joint"/>-->
+<!--        <velocity name="RL_thigh_v"     kv="1" ctrllimited="true" ctrlrange="-50 50" joint="RL_thigh_joint"/>-->
+<!--        <velocity name="RL_calf_v"      kv="1" ctrllimited="true" ctrlrange="-50 50" joint="RL_calf_joint"/>-->
 
         <!-- feed forward commands -->
-        <motor name="FR_hip"       gear="0.5" ctrllimited="true" ctrlrange="-30 30" joint="FR_hip_joint"/>
-        <motor name="FR_thigh"     gear="0.5" ctrllimited="true" ctrlrange="-30 30" joint="FR_thigh_joint"/>
-        <motor name="FR_calf"      gear="0.5" ctrllimited="true" ctrlrange="-30 30" joint="FR_calf_joint"/>
-        <motor name="FL_hip"       gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FL_hip_joint"/>
-        <motor name="FL_thigh"     gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FL_thigh_joint"/>
-        <motor name="FL_calf"      gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FL_calf_joint"/>
+        <!-- had cntrl range at +-100 -->
+        <motor name="FR_hip"       gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FR_hip_joint"/>
+        <motor name="FR_thigh"     gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FR_thigh_joint"/>
+        <motor name="FR_calf"      gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FR_calf_joint"/>
+        <motor name="FL_hip"       gear="1" ctrllimited="true" ctrlrange="-50 50" joint="FL_hip_joint"/>
+        <motor name="FL_thigh"     gear="1" ctrllimited="true" ctrlrange="-50 50" joint="FL_thigh_joint"/>
+        <motor name="FL_calf"      gear="1" ctrllimited="true" ctrlrange="-50 50" joint="FL_calf_joint"/>
         <motor name="RR_hip"       gear="1" ctrllimited="true" ctrlrange="-30 30" joint="RR_hip_joint"/>
-        <motor name="RR_thigh"     gear="-1" ctrllimited="true" ctrlrange="-30 30" joint="RR_thigh_joint"/>
-        <motor name="RR_calf"      gear="-1" ctrllimited="true" ctrlrange="-30 30" joint="RR_calf_joint" />
+        <motor name="RR_thigh"     gear="1" ctrllimited="true" ctrlrange="-30 30" joint="RR_thigh_joint"/>
+        <motor name="RR_calf"      gear="1" ctrllimited="true" ctrlrange="-30 30" joint="RR_calf_joint" />
         <motor name="RL_hip"       gear="1" ctrllimited="true" ctrlrange="-30 30" joint="RL_hip_joint"/>
-        <motor name="RL_thigh"     gear="-1" ctrllimited="true" ctrlrange="-30 30" joint="RL_thigh_joint"/>
-        <motor name="RL_calf"      gear="-1" ctrllimited="true" ctrlrange="-30 30" joint="RL_calf_joint"/>
+        <motor name="RL_thigh"     gear="1" ctrllimited="true" ctrlrange="-30 30" joint="RL_thigh_joint"/>
+        <motor name="RL_calf"      gear="1" ctrllimited="true" ctrlrange="-30 30" joint="RL_calf_joint"/>
     </actuator>
 
     <sensor>

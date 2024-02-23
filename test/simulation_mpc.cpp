@@ -208,17 +208,6 @@ int main() {
 
 //    mpc::GaitOptimizer gait_opt(4, 10, 10, 10, 1, 0.05);
 
-    // Visualize results
-    simulation::SimpleSimulation sim(robot_file);
-    robot->SetSimModel(sim.GetModelPointer());
-
-//    mpc.CreateInitialRun(init_state, ee_locations);
-//    mpc::Trajectory prev_traj = mpc.GetTrajectory();
-
-    double total_cost = 0;
-    double prev_cost = 0;
-    double cost_red = 0;
-
     if (viz_rate != 1.0/config.ParseNumber<double>("control_rate")) {
         throw std::runtime_error("different viz rate and integration dt is not allowed");
     }
@@ -227,10 +216,18 @@ int main() {
     vector_t init_vel = config.ParseEigenVector("init_vel");
     robot->SetInitialCondition(standing, init_vel);
 
+
     // Set up controller solver
     robot->InitController(standing, init_state);
     robot->DefineContacts(config.ParseStringVector("collision_frames"),
                           config.ParseStdVector<int>("collision_bodies"));
+
+    // Visualize results
+    simulation::SimpleSimulation sim(robot_file);
+    robot->SetSimModel(sim.GetModelPointer());
+
+//    mpc.CreateInitialRun(init_state, ee_locations);
+//    mpc::Trajectory prev_traj = mpc.GetTrajectory();
 
     mjData* data = sim.GetDataPointer();
     for (int i = 0; i < standing.size(); i++) {
@@ -240,7 +237,13 @@ int main() {
         data->qvel[i] = robot->ConvertPinocchioVelToMujoco(init_vel)(i);
     }
 
-    int constexpr N = 100;
+    // Update Sim
+    sim.GetTrajViz(robot->GetTrajViz(), info.ee_box_size, robot->GetEEBoxCenter());
+    sim.UpdateSim(viz_rate);
+
+    sim.PauseSim();
+
+    int constexpr N = 400;
     for (int i = 0; i < N; i++) {
         double time = i*info.integrator_dt;
 

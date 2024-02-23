@@ -32,7 +32,7 @@ namespace mpc {
                                      in_contact, 3); // TODO: Make this not hard coded
         }
 
-        for (int i = 0; i < full_config_.size(); i++) {
+        for (int i = 0; i < states_.size(); i++) {
             full_config_.at(i) = vector_t::Zero(state_size);
             full_velocity_.at(i) = vector_t::Zero(state_size-1);
         }
@@ -481,11 +481,12 @@ namespace mpc {
     controller::Contact Trajectory::GetDesiredContacts(double time) const {
         controller::Contact contact(ee_splines_.size());
         for (int ee = 0; ee < ee_splines_.size(); ee++) {
-            if (GetForce(ee, time)(2) <= 0.0) {
-                contact.in_contact_.at(ee) = false;
-            } else {
-                contact.in_contact_.at(ee) = true;
-            }
+            contact.in_contact_.at(ee) = ee_splines_.at(ee).IsInContact(time);
+//            if (GetForce(ee, time)(2) <= 0.0) {
+//                contact.in_contact_.at(ee) = false;
+//            } else {
+//                contact.in_contact_.at(ee) = true;
+//            }
         }
         // TODO: Get the contact frames
 
@@ -536,6 +537,14 @@ namespace mpc {
         for (int ee = 0; ee < ee_splines_.size(); ee++) {
             ee_splines_.at(ee).SetContactTimes(contact_times.at(ee));
         }
+    }
+
+    double Trajectory::GetNextContactTime(int ee, double time) const {
+        return ee_splines_.at(ee).GetNextTouchDownTime(time);
+    }
+
+    void Trajectory::SetEEInContact(int ee, double time) {
+        ee_splines_.at(ee).SetToTouchdown(time);
     }
 
 } // mpc

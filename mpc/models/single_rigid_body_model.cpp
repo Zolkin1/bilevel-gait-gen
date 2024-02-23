@@ -282,9 +282,15 @@ namespace mpc {
 // TODO: This is adding an additional shift
         vector_3t temp = -pin_data_->oMi[com_joint_id].translation() + pin_data_->oMi[hip_joint_id].translation();
         if (temp(1) >= 0) {
-            temp(1) += 0.13;
+            temp(1) += 0.1;
         } else {
-            temp(1) -= 0.13;
+            temp(1) -= 0.1;
+        }
+
+        if (temp(0) >= 0) {
+            temp(0) += 0.075;
+        } else {
+            temp(0) += 0.1;
         }
 
         return temp;
@@ -547,6 +553,9 @@ namespace mpc {
         *this = other;
     }
 
+    matrix_33t SingleRigidBodyModel::GetIr() const {
+        return Ir_;
+    }
 
 //    vector_t SingleRigidBodyModel::VelocityInverseKinematics(const vector_t& config,
 //                                                             const std::vector<vector_3t>& end_effector_velocity,

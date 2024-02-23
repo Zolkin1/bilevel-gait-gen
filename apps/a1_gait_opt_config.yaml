@@ -73,9 +73,9 @@ srb_init: [0, 0, 0.34,
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
 control_rate: 500  # Hz
 torque_bounds: [100, 100, 100,
-                 100, 100, 100,
-                 100, 100, 100,
-                 100, 100, 100] # 33.5
+                100, 100, 100,
+                100, 100, 100,
+                100, 100, 100] # 33.5
 #  [100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100,
@@ -88,12 +88,12 @@ base_ang_gains: [10, 100]  # kd_ang, kp_ang
 
 # The following are tuned for when vdes = 0
 # 200, 5 seems ok, 30 and 5 also looks ok
-kp_joint_gains: [5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000]
-kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
+kp_joint_gains: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
+kd_joint_gains: [30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]
 
-leg_tracking_weight: 10 #0.1
-torso_tracking_weight: 0 #10
-force_tracking_weight: 1
+leg_tracking_weight: 1 #0.1
+torso_tracking_weight: 10 #10
+force_tracking_weight: 0
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
@@ -123,21 +123,21 @@ swing_height: 0.1
 
 num_polys: 3
 
-x_des: 0
-y_des: 0
+x_des: 1
+y_des: 1
 xdot_des: 0
 ydot_des: 0
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
-ee_box_size: [0.25, 0.25]
+ee_box_size: [0.15, 0.15]
 
 run_time_iterations: 6000 # 150 works well
 
 foot_offset: 0.001 # 0.02
 
 force_cost: 0.000 # Note: without this cost, the problem is much more poorly
-                  # conditioned and can return infeasible, also the derivative computations are much worse
-                  # without this force cost, the QP cost is almost constant in steady state.
+  # conditioned and can return infeasible, also the derivative computations are much worse
+# without this force cost, the QP cost is almost constant in steady state.
 
 Q_diag: [1, 1, 1,          # linear momentum
          1, 1, 1,           # angular momentum

@@ -5,6 +5,12 @@
 #include "mpc_controller.h"
 #include "models/single_rigid_body_model.h"
 
+#include "pinocchio/algorithm/kinematics.hpp"
+#include "pinocchio/algorithm/crba.hpp"
+#include "pinocchio/algorithm/rnea.hpp"
+#include "pinocchio/algorithm/jacobian.hpp"
+#include "pinocchio/algorithm/frames.hpp"
+
 namespace controller {
     MPCController::MPCController(double control_rate, std::string robot_urdf, const std::string &foot_type, int nv,
                                  const Eigen::VectorXd &torque_bounds, double friction_coef,
@@ -53,6 +59,9 @@ namespace controller {
         mpc_.SetQuadraticFinalCost(1*Q);
         mpc_.SetLinearFinalCost(-1*Q*des_alg);
 
+        kp_joints_ = kp_joint_gains;
+        kv_joints_ = kd_joint_gains;
+
         prev_time_ = 0;
         computed_ = false;
 
@@ -84,10 +93,10 @@ namespace controller {
         mpc_.CreateInitialRun(mpc_state, ee_locations_);
         mpc_.PrintStats();
 
-        traj_viz_mut_.lock();
+//        traj_viz_mut_.lock();
         traj_ = mpc_.GetTrajectory();
         FullBodyTrajUpdate(traj_);
-        traj_viz_mut_.unlock();
+//        traj_viz_mut_.unlock();
 
         time_ = 0;
 
@@ -112,43 +121,112 @@ namespace controller {
             time_ = time;
         }
 
+//        if (time > 1) {
+//            time = 1;
+//        }
+
         ee_locations_ = ee_locations;
         state_time_mut_.unlock();
 
         // For now, single thread everything
 
         // Get MPC update (not gait opt yet)
+        mpc_.AdjustForCurrentContacts(time, contact);
         mpc::Trajectory traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
-
+        FullBodyTrajUpdate(traj);
+        UpdateTrajViz();
 
 //        mpc_res_mut_.lock();
-        GetTargetsFromTraj(traj_, time_);
-        Contact contact1 = traj_.GetDesiredContacts(time);  // TODO: Implement
+        GetTargetsFromTraj(traj, time); // TODO: IK for velocties.
+        // TODO: Check GRF
+        Contact contact1 = traj.GetDesiredContacts(time);  // TODO: Implement
+        contact1.contact_frames_ = contact.contact_frames_;
 //        mpc_res_mut_.unlock();
+
+//        q_des_ << 0., 0., 0.36, 0, 0, 0, 1.0, -0.22, -0.2, -0.977,
+//                0.02, 0.2, -0.977,  0.02, 0.45, -1.03, -0.02, 0.45, -1.03;
+//        v_des_.setZero();
+
+        vector_t tau_fb = kp_joints_.cwiseProduct((q_des_ - q).tail(num_inputs_))
+                + kv_joints_.cwiseProduct((v_des_ - v).tail(num_inputs_));
+//        tau_fb.setZero();
+
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
+        // Get C
+        pinocchio::computeCoriolisMatrix(pin_model_, *pin_data_, q, v);
+        // Get g
+        pinocchio::computeGeneralizedGravity(pin_model_, *pin_data_, q);
+        // Get M
+        pinocchio::crba(pin_model_, *pin_data_,  q);
+        // Make M symmetric
+        pin_data_->M.triangularView<Eigen::StrictlyLower>() =
+                pin_data_->M.transpose().triangularView<Eigen::StrictlyLower>();
+
+        const int num_sw = (4-contact.GetNumContacts())*3;
+        const int num_st = contact.GetNumContacts()*3;
+        vector_t tau_ff(num_inputs_); //pin_data_->g.tail(num_inputs_);
+
+        for (int ee = 0; ee < contact1.in_contact_.size(); ee++) {
+            if (contact1.in_contact_.at(ee)) {
+                // Stance foot
+//                const mpc::matrix_33t J = model_.GetEEJacobian(ee, q);
+//                const mpc::matrix_33t Jdot = model_.GetEEJacobianDeriv(ee, q, v);
+
+                matrix_t J = matrix_t::Zero(6, 18);
+                pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, contact1.contact_frames_.at(ee),
+                                                pinocchio::LOCAL_WORLD_ALIGNED, J); // TODO: Consider frame
+
+                // force in generalized coordinates
+                vector_t qf = -J.transpose().leftCols<3>()*traj.GetForce(ee, time);
+
+//                std::cout << "J^T: \n" << J.transpose() << std::endl;
+//                std::cout << "force: \n" << traj_.GetForce(ee, time) << std::endl;
+//
+//                std::cout << "qf: \n" << qf << std::endl;
+
+                tau_ff.segment(3*ee, 3) = qf.segment<3>(6 + 3*ee); // .setZero();
+            } else {
+                // Swing foot
+                tau_ff.segment(3*ee, 3) = (-pin_data_->g + pin_data_->C*v + pin_data_->M*a).segment(6 + 3*ee,3);
+            }
+//            std::cout << "ee: " << ee << ", contact: " << contact.in_contact_.at(ee) << std::endl;
+        }
+//        tau_ff.setZero();
 
         vector_t control_action = vector_t::Zero(3*num_inputs_);    // joints, joint velocities, torques
 
         control_action.head(num_inputs_) = q_des_.tail(num_inputs_);
         control_action.segment(num_inputs_, num_inputs_) = vector_t::Zero(12); //v_des_.tail(num_inputs_);
+        control_action.tail(num_inputs_) = tau_fb + tau_ff;
 
-
-        for (int ee = 0; ee < contact1.in_contact_.size(); ee++) {
+//        for (int ee = 0; ee < contact1.in_contact_.size(); ee++) {
             // TODO: Should I be going on actual or desired contacts?
-            if (contact1.in_contact_.at(ee)) {
-                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeGroundForceTorques(ee); // TODO: Make not hard coded
-            } else {
-                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeSwingTorques(ee); // TODO: Make not hard coded
-            }
-        }
-
+//            if (contact1.in_contact_.at(ee)) {
+//                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeGroundForceTorques(ee); // TODO: Make not hard coded
+//            } else {
+//                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeSwingTorques(ee); // TODO: Make not hard coded
+//            }
+//        }
 
 //        control_action.segment(num_inputs_*2 + 6, 3) = vector_t::Zero(3);
 
-        return control_action;
+//        return control_action;
 
-        // Recover torques using ID
-//        qp_controller_.UpdateDesiredContacts(contact1);
-//        return qp_controller_.ComputeControlAction(q, v, a, contact, time);
+        qp_controller_.UpdateTargetConfig(q_des_);
+        qp_controller_.UpdateTargetVel(v_des_);
+        vector_t force_des(contact1.GetNumContacts()*3);
+        int j = 0;
+        for (int i = 0; i < contact1.in_contact_.size(); i++) {
+            if (contact1.in_contact_.at(i)) {
+                force_des.segment<3>(3*j) = traj.GetForce(i, time);
+                j++;
+            }
+        }
+        qp_controller_.UpdateForceTargets(force_des);
+
+        qp_controller_.UpdateDesiredContacts(contact1);
+
+        return qp_controller_.ComputeControlAction(q, v, a, contact1, time);
     }
 
     vector_t MPCController::ReconstructState(const controller::vector_t& q, const controller::vector_t& v,
@@ -173,8 +251,10 @@ namespace controller {
         state(mpc::SingleRigidBodyModel::ORIENTATION_START + 3) = quat.w();
 
         // Angular Momentum
+        // TODO: Is the angular velocity correct?
+        // TODO: The state is the angular momentum, not just the velocity
         state.segment<POS_VARS>(mpc::SingleRigidBodyModel::ANG_VEL_START + 1) =
-                v.segment<POS_VARS>(mpc::SingleRigidBodyModel::QUAT_SIZE);
+                model_.GetIr() * v.segment<POS_VARS>(mpc::SingleRigidBodyModel::QUAT_SIZE);
 
         return state;
     }
@@ -236,16 +316,16 @@ namespace controller {
     }
 
     std::vector<std::vector<Eigen::Vector3d>> MPCController::GetTrajViz() {
-        traj_viz_mut_.lock();
+//        traj_viz_mut_.lock();
         std::vector<std::vector<Eigen::Vector3d>> fk_traj = fk_traj_;
-        traj_viz_mut_.unlock();
+//        traj_viz_mut_.unlock();
         return fk_traj;
     }
 
     void MPCController::UpdateTrajViz() {
-        traj_viz_mut_.lock();
+//        traj_viz_mut_.lock();
         fk_traj_ = mpc_.CreateVizData();
-        traj_viz_mut_.unlock();
+//        traj_viz_mut_.unlock();
     }
 
     void MPCController::FullBodyTrajUpdate(mpc::Trajectory& traj) {
@@ -263,7 +343,7 @@ namespace controller {
             state_guess = traj.GetFullConfig(i);
 
             if (i >= 1) {
-                // TODO: Do the velocity IK
+                // TODO: Do the velocity IK (better vel estimate...)
 
                 vector_t vel(model_.GetFullModelConfigSpace() - 1);
                 vel.head<6>() << traj.GetState(i).segment<3>(3), traj.GetState(i).segment<3>(9);
@@ -272,7 +352,7 @@ namespace controller {
                 traj.UpdateFullVelocity(i-1, vel);
             }
         }
-        traj.UpdateFullVelocity(49, vector_t::Zero(pin_model_.nv));
+        traj.UpdateFullVelocity(traj.GetStates().size() - 1, vector_t::Zero(pin_model_.nv));
     }
 
     void MPCController::GetTargetsFromTraj(const mpc::Trajectory& traj, double time) {
@@ -280,7 +360,7 @@ namespace controller {
             time = traj.GetTime(0);
         }
 
-        int node = traj.GetNode(time)+1;
+        int node = traj.GetNode(time)+1; // TODO: +1 or +0
 
         q_des_ = traj.GetFullConfig(node);
         v_des_ = traj.GetFullVelocity(node);

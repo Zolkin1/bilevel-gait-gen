@@ -101,6 +101,9 @@ namespace controller {
         int num_polys_;
 
         vector_t full_body_state_;
+
+        vector_t kp_joints_;
+        vector_t kv_joints_;
     };
 } // controller
 

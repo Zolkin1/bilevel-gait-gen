@@ -78,6 +78,8 @@ namespace mpc {
                                                         int end_effector,
                                                         int contact_time_idx);
 
+        matrix_33t GetIr() const;
+
         static constexpr int QUAT_SIZE = 4;
         static constexpr int QUAT_START = 6;
         static constexpr int ORIENTATION_START = 6;
