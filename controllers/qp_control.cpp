@@ -48,8 +48,8 @@ namespace controller {
         num_actuators_ = num_vel_ - FLOATING_VEL_OFFSET;
 
         // Set solver settings
-        qp_solver_.settings()->setRelativeTolerance(1e-5);
-        qp_solver_.settings()->setAbsoluteTolerance(1e-5);
+        qp_solver_.settings()->setRelativeTolerance(1e-10);
+        qp_solver_.settings()->setAbsoluteTolerance(1e-10);
         qp_solver_.settings()->setVerbosity(false);
         qp_solver_.settings()->setPolish(true);     // Makes a HUGE difference
 
@@ -336,7 +336,7 @@ namespace controller {
         // Add the constraints to the matricies
         ComputeDynamicsTerms(q, v, contact);
         /// TODO: Keep an eye on the nonlinear terms
-        acc_target_ = pin_data_->M*a + pinocchio::nonLinearEffects(pin_model_, *pin_data_, q, v);
+        acc_target_.setZero();  // pin_data_->M*a + pinocchio::nonLinearEffects(pin_model_, *pin_data_, q, v);
         acc_target_.head(FLOATING_VEL_OFFSET).setZero();
 
         AddDynamicsConstraints(v, contact);
@@ -352,11 +352,11 @@ namespace controller {
 
 //        std::cout << "Constraint jacobian^T (pin): \n" << Js_.transpose() << std::endl;
 
-        std::cout << "Constraints: \n" << A_ << std::endl;
-        std::cout << "ub: \n" << ub_ << std::endl;
-        std::cout << "lb: \n" <<  lb_ << std::endl;
-//        std::cout << "Quadratic cost: \n" << P_ << std::endl;
-//        std::cout << "Linear cost: \n" << w_ << std::endl;
+//        std::cout << "Constraints: \n" << A_ << std::endl;
+//        std::cout << "ub: \n" << ub_ << std::endl;
+//        std::cout << "lb: \n" <<  lb_ << std::endl;
+        std::cout << "Quadratic cost: \n" << P_ << std::endl;
+        std::cout << "Linear cost: \n" << w_ << std::endl;
 
         pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, a);
 
