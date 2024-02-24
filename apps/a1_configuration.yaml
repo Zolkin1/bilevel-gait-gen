@@ -16,7 +16,7 @@ foot_type: "POINT_FEET"
 
 # initial joint config
 # xp, yp, zp, qw, qx, qy, qz, q0, ..., q11 - note that the angles are quaternions and need to be normalized
-init_config: [0., 0., 0.36, 0, 0, 0, 1.0, # -0.0004, 0.004, 0.0001,
+init_config: [0., 0., 0.34, 0, 0, 0, 1.0, # -0.0004, 0.004, 0.0001,
               -0.02, 0.2, -0.977,       # front left
               0.02, 0.2, -0.977,        # front right
               0.02, 0.45, -1.03,        # rear left
@@ -45,7 +45,7 @@ init_vel: [0., 0., 0., 0., 0., 0.,
 #                 -0.0788, 0.6, -.91
 #                 0.0798, 0.6, -.91]
 
-target_config: [0., 0., 0.3541, 0, 0, 0, 1.0,
+target_config: [0., 0., 0.361, 0, 0, 0, 1.0,
                 -0.02, -1, -0.977,     # front left
                 0.02, 0.2, -0.977,     # front right
                 0.08, 0.45, -1.03,     # rear left
@@ -64,7 +64,7 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
 #            0, 0, 0, 1,
 #            0, 0, 0]
 
-srb_init: [0, 0, 0.34,
+srb_init: [0, 0, 0.3,
            0, 0, 0, # 6, 6 for x, y vel give some cool results
            0, 0, 0, 1,
            0, 0, 0]
@@ -72,28 +72,31 @@ srb_init: [0, 0, 0.34,
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
 control_rate: 500  # Hz
-torque_bounds: [100, 100, 100,
-                 100, 100, 100,
-                 100, 100, 100,
-                 100, 100, 100] # 33.5
+torque_bounds: [30, 30, 30,
+                30, 30, 30,
+                30, 30, 30,
+                30, 30, 30] # 33.5, 100
 #  [100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100]
-friction_coef: 0.6 #0.3 - note problem can be sensitive to this with the gait opt
+friction_coef: 0.8 #0.3 - note problem can be sensitive to this with the gait opt
 
 # TODO: Tune
-base_pos_gains: [10, 100]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
-base_ang_gains: [10, 100]  # kd_ang, kp_ang
+base_pos_gains: [10, 500]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
+base_ang_gains: [0.01, .01]  # kd_ang, kp_ang
 
 # The following are tuned for when vdes = 0
-# 200, 5 seems ok, 30 and 5 also looks ok
-kp_joint_gains: [5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000]
+# 5000, 300 works well for the QP controller
+kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
 kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
 
-leg_tracking_weight: 10 #0.1
-torso_tracking_weight: 0 #10
-force_tracking_weight: 1
+#kp_joint_gains: [50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50]
+#kd_joint_gains: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+
+leg_tracking_weight: 10 #10
+torso_tracking_weight: .1 #10 - can't put this too high (or even nonzero) - doesn't work well
+force_tracking_weight: 10
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
@@ -123,17 +126,17 @@ swing_height: 0.1
 
 num_polys: 3
 
-x_des: 0
+x_des: 1
 y_des: 0
 xdot_des: 0
 ydot_des: 0
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
-ee_box_size: [0.25, 0.25]
+ee_box_size: [0.15, 0.1] # 0.15, 0.1 for the sim, 0.2 0.15 for the MPC viz
 
 run_time_iterations: 6000 # 150 works well
 
-foot_offset: 0.001 # 0.02
+foot_offset: 0.003 # 0.02
 
 force_cost: 0.000 # Note: without this cost, the problem is much more poorly
                   # conditioned and can return infeasible, also the derivative computations are much worse
@@ -149,7 +152,7 @@ Q_diag: [1, 1, 1,          # linear momentum
          60000, 500, 10]       # RR leg
 
 # can try higher weight with less nodes
-Q_srbd_diag: [55.0, 40.0, 500, 0.1, 0.1, 0.1, 5000, 5000, 5000, 0.1, 0.1, 0.1]
+Q_srbd_diag: [55.0, 40.0, 5000, 0.1, 0.1, 0.1, 5000, 5000, 5000, 0.1, 0.1, 0.1]
 
 
 # Walk to position weights:

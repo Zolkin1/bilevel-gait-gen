@@ -65,6 +65,8 @@ namespace controller {
         prev_time_ = 0;
         computed_ = false;
 
+        run_num = 0;
+
         for (auto& ee : fk_traj_) {
             ee.resize(info.num_nodes + 1);
         }
@@ -131,8 +133,11 @@ namespace controller {
         // For now, single thread everything
 
         // Get MPC update (not gait opt yet)
-        mpc_.AdjustForCurrentContacts(time, contact);
-        mpc::Trajectory traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
+        mpc::Trajectory traj = traj_;
+        if (!(run_num % 1)) {
+            mpc_.AdjustForCurrentContacts(time, contact);
+            traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
+        }
         FullBodyTrajUpdate(traj);
         UpdateTrajViz();
 
@@ -225,6 +230,10 @@ namespace controller {
         qp_controller_.UpdateForceTargets(force_des);
 
         qp_controller_.UpdateDesiredContacts(contact1);
+
+        traj_ = traj;
+
+        run_num++;
 
         return qp_controller_.ComputeControlAction(q, v, a, contact1, time);
     }
@@ -405,7 +414,7 @@ namespace controller {
         return torques;
     }
 
-    std::vector<Eigen::Vector2d> MPCController::GetEEBoxCenter() const {
+    std::vector<Eigen::Vector2d> MPCController::GetEEBoxCenter() {
         // TODO: Deal with multithreading
         return mpc_.GetEEBoxCenter();
     }

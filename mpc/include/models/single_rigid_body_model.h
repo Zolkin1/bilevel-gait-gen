@@ -57,7 +57,7 @@ namespace mpc {
         vector_t ConvertManifoldStateToTangentState(const vector_t& state, const vector_t& ref_state) const override;
         vector_t ConvertTangentStateToManifoldState(const vector_t& state, const vector_t& ref_state) const override;
 
-        vector_3t GetCOMToHip(int end_effector) const;
+        vector_3t GetCOMToHip(int end_effector);
 
         vector_t InverseKinematics(const man_state_t& state, const std::vector<vector_3t>& end_effector_location,
                                    const vector_t& state_guess, const vector_t& joint_limits_ub,
@@ -80,6 +80,8 @@ namespace mpc {
 
         matrix_33t GetIr() const;
 
+        vector_2t GetCOMHipOffset(int ee) const;
+
         static constexpr int QUAT_SIZE = 4;
         static constexpr int QUAT_START = 6;
         static constexpr int ORIENTATION_START = 6;
@@ -98,6 +100,8 @@ namespace mpc {
         // Was const
         int num_tangent_states_;
         int num_manifold_states_;
+
+        std::vector<vector_2t> com_hip_offsets;
 
         matrix_33t Ir_;   // Rotational inertia
         matrix_33t Ir_inv_;

@@ -62,6 +62,9 @@ namespace mpc {
         AddFinalCost();
         AddDiagonalCost();
 
+//        AddEEPosCost();
+
+
 //        data_.cost_mat_.SetDiagonalMatrix(1, 0, 0, data_.num_decision_vars);
 
         // -------------------- Constraints ---------------------- //
@@ -82,6 +85,9 @@ namespace mpc {
                     break;
                 case Constraints::EndEffectorLocation:
                     AddEELocationConstraints(ee_start_locations);
+                    break;
+                case Constraints::TDPosition:
+                    AddTDPositionConstraints();
                     break;
                 default:
                     throw std::runtime_error("No such constraint exists.");
@@ -294,9 +300,11 @@ namespace mpc {
 
         data_.num_cone_constraints_ = GetNumFricConeConstraints();
 //        data_.num_cone_constraints_ = (info_.num_nodes+1)*4*num_ee_;
+
         if (using_clarabel_) {
             data_.num_force_box_constraints_ = GetNumForceBoxConstraints(); //2*GetNodeIntersectMutableForces();
             data_.num_ee_location_constraints_ = 2*(info_.num_nodes-(EE_NODE_START-1))*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
+            data_.num_td_pos_constraints_ = GetNumTDConstraints();
         } else {
             data_.num_force_box_constraints_ = GetNodeIntersectMutableForces(); // TODO: Change
             data_.num_ee_location_constraints_ = (info_.num_nodes+1)*2*num_ee_;
@@ -463,7 +471,7 @@ namespace mpc {
 //        return state;
     }
 
-    std::vector<Eigen::Vector2d> MPCSingleRigidBody::GetEEBoxCenter() const {
+    std::vector<Eigen::Vector2d> MPCSingleRigidBody::GetEEBoxCenter() {
         std::vector<Eigen::Vector2d> box_centers(num_ee_);
         for (int ee = 0; ee < num_ee_; ee++) {
             box_centers.at(ee) = model_.GetCOMToHip(ee).head<2>();
@@ -758,5 +766,68 @@ namespace mpc {
     MPCSingleRigidBody::MPCSingleRigidBody(const mpc::MPCSingleRigidBody& other) : MPC(other) {
         *this = other;
         InitalizeQPData();
+    }
+
+    void MPCSingleRigidBody::AddEEPosCost() {
+        const double weight = .1;
+
+        const int pos_start_idx = GetPosSplineStartIdx();
+        constexpr int CONSTRAINT_COORDS = 2;
+
+        for (int node = EE_NODE_START; node < info_.num_nodes + 1; node++) {
+            for (int ee = 0; ee < num_ee_; ee++) {
+                model_.GetCOMToHip(ee); // need this to populate the vector
+
+                data_.cost_mat_.SetDiagonalMatrix(weight, node*num_states_, node*num_states_, CONSTRAINT_COORDS);
+
+                vector_2t k = model_.GetCOMHipOffset(ee); // + info_.ee_box_size/2;
+
+
+                vector_2t q_c;
+                q_c = (weight*k); //weight*prev_traj_.GetState(node).head<CONSTRAINT_COORDS>() -
+                data_.cost_linear.segment<2>(node*num_states_) += q_c;
+
+                for (int coord = 0; coord < CONSTRAINT_COORDS; coord++) {
+                    int vars_idx, vars_affecting;
+                    std::tie(vars_idx, vars_affecting) =
+                            prev_traj_.GetPositionSplineIndex(ee, GetTime(node), coord);
+
+                    vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position,
+                                                                ee, coord, GetTime(node));
+
+                    data_.cost_linear.segment(pos_start_idx + vars_idx, vars_affecting) += -q_c(coord)*vars_lin;
+
+                    data_.cost_mat_.SetMatrix(weight*vars_lin, node * num_states_, pos_start_idx + vars_idx);
+//                    data_.cost_mat_.SetDiagonalMatrix(weight, pos_start_idx + vars_idx, node * num_states_, vars_affecting);
+                    data_.cost_mat_.SetMatrix(weight*vars_lin, pos_start_idx + vars_idx, node * num_states_);
+
+                    data_.cost_mat_.SetMatrix(weight*vars_lin, pos_start_idx + vars_idx, pos_start_idx + vars_idx);
+                }
+            }
+        }
+    }
+
+    void MPCSingleRigidBody::AddTDPositionConstraints() {
+        const int start_pos_idx = GetPosSplineStartIdx();
+        int row_idx = 0;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < prev_traj_.GetCurrentSwingTime(ee)/2) {
+                const double td_time = prev_traj_.GetNextContactTime(ee, init_time_);
+                data_.td_pos_constants_.segment<2>(row_idx) = prev_traj_.GetEndEffectorLocation(ee, td_time).head<2>();
+                for (int coord = 0; coord < 2; coord++) {
+                    int vars_idx, vars_affecting;
+                    std::tie(vars_idx, vars_affecting) =
+                            prev_traj_.GetPositionSplineIndex(ee, td_time, coord);
+
+                    vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position,
+                                                                ee, coord, td_time);
+                    data_.constraint_mat_.SetMatrix(vars_lin.transpose(), constraint_idx_ + row_idx,
+                                                    start_pos_idx + vars_idx);
+                    row_idx++;
+                }
+            }
+        }
+        assert(row_idx == data_.num_td_pos_constraints_);
+        constraint_idx_ += row_idx;
     }
 } // mpc

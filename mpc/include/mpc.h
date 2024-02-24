@@ -231,6 +231,8 @@ namespace mpc {
 
         int GetNumFricConeConstraints() const;
 
+        int GetNumTDConstraints() const;
+
         // ---------------- Member Variables ---------------- //
         // model
         SingleRigidBodyModel model_;

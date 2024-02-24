@@ -547,4 +547,8 @@ namespace mpc {
         ee_splines_.at(ee).SetToTouchdown(time);
     }
 
+    double Trajectory::GetCurrentSwingTime(int ee) const {
+        return ee_splines_.at(ee).GetSwingTime(init_time_);
+    }
+
 } // mpc

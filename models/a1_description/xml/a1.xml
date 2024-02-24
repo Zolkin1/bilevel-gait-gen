@@ -1,13 +1,14 @@
 <mujoco model="a1_description">
     <compiler angle="radian" meshdir="meshes/" />
     <size njmax="500" nconmax="100" />
-    <option gravity='0 0 -9.806' iterations='50' solver='Newton' timestep='0.001'/> <!-- 0.002 -->
+    <!-- -9.806 gravity term -->
+    <option gravity='0 0 -9.81' iterations='50' solver='Newton' timestep='0.0005'/> <!-- 0.002 -->
     <option cone="elliptic" impratio="100"/>
 
     <default>
-        <!-- solimp="0.01 1 0.02 0.9 6" solref="-0.5 -2000" -->
+        <!-- solimp="0.01 1 0.02 0.9 6" solref="-0.005 -2500" -->
         <geom contype="1" conaffinity="1" solimp="0.01 1 0.02 0.9 4" solref="-0.005 -2500" condim="6"
-              friction="1.8 0.02 0.01" rgba="0.5 0.6 0.7 1" margin="0.001" group="0"/>
+              friction="0.8 0.02 0.01" rgba="0.5 0.6 0.7 1" margin="0.001" group="0"/>
 
         <light castshadow="false" diffuse="1 1 1"/>
         <motor ctrlrange="-33.5 33.5" ctrllimited="true"/>
@@ -198,9 +199,9 @@
         <motor name="FR_hip"       gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FR_hip_joint"/>
         <motor name="FR_thigh"     gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FR_thigh_joint"/>
         <motor name="FR_calf"      gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FR_calf_joint"/>
-        <motor name="FL_hip"       gear="1" ctrllimited="true" ctrlrange="-50 50" joint="FL_hip_joint"/>
-        <motor name="FL_thigh"     gear="1" ctrllimited="true" ctrlrange="-50 50" joint="FL_thigh_joint"/>
-        <motor name="FL_calf"      gear="1" ctrllimited="true" ctrlrange="-50 50" joint="FL_calf_joint"/>
+        <motor name="FL_hip"       gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FL_hip_joint"/>
+        <motor name="FL_thigh"     gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FL_thigh_joint"/>
+        <motor name="FL_calf"      gear="1" ctrllimited="true" ctrlrange="-30 30" joint="FL_calf_joint"/>
         <motor name="RR_hip"       gear="1" ctrllimited="true" ctrlrange="-30 30" joint="RR_hip_joint"/>
         <motor name="RR_thigh"     gear="1" ctrllimited="true" ctrlrange="-30 30" joint="RR_thigh_joint"/>
         <motor name="RR_calf"      gear="1" ctrllimited="true" ctrlrange="-30 30" joint="RR_calf_joint" />

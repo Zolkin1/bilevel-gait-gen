@@ -573,18 +573,18 @@ namespace mpc {
 //            times.push_back(0.9);
 //            times.push_back(1.05);
 
-//            times.push_back(0);
-//            times.push_back(0.3);
-//            times.push_back(0.6);
-//            times.push_back(0.9);
-//            times.push_back(1.2);
-
             times.push_back(0);
-            times.push_back(0.2);
-            times.push_back(0.4);
-            times.push_back(0.65);
-            times.push_back(0.8);
-            times.push_back(1);
+            times.push_back(0.3);
+            times.push_back(0.6);
+            times.push_back(0.9);
+            times.push_back(1.2);
+
+//            times.push_back(0);
+//            times.push_back(0.2);
+//            times.push_back(0.4);
+//            times.push_back(0.65);
+//            times.push_back(0.8);
+//            times.push_back(1);
 //            }
 
             switching_times.push_back(times);
@@ -597,10 +597,12 @@ namespace mpc {
         UpdateNumInputs();
         data_.num_decision_vars = (info_.num_nodes+1)*num_states_ + num_inputs_;
 
+
         // TODO: May want to put in a check for this, but it should always be active
         if (using_clarabel_) {
             data_.num_force_box_constraints_ = GetNumForceBoxConstraints();
             data_.num_cone_constraints_ = GetNumFricConeConstraints();
+            data_.num_td_pos_constraints_ = GetNumTDConstraints();
         } else {
             data_.num_force_box_constraints_ = GetNodeIntersectMutableForces(); // TODO: Change
             // TODO: Add other constraint
@@ -1074,9 +1076,20 @@ namespace mpc {
         const controller::Contact& traj_contact = prev_traj_.GetDesiredContacts(time);
         for (int ee = 0; ee < num_ee_; ee++) {
             if (contact.in_contact_.at(ee) && !traj_contact.in_contact_.at(ee) &&
-            std::abs(prev_traj_.GetNextContactTime(ee, time) - time) < 5e-2) {
+            std::abs(prev_traj_.GetNextContactTime(ee, time) - time) < 7e-2) {
                 prev_traj_.SetEEInContact(ee, time);
             }
         }
+    }
+
+    int MPC::GetNumTDConstraints() const {
+        int num_constraints = 0;
+        for (int ee = 0; ee < num_ee_; ee++) {
+            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < prev_traj_.GetCurrentSwingTime(ee)/2) {
+                num_constraints += 2;
+            }
+        }
+
+        return num_constraints;
     }
 } // mpc

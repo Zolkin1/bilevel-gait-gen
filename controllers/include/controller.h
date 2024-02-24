@@ -57,7 +57,7 @@ namespace controller {
 
         virtual std::vector<std::vector<Eigen::Vector3d>> GetTrajViz();
 
-        virtual std::vector<Eigen::Vector2d> GetEEBoxCenter() const;
+        virtual std::vector<Eigen::Vector2d> GetEEBoxCenter();
 
     protected:
         /**

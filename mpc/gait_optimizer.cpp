@@ -652,6 +652,7 @@ namespace mpc {
         // This appears to compute quicker if the thread is already "warmed up"
         #pragma omp parallel
         {
+//        for (int i = 0; i < LS_SIZE; i++) {
             const int i = omp_get_thread_num(); // TODO: Do this differently?
             utils::Timer mpc_creation_timer("mpc creation");
             mpc_creation_timer.StartTimer();

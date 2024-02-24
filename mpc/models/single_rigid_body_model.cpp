@@ -22,7 +22,8 @@ namespace mpc {
                   {Constraints::Dynamics,
                    Constraints::ForceBox,
                    Constraints::FrictionCone,
-                   Constraints::EndEffectorLocation
+                   Constraints::EndEffectorLocation,
+//                   Constraints::TDPosition
                   }),
             num_tangent_states_(MOMENTUM_OFFSET + FLOATING_VEL_OFFSET),
             num_manifold_states_(MOMENTUM_OFFSET + FLOATING_BASE_OFFSET) {
@@ -32,6 +33,10 @@ namespace mpc {
 
         // Calc Ir inv
         Ir_inv_ = Ir_.inverse();
+
+        for (int ee = 0; ee < num_ee_; ee++) {
+            com_hip_offsets.push_back(vector_2t::Zero());
+        }
     }
 
     void SingleRigidBodyModel::ConvertMPCStateToPinocchioState(const vector_t &state, Eigen::Ref<vector_t> q_pin) const {
@@ -248,7 +253,7 @@ namespace mpc {
         return xdot;
     }
 
-    vector_3t SingleRigidBodyModel::GetCOMToHip(int end_effector) const {
+    vector_3t SingleRigidBodyModel::GetCOMToHip(int end_effector) {
         // TODO: Make not hard coded
 
 //        for (int i = 0; i < pin_model_.njoints; i++) {
@@ -282,18 +287,26 @@ namespace mpc {
 // TODO: This is adding an additional shift
         vector_3t temp = -pin_data_->oMi[com_joint_id].translation() + pin_data_->oMi[hip_joint_id].translation();
         if (temp(1) >= 0) {
-            temp(1) += 0.1;
+            temp(1) += 0.1; //+= 0.1;
+            com_hip_offsets.at(end_effector)(1) = temp(1);
         } else {
-            temp(1) -= 0.1;
+            temp(1) -= 0.1; // -= 0.1;
+            com_hip_offsets.at(end_effector)(1) = temp(1);
         }
 
         if (temp(0) >= 0) {
-            temp(0) += 0.075;
+            temp(0) += 0.025;// += 0.075;
+            com_hip_offsets.at(end_effector)(0) = temp(0);
         } else {
-            temp(0) += 0.1;
+            temp(0) += 0.025; // += 0.1;
+            com_hip_offsets.at(end_effector)(0) = temp(0);
         }
 
         return temp;
+    }
+
+    vector_2t SingleRigidBodyModel::GetCOMHipOffset(int ee) const {
+        return com_hip_offsets.at(ee);
     }
 
     vector_t SingleRigidBodyModel::InverseKinematics(const mpc::man_state_t& state,
@@ -544,6 +557,7 @@ namespace mpc {
             num_manifold_states_ = model.num_manifold_states_;
             Ir_ = model.Ir_;
             Ir_inv_ = model.Ir_inv_;
+            com_hip_offsets = model.com_hip_offsets;
         }
 
         return *this;

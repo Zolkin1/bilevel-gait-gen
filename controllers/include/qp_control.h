@@ -104,7 +104,7 @@ namespace controller {
          * Note: Assumes ComputeDynamicsTerms has already been called.
          * @param v generalized velocity
          */
-        void AddContactMotionConstraints(const Eigen::VectorXd& v);
+        void AddContactMotionConstraints(const Eigen::VectorXd& v, int num_contacts);
         /**
          * Note: Assumes ComputeDynamicsTerms has already been called.
          */

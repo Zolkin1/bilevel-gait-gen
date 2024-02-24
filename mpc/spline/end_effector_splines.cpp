@@ -1137,6 +1137,16 @@ namespace mpc {
         }
     }
 
+    double EndEffectorSplines::GetSwingTime(double time) const {
+        const int lower_node = GetLowerNodeIdx(Position, 0, time);
+        if (times_.at(lower_node).GetType() != LiftOff) {
+            return -1;
+        }
+
+        const int upper_node = GetUpperNodeIdx(Position, 0, time);
+        return times_.at(upper_node).GetTime() - times_.at(lower_node).GetTime();
+    }
+
     inline void EndEffectorSplines::UnsupportedSpline() {
         throw std::runtime_error("The provided spline type is not supported.");
     }

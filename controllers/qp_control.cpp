@@ -48,6 +48,8 @@ namespace controller {
         num_actuators_ = num_vel_ - FLOATING_VEL_OFFSET;
 
         // Set solver settings
+        qp_solver_.settings()->setRelativeTolerance(1e-5);
+        qp_solver_.settings()->setAbsoluteTolerance(1e-5);
         qp_solver_.settings()->setVerbosity(false);
         qp_solver_.settings()->setPolish(true);     // Makes a HUGE difference
 
@@ -77,6 +79,9 @@ namespace controller {
         Eigen::VectorXd qp_sol = qp_solver_.getSolution();
 
         Eigen::VectorXd control_action = Eigen::VectorXd::Zero(3*num_inputs_);
+
+        // Question: Wouldn't we expect there to be a non-zero accleration if we don't consider the effect of the ground reaction forces?
+        // If there was no downward acceleration then we could never get a force.
 
         RecoverControlInputs(qp_sol, v, control_action, contact2);
 
@@ -134,7 +139,7 @@ namespace controller {
     void QPControl::AddDynamicsConstraints(const Eigen::VectorXd& v, const Contact& contact) {
         // Add equality constraints to the solver params
         // TODO: g really causes a lot of problems
-        lb_.head(FLOATING_VEL_OFFSET) = -(//pin_data_->g.head(FLOATING_VEL_OFFSET) +
+        lb_.head(FLOATING_VEL_OFFSET) = -(pin_data_->g.head(FLOATING_VEL_OFFSET) +
                 (pin_data_->C*v).head(FLOATING_VEL_OFFSET));
         ub_.head(FLOATING_VEL_OFFSET) = lb_.head(FLOATING_VEL_OFFSET);
 
@@ -144,20 +149,26 @@ namespace controller {
 //        A_.topRightCorner(FLOATING_VEL_OFFSET, CONSTRAINT_PER_FOOT*GetNumBothContacts(contact, des_contact_)) =
         A_.block(0, num_vel_, FLOATING_VEL_OFFSET,
                CONSTRAINT_PER_FOOT* GetNumBothContacts(contact, des_contact_)) =
-            -Js_.transpose().topLeftCorner(FLOATING_VEL_OFFSET, Js_.rows());
+            -Js_.transpose().topRows(FLOATING_VEL_OFFSET);
     }
 
-    void QPControl::AddContactMotionConstraints(const Eigen::VectorXd& v) {
+    void QPControl::AddContactMotionConstraints(const Eigen::VectorXd& v, int num_contacts) {
         // Assign to solver params
         // TODO: This appears to be wrong
         if (Js_.size() > 0) {
-            std::cout << "Jsdot: \n" << Jsdot_ << std::endl;
-            std::cout << "Js: \n" << Js_ << std::endl;
+//            std::cout << "Jsdot: \n" << Jsdot_ << std::endl;
+//            std::cout << "Js: \n" << Js_ << std::endl;
 
             lb_.segment(FLOATING_VEL_OFFSET, Js_.rows()) = -Jsdot_ * v;
             ub_.segment(FLOATING_VEL_OFFSET, Js_.rows()) = lb_.segment(FLOATING_VEL_OFFSET, Js_.rows());
 
             A_.block(FLOATING_VEL_OFFSET, 0, Js_.rows(), Js_.cols()) = Js_;
+
+            // Additional force term did not work
+//            for (int i = 0; i < num_contacts; i++) {
+//                A_.block(FLOATING_VEL_OFFSET, num_inputs_ + 3*i, 3, 3) =
+//                        Eigen::MatrixXd::Identity(3, 3);
+//            }
         }
 
     }
@@ -175,9 +186,9 @@ namespace controller {
         }
 
         lb_.segment(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT * num_contacts, num_actuators_) =
-               -(pin_data_->C*v).segment(FLOATING_VEL_OFFSET, num_actuators_) - torque_bounds_; // removed + pin_data_->g
+               -(pin_data_->C*v + pin_data_->g).segment(FLOATING_VEL_OFFSET, num_actuators_) - torque_bounds_; // removed + pin_data_->g
         ub_.segment(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT * num_contacts, num_actuators_) =
-                -(pin_data_->C*v).segment(FLOATING_VEL_OFFSET, num_actuators_) + torque_bounds_; // removed + pin_data_->g
+                -(pin_data_->C*v + pin_data_->g).segment(FLOATING_VEL_OFFSET, num_actuators_) + torque_bounds_; // removed + pin_data_->g
     }
 
     void QPControl::AddFrictionConeConstraints(const Contact& contact) {
@@ -216,22 +227,32 @@ namespace controller {
 
     void QPControl::AddTorsoCost(const Eigen::VectorXd& q, const Eigen::VectorXd& v) {
         // Add the position costs
+        // 2/23 3:10pm: position appears to be working at least ok
         P_.topLeftCorner(POS_VARS, POS_VARS) =
                 torso_tracking_weight_*2*Eigen::MatrixXd::Identity(POS_VARS, POS_VARS);
 
         Eigen::VectorXd target = acc_target_.head(POS_VARS) + kv_pos_ * (vel_target_.head(POS_VARS) - v.head(POS_VARS)) +
                 kp_pos_*(config_target_.head(POS_VARS) - q.head(POS_VARS));
 
+//        std::cout << "torso acc target: " << target.transpose() << std::endl;
+
         w_.head(POS_VARS) = -2*target*torso_tracking_weight_;
 
         // Add the orientation costs
+        // TODO: Orientation costs break the system
         P_.block(POS_VARS, POS_VARS, 3, 3) =
                 torso_tracking_weight_*2*Eigen::MatrixXd::Identity(3,3);
 
         Eigen::Quaternion<double> orientation(static_cast<Eigen::Vector4d>(q.segment(POS_VARS, 4)));
+        orientation.normalize();
         Eigen::Quaternion<double> des_orientation(static_cast<Eigen::Vector4d>(config_target_.segment(POS_VARS, 4)));
+        des_orientation.normalize();
         Eigen::VectorXd angle_target = kv_ang_*(vel_target_.segment(POS_VARS, 3) - v.segment(POS_VARS, 3)) +
                 kp_ang_*pinocchio::quaternion::log3(orientation.inverse()*des_orientation);
+// //        std::cout << "quat mult: " << orientation.inverse()*des_orientation << std::endl;
+// //        Eigen::Quaterniond quat;
+// //        pinocchio::quaternion::exp3(angle_target, quat);
+
         w_.segment(POS_VARS, 3) = -2*angle_target*torso_tracking_weight_;
     }
 
@@ -269,26 +290,27 @@ namespace controller {
         P_ = Eigen::MatrixXd::Zero(num_decision_vars_, num_decision_vars_);
         w_ = Eigen::VectorXd::Zero(num_decision_vars_);
 
-        // TODO: Change. For now assuming we are always trying to apply 0 contact force
-//        force_target_ = Eigen::VectorXd::Constant(3*num_contacts, 0);
-
         // Add the constraints to the matricies
         ComputeDynamicsTerms(q, v, contact);
-        acc_target_ = pin_data_->M*a; //pinocchio::nonLinearEffects(pin_model_, *pin_data_, q, v) +
+        /// TODO: Keep an eye on the nonlinear terms
+        acc_target_ = pin_data_->M*a + pinocchio::nonLinearEffects(pin_model_, *pin_data_, q, v);
+        acc_target_.head(FLOATING_VEL_OFFSET).setZero();
 
         AddDynamicsConstraints(v, contact);
-//        AddContactMotionConstraints(v); // TODO: Fix
+//        AddContactMotionConstraints(v, num_contacts); // TODO: Fix -- there is a possiblity it is somehow a frame issue
         AddTorqueConstraints(v, contact);
         AddFrictionConeConstraints(contact);
 
         // Init the cost matricies
         AddLegTrackingCost(q, v);
-        AddTorsoCost(q, v);
+        AddTorsoCost(q, v); // TODO: Investigate/fix -- need to check the scaling on this constraint and check that the dynamics are good
         AddForceTrackingCost(contact);
 
-//        std::cout << "Constraints: \n" << A_ << std::endl;
-//        std::cout << "ub: \n" << ub_ << std::endl;
-//        std::cout << "lb: \n" <<  lb_ << std::endl;
+//        std::cout << "Constraint jacobian^T (pin): \n" << Js_.transpose() << std::endl;
+
+        std::cout << "Constraints: \n" << A_ << std::endl;
+        std::cout << "ub: \n" << ub_ << std::endl;
+        std::cout << "lb: \n" <<  lb_ << std::endl;
 //        std::cout << "Quadratic cost: \n" << P_ << std::endl;
 //        std::cout << "Linear cost: \n" << w_ << std::endl;
 
@@ -344,7 +366,7 @@ namespace controller {
         Eigen::VectorXd tau =
                 (pin_data_->M*qp_sol.head(num_vel_) - Js_.transpose()*qp_sol.tail(CONSTRAINT_PER_FOOT*
                                                               GetNumBothContacts(contact, des_contact_))
-                                                      + pin_data_->C*v).tail(num_inputs_); // - pin_data_->g
+                                                      + pin_data_->C*v + pin_data_->g).tail(num_inputs_); // - pin_data_->g
 
         std::cout << "tau: \n" << tau << std::endl;
 

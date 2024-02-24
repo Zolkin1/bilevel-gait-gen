@@ -127,6 +127,8 @@ namespace mpc {
 
         void SetEEInContact(int ee, double time);
 
+        double GetCurrentSwingTime(int ee) const;
+
     protected:
     private:
         void UpdateSplineVarsCount();

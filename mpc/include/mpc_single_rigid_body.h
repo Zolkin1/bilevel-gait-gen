@@ -23,7 +23,7 @@ namespace mpc {
 
         vector_t GetFullTargetState(double time, const vector_t& state_guess);
 
-        std::vector<Eigen::Vector2d> GetEEBoxCenter() const;
+        std::vector<Eigen::Vector2d> GetEEBoxCenter();
 
         void UpdateWholeBodyTrajectory(Trajectory& traj);
 
@@ -41,6 +41,8 @@ namespace mpc {
 
         void AddEELocationConstraints(const std::vector<vector_3t>& ee_start_locations);
 
+        void AddTDPositionConstraints();
+
         int GetForceSplineStartIdx() const override;
         int GetPosSplineStartIdx() const override;
 
@@ -48,9 +50,11 @@ namespace mpc {
 
         void InitalizeQPData();
 
+        void AddEEPosCost();
+
         int num_run_;
 
-        static constexpr int EE_NODE_START = 2;
+        static constexpr int EE_NODE_START = 5;
     private:
     };
 } // mpc

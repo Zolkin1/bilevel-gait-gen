@@ -20,7 +20,8 @@ namespace mpc {
         EndEffectorLocation,
         ForceBox,
         JointBox,
-        FrictionCone
+        FrictionCone,
+        TDPosition
     };
 
     struct QPSettings {
@@ -82,6 +83,8 @@ namespace mpc {
 
         vector_t start_ee_constants_;
 
+        vector_t td_pos_constants_;
+
         int num_dynamics_constraints;
         int num_decision_vars;
 
@@ -92,6 +95,7 @@ namespace mpc {
         int num_fk_ineq_constraints_;
         int num_ee_location_constraints_;
         int num_start_ee_constraints_;
+        int num_td_pos_constraints_;
 
         bool using_clarabel_;
 

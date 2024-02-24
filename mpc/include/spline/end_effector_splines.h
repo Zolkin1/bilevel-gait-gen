@@ -100,6 +100,8 @@ namespace mpc {
 
         void SetToTouchdown(double time);
 
+        double GetSwingTime(double time) const;
+
         // Function list:
         // - Spline Value
         // - Vars coefficients -- Compressed view

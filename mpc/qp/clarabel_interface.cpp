@@ -53,6 +53,8 @@ namespace mpc {
                 case Constraints::FrictionCone:
                     cones_.push_back(NonnegativeConeT<double>(data.num_cone_constraints_));
                     break;
+                case Constraints::TDPosition:
+                    cones_.push_back(ZeroConeT<double>(data.num_td_pos_constraints_));
             }
         }
 
@@ -417,6 +419,11 @@ namespace mpc {
 
                     ineq_idx += data.num_cone_constraints_;
                     gen_idx += data.num_cone_constraints_;
+                    break;
+                case Constraints::TDPosition:
+                    // TODO: Add this in the derivative term
+                    eq_idx += data.num_td_pos_constraints_;
+                    gen_idx += data.num_td_pos_constraints_;
                     break;
             }
         }

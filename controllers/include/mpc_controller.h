@@ -50,7 +50,7 @@ namespace controller {
 
         void UpdateTrajViz();
 
-        std::vector<Eigen::Vector2d> GetEEBoxCenter() const override;
+        std::vector<Eigen::Vector2d> GetEEBoxCenter() override;
 
     protected:
     private:
@@ -104,6 +104,8 @@ namespace controller {
 
         vector_t kp_joints_;
         vector_t kv_joints_;
+
+        int run_num;
     };
 } // controller
 

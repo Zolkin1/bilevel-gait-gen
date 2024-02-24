@@ -243,7 +243,7 @@ int main() {
 
     sim.PauseSim();
 
-    int constexpr N = 400;
+    int constexpr N = 1000;
     for (int i = 0; i < N; i++) {
         double time = i*info.integrator_dt;
 

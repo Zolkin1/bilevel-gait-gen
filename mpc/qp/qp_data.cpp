@@ -80,6 +80,9 @@ namespace mpc {
                 case Constraints::FrictionCone:
                     num_constraints += num_cone_constraints_;
                     break;
+                case Constraints::TDPosition:
+                    num_constraints += num_td_pos_constraints_;
+                    break;
             }
         }
 
@@ -136,6 +139,9 @@ namespace mpc {
                 case Constraints::FrictionCone:
                     friction_cone_lb_ = vector_t::Zero(num_cone_constraints_);
                     friction_cone_ub_ = vector_t::Zero(num_cone_constraints_);
+                    break;
+                case Constraints::TDPosition:
+                    td_pos_constants_ = vector_t::Zero(num_td_pos_constraints_);
                     break;
             }
         }
@@ -254,6 +260,11 @@ namespace mpc {
                     }
                     idx += num_cone_constraints_;
                     num_inequality_ += num_cone_constraints_;
+                    break;
+                case Constraints::TDPosition:
+                    ub_.segment(idx, num_td_pos_constraints_) = td_pos_constants_;
+                    num_equality_ += num_td_pos_constraints_;
+                    idx += num_td_pos_constraints_;
                     break;
             }
         }
