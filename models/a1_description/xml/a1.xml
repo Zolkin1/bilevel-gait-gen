@@ -2,7 +2,7 @@
     <compiler angle="radian" meshdir="meshes/" />
     <size njmax="500" nconmax="100" />
     <!-- -9.806 gravity term -->
-    <option gravity='0 0 -9.81' iterations='50' solver='Newton' timestep='0.0005'/> <!-- 0.002 -->
+    <option gravity='0 0 -9.81' iterations='50' solver='Newton' timestep='0.001'/> <!-- 0.002, 0.0005 -->
     <option cone="elliptic" impratio="100"/>
 
     <default>

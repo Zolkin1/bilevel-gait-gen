@@ -104,7 +104,7 @@ namespace controller {
          * Note: Assumes ComputeDynamicsTerms has already been called.
          * @param v generalized velocity
          */
-        void AddContactMotionConstraints(const Eigen::VectorXd& v, int num_contacts);
+        void AddContactMotionConstraints(const Eigen::VectorXd& q, const Eigen::VectorXd& v, const Contact& contact);
         /**
          * Note: Assumes ComputeDynamicsTerms has already been called.
          */
@@ -148,11 +148,21 @@ namespace controller {
         void RecoverControlInputs(const Eigen::VectorXd& qp_sol, const Eigen::VectorXd& v,
                                   Eigen::VectorXd& control, const Contact& contact);
 
+        void AddPositiveGRFConstraints(const Contact& contact);
+
         Eigen::MatrixXd GetConstraintJacobian(const Eigen::VectorXd& q, const Contact& contact);
         Eigen::MatrixXd GetConstraintJacobianDerivative(const Eigen::VectorXd& q, const Eigen::VectorXd& v,
                                                              const Contact& contact);
 
         int GetNumBothContacts(const Contact& contact1, const Contact& contact2) const;
+
+        void LogInfo(double time,
+                     const Eigen::VectorXd& q_des,
+                     const Eigen::VectorXd& v_des,
+                     const Eigen::VectorXd& q,
+                     const Eigen::VectorXd& v,
+                     const Eigen::VectorXd& a,
+                     const Eigen::VectorXd& grf);
 
         // QP Solver
         OsqpEigen::Solver qp_solver_;
@@ -197,6 +207,8 @@ namespace controller {
         Eigen::VectorXd force_target_;
 
         Contact des_contact_;
+
+        std::ofstream log_file_;
     };
 }   // controller
 

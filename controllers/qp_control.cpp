@@ -54,6 +54,16 @@ namespace controller {
         qp_solver_.settings()->setPolish(true);     // Makes a HUGE difference
 
         prev_num_contacts_ = -1;
+
+        log_file_.open("qp_control_log.txt");
+        log_file_ << std::setw(15) << "time "
+                << std::setw(15) << "q_des "
+                << std::setw(15) << "v_des "
+                << std::setw(15) << "q "
+                << std::setw(15) << "v "
+                << std::setw(15) << "a "
+                << std::setw(15) << "grf"
+                << std::endl;
     }
 
     Eigen::VectorXd QPControl::ComputeControlAction(const Eigen::VectorXd& q,
@@ -88,6 +98,18 @@ namespace controller {
         // since I am passing to a PID controller, I still need to pass the configuration and velocity
         AssignPositionControl(control_action);
         AssignVelocityControl(control_action);
+
+        // TODO: Grab the grf for the ones even not in contact
+        vector_t grf(12);
+        int j = 0;
+        for (int i = 0; i < contact.in_contact_.size(); i++) {
+            if (contact.in_contact_.at(i)) {
+                grf.segment(i*3, 3) << qp_sol.segment(qp_sol.size() - 3*(contact.GetNumContacts() - j), 3);
+            } else {
+                grf.segment(i*3, 3) << Eigen::Vector3d::Zero();
+            }
+        }
+        LogInfo(time, config_target_, vel_target_, q, v, a, grf);
 
         return control_action;
     }
@@ -152,15 +174,26 @@ namespace controller {
             -Js_.transpose().topRows(FLOATING_VEL_OFFSET);
     }
 
-    void QPControl::AddContactMotionConstraints(const Eigen::VectorXd& v, int num_contacts) {
+    void QPControl::AddContactMotionConstraints(const Eigen::VectorXd& q, const Eigen::VectorXd& v, const Contact& contact) {
         // Assign to solver params
         // TODO: This appears to be wrong
         if (Js_.size() > 0) {
 //            std::cout << "Jsdot: \n" << Jsdot_ << std::endl;
 //            std::cout << "Js: \n" << Js_ << std::endl;
 
-            lb_.segment(FLOATING_VEL_OFFSET, Js_.rows()) = -Jsdot_ * v;
-            ub_.segment(FLOATING_VEL_OFFSET, Js_.rows()) = lb_.segment(FLOATING_VEL_OFFSET, Js_.rows());
+            pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, 0*v);
+            for (int i = 0; i < contact.in_contact_.size(); i++) {
+                if (contact.in_contact_.at(i)) {
+                    int frame_id = static_cast<int>(pin_model_.getFrameId(pin_model_.frames.at(contact.contact_frames_.at(i)).name,
+                                                                          pin_model_.frames.at(contact.contact_frames_.at(i)).type));
+                    lb_.segment(FLOATING_VEL_OFFSET + i*3, 3) =
+                            -pinocchio::getFrameClassicalAcceleration(pin_model_, *pin_data_,
+                                                                     frame_id, pinocchio::LOCAL_WORLD_ALIGNED).linear(); //-Jsdot_ * v;
+                }
+            }
+            const int num_contacts = contact.GetNumContacts();
+            ub_.segment(FLOATING_VEL_OFFSET, num_contacts*3) =
+                    lb_.segment(FLOATING_VEL_OFFSET, num_contacts*3);
 
             A_.block(FLOATING_VEL_OFFSET, 0, Js_.rows(), Js_.cols()) = Js_;
 
@@ -212,6 +245,16 @@ namespace controller {
         }
     }
 
+    void QPControl::AddPositiveGRFConstraints(const controller::Contact& contact) {
+        int num_contacts = GetNumBothContacts(contact, des_contact_);
+        for (int i = 0; i < num_contacts; i++) {
+            A_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i,
+                     num_vel_ + 2 + 3*i) = 1;
+            ub_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i) = 1e30;
+            lb_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i) = 0;
+        }
+    }
+
     // TODO: Make the leg tracking able to only track subset's of legs (i.e. swing legs)
     void QPControl::AddLegTrackingCost(const Eigen::VectorXd& q, const Eigen::VectorXd& v) {
         // For now, just make all the joint accelerations go to 0.
@@ -240,8 +283,8 @@ namespace controller {
 
         // Add the orientation costs
         // TODO: Orientation costs break the system
-        P_.block(POS_VARS, POS_VARS, 3, 3) =
-                torso_tracking_weight_*2*Eigen::MatrixXd::Identity(3,3);
+//        P_.block(POS_VARS, POS_VARS, 3, 3) =
+//                torso_tracking_weight_*2*Eigen::MatrixXd::Identity(3,3);
 
         Eigen::Quaternion<double> orientation(static_cast<Eigen::Vector4d>(q.segment(POS_VARS, 4)));
         orientation.normalize();
@@ -253,7 +296,7 @@ namespace controller {
 // //        Eigen::Quaterniond quat;
 // //        pinocchio::quaternion::exp3(angle_target, quat);
 
-        w_.segment(POS_VARS, 3) = -2*angle_target*torso_tracking_weight_;
+//        w_.segment(POS_VARS, 3) = -angle_target*torso_tracking_weight_;
     }
 
     void QPControl::AddForceTrackingCost(const Contact& contact) {
@@ -280,7 +323,7 @@ namespace controller {
 
         qp_solver_.data()->setNumberOfVariables(num_decision_vars_);
 
-        num_constraints_ = FLOATING_VEL_OFFSET + 7*num_contacts + num_actuators_;
+        num_constraints_ = FLOATING_VEL_OFFSET + 7*num_contacts + num_actuators_ + num_contacts;
         qp_solver_.data()->setNumberOfConstraints(num_constraints_);
 
         A_ = Eigen::MatrixXd::Zero(num_constraints_, num_decision_vars_);
@@ -297,9 +340,10 @@ namespace controller {
         acc_target_.head(FLOATING_VEL_OFFSET).setZero();
 
         AddDynamicsConstraints(v, contact);
-//        AddContactMotionConstraints(v, num_contacts); // TODO: Fix -- there is a possiblity it is somehow a frame issue
+        AddContactMotionConstraints(q, v, contact); // TODO: Fix -- there is a possiblity it is somehow a frame issue
         AddTorqueConstraints(v, contact);
         AddFrictionConeConstraints(contact);
+        AddPositiveGRFConstraints(contact);
 
         // Init the cost matricies
         AddLegTrackingCost(q, v);
@@ -313,6 +357,23 @@ namespace controller {
         std::cout << "lb: \n" <<  lb_ << std::endl;
 //        std::cout << "Quadratic cost: \n" << P_ << std::endl;
 //        std::cout << "Linear cost: \n" << w_ << std::endl;
+
+        pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, a);
+
+        for (int i = 0; i < contact.in_contact_.size(); i++) {
+            if (contact.in_contact_.at(i)) {
+                int frame_id = static_cast<int>(pin_model_.getFrameId(
+                        pin_model_.frames.at(contact.contact_frames_.at(i)).name,
+                        pin_model_.frames.at(contact.contact_frames_.at(i)).type));
+                const auto classic_frame_acc = pinocchio::getFrameClassicalAcceleration(pin_model_, *pin_data_, frame_id,
+                                                         pinocchio::LOCAL_WORLD_ALIGNED);
+                std::cout << "classic frame acc for ee " << i << ": \n" << classic_frame_acc << std::endl;
+
+                const auto frame_acc = pinocchio::getFrameAcceleration(pin_model_, *pin_data_, frame_id,
+                                                                                      pinocchio::LOCAL_WORLD_ALIGNED);
+                std::cout << "frame acc for ee " << i << ": \n" << frame_acc << std::endl;
+            }
+        }
 
         // Check if the sparsity pattern changed
         if (num_contacts != prev_num_contacts_) {
@@ -439,6 +500,22 @@ namespace controller {
             }
         }
         return num_contacts;
+    }
+
+    void QPControl::LogInfo(double time,
+                            const Eigen::VectorXd& q_des, const Eigen::VectorXd& v_des, const Eigen::VectorXd& q,
+                            const Eigen::VectorXd& v, const Eigen::VectorXd& a,
+                            const Eigen::VectorXd& grf) {
+        log_file_ << std::setw(15) << time
+                << std::setw(15) << q_des.transpose()
+                << std::setw(15) << v_des.transpose()
+                << std::setw(15) << q.transpose()
+                << std::setw(15) << v.transpose()
+                << std::setw(15) << a.transpose()
+                << std::setw(15) << grf.transpose() << std::endl;
+
+        log_file_ << std::endl;
+
     }
 
 } // controller

@@ -274,13 +274,16 @@ namespace mpc {
         utils::Timer timer("KKT mat solve");
         timer.StartTimer();
 
+        num_equality_constraints_ = data.num_equality_ - data.num_td_pos_constraints_;
+        num_inequality_constraints_ = data.num_inequality_;
+
         // TODO: Speed up! The setup for the solve is about 20ms
         utils::Timer mat_build_timer("matrix building");
         mat_build_timer.StartTimer();
 //        matrix_t A(data.num_equality_, data.num_decision_vars);
 //        matrix_t G(data.num_inequality_, data.num_decision_vars);
         lam_.resize(data.num_inequality_);
-        nu_.resize(data.num_equality_);
+        nu_.resize(num_equality_constraints_);
 //        vector_t h(data.num_inequality_);
 //        vector_t s_ineq(data.num_inequality_);
 //        vector_t b(data.num_equality_);
@@ -430,8 +433,8 @@ namespace mpc {
 
         mat_builder.SetMatrix(data.sparse_cost_, 0, 0);
 
-        sp_matrix_t diff_mat(data.num_decision_vars + data.GetTotalNumConstraints(),
-                             data.num_decision_vars + data.GetTotalNumConstraints());
+        sp_matrix_t diff_mat(data.num_decision_vars + data.GetTotalNumConstraints() - data.num_td_pos_constraints_,
+                             data.num_decision_vars + data.GetTotalNumConstraints() - data.num_td_pos_constraints_);
 
         diff_mat.setFromTriplets(mat_builder.GetTriplet().begin(), mat_builder.GetTriplet().end());
 
@@ -514,8 +517,8 @@ namespace mpc {
 
         // Solve the system
         // The system solve is only about 1-2ms
-        d_.resize(data.num_decision_vars + data.num_equality_ + data.num_inequality_);
-        d_ << dx, vector_t::Zero(data.num_equality_ + data.num_inequality_);
+        d_.resize(data.num_decision_vars + num_equality_constraints_ + data.num_inequality_);
+        d_ << dx, vector_t::Zero(num_equality_constraints_ + data.num_inequality_);
 
 //        diff_mat.pruned(1e-8); // doesn't make a big difference
 
@@ -558,9 +561,6 @@ namespace mpc {
         timer.StopTimer();
 
         timer.PrintElapsedTime();
-
-        num_equality_constraints_ = data.num_equality_;
-        num_inequality_constraints_ = data.num_inequality_;
     }
 
     vector_t ClarabelInterface::Computedx(const Eigen::SparseMatrix<double>& P, const mpc::vector_t& q,

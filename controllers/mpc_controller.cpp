@@ -134,10 +134,10 @@ namespace controller {
 
         // Get MPC update (not gait opt yet)
         mpc::Trajectory traj = traj_;
-        if (!(run_num % 1)) {
-            mpc_.AdjustForCurrentContacts(time, contact);
-            traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
-        }
+//        if (!(run_num % 10)) {
+//            mpc_.AdjustForCurrentContacts(time, contact);
+//            traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
+//        }
         FullBodyTrajUpdate(traj);
         UpdateTrajViz();
 

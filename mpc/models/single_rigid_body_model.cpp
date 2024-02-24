@@ -23,7 +23,7 @@ namespace mpc {
                    Constraints::ForceBox,
                    Constraints::FrictionCone,
                    Constraints::EndEffectorLocation,
-//                   Constraints::TDPosition
+                   Constraints::TDPosition
                   }),
             num_tangent_states_(MOMENTUM_OFFSET + FLOATING_VEL_OFFSET),
             num_manifold_states_(MOMENTUM_OFFSET + FLOATING_BASE_OFFSET) {
