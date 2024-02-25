@@ -206,12 +206,6 @@ namespace controller {
                     lb_.segment(FLOATING_VEL_OFFSET, num_contacts*3);
 
             A_.block(FLOATING_VEL_OFFSET, 0, Js_.rows(), Js_.cols()) = Js_;
-
-            // Additional force term did not work
-//            for (int i = 0; i < num_contacts; i++) {
-//                A_.block(FLOATING_VEL_OFFSET, num_inputs_ + 3*i, 3, 3) =
-//                        Eigen::MatrixXd::Identity(3, 3);
-//            }
         }
 
     }
@@ -280,7 +274,6 @@ namespace controller {
 
     void QPControl::AddTorsoCost(const Eigen::VectorXd& q, const Eigen::VectorXd& v) {
         // Add the position costs
-        // 2/23 3:10pm: position appears to be working at least ok
         P_.topLeftCorner(POS_VARS, POS_VARS) =
                 torso_tracking_weight_*2*Eigen::MatrixXd::Identity(POS_VARS, POS_VARS);
 
@@ -290,8 +283,6 @@ namespace controller {
         Eigen::VectorXd target = acc_target_.head(POS_VARS)
                 + kv_pos_ * (vel_target_.head(POS_VARS) - v.head<3>()) //pin_data_->vcom[0])
                 + kp_pos_*(config_target_.head(POS_VARS) - q.head<3>()); //pin_data_->com[0]);
-
-//        std::cout << "torso acc target: " << target.transpose() << std::endl;
 
         w_.head(POS_VARS) = -2*target*torso_tracking_weight_;
 
@@ -315,9 +306,6 @@ namespace controller {
 
         Eigen::VectorXd angle_target = kv_ang_*(vel_frame - v.segment(POS_VARS, 3)) +
                 kp_ang_*pinocchio::quaternion::log3(orientation.inverse()*des_orientation);
-// //        std::cout << "quat mult: " << orientation.inverse()*des_orientation << std::endl;
-// //        Eigen::Quaterniond quat;
-// //        pinocchio::quaternion::exp3(angle_target, quat);
 
         w_.segment(POS_VARS, 3) = -2*angle_target*torso_tracking_weight_;
     }
@@ -373,31 +361,6 @@ namespace controller {
         AddTorsoCost(q, v); // TODO: Investigate/fix -- need to check the scaling on this constraint and check that the dynamics are good
         AddForceTrackingCost(contact);
 
-//        std::cout << "Constraint jacobian^T (pin): \n" << Js_.transpose() << std::endl;
-
-//        std::cout << "Constraints: \n" << A_ << std::endl;
-//        std::cout << "ub: \n" << ub_ << std::endl;
-//        std::cout << "lb: \n" <<  lb_ << std::endl;
-//        std::cout << "Quadratic cost: \n" << P_ << std::endl;
-//        std::cout << "Linear cost: \n" << w_ << std::endl;
-
-//        pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, a);
-//
-//        for (int i = 0; i < contact.in_contact_.size(); i++) {
-//            if (contact.in_contact_.at(i)) {
-//                int frame_id = static_cast<int>(pin_model_.getFrameId(
-//                        pin_model_.frames.at(contact.contact_frames_.at(i)).name,
-//                        pin_model_.frames.at(contact.contact_frames_.at(i)).type));
-//                const auto classic_frame_acc = pinocchio::getFrameClassicalAcceleration(pin_model_, *pin_data_, frame_id,
-//                                                         pinocchio::LOCAL_WORLD_ALIGNED);
-//                std::cout << "classic frame acc for ee " << i << ": \n" << classic_frame_acc << std::endl;
-//
-//                const auto frame_acc = pinocchio::getFrameAcceleration(pin_model_, *pin_data_, frame_id,
-//                                                                                      pinocchio::LOCAL_WORLD_ALIGNED);
-//                std::cout << "frame acc for ee " << i << ": \n" << frame_acc << std::endl;
-//            }
-//        }
-
         // Check if the sparsity pattern changed
         if (num_contacts != prev_num_contacts_) {
             qp_solver_.data()->clearLinearConstraintsMatrix();
@@ -442,17 +405,10 @@ namespace controller {
     void QPControl::RecoverControlInputs(const Eigen::VectorXd& qp_sol, const Eigen::VectorXd& v,
                                          Eigen::VectorXd& control, const Contact& contact) {
         // Recover torques using ID
-        // TODO: Grav comp is wrong!
-        // TODO: Look into velocity being wrong
-        // Note: We need to use negative g!
-//        vector_t v_temp = v;
-//        v_temp.setZero();
         Eigen::VectorXd tau =
                 (pin_data_->M*qp_sol.head(num_vel_) - Js_.transpose()*qp_sol.tail(CONSTRAINT_PER_FOOT*
                                                               GetNumBothContacts(contact, des_contact_))
-                                                      + pin_data_->C*v + pin_data_->g).tail(num_inputs_); // + pin_data_->g
-
-//        std::cout << "tau: \n" << tau << std::endl;
+                                                      + pin_data_->C*v + pin_data_->g).tail(num_inputs_);
 
         for (int i = 2*num_inputs_; i < 3*num_inputs_; i++) {
             control(i) = tau(i - 2*num_inputs_);
