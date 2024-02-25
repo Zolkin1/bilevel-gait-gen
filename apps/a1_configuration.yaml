@@ -137,7 +137,7 @@ ee_box_size: [0.2, 0.055] # 0.15, 0.1 for the sim, 0.2 0.15 for the MPC viz
 
 run_time_iterations: 6000 # 150 works well
 
-foot_offset: 0.0075  # 0.01 works well -- can be sensitive
+foot_offset: 0.01  # 0.01 works well -- can be sensitive
 
 force_cost: 0.000 # Note: without this cost, the problem is much more poorly
                   # conditioned and can return infeasible, also the derivative computations are much worse
