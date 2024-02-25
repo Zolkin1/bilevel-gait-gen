@@ -106,6 +106,7 @@ namespace mpc {
         primal_ = sol.x;
 
         if (solve_quality_ == PrimalInfeasible) {
+            // TODO: Is this the behavior I want?
             primal_ = vector_t::Constant(sol.x.size(), 0);
 
             vector_t temp = data.sparse_constraint_*primal_ + slacks_ - data.ub_;

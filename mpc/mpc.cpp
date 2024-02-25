@@ -722,7 +722,7 @@ namespace mpc {
         double merit_directional = GetMeritGradient(prev_qp_sol, direction, mu_, init_state);
 
         int i = 0;
-        while ((merit - merit_step) < -0.00001 * alpha * merit_directional && i < 5) {
+        while ((merit - merit_step) < -0.00001 * alpha * merit_directional && i < 10) {
             alpha *= 0.5;
             vector_t temp = (alpha * direction) + prev_qp_sol;
             merit_step = GetMeritValue(temp, mu_, init_state);
