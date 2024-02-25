@@ -10,6 +10,7 @@
 #include "pinocchio/algorithm/rnea.hpp"
 #include "pinocchio/algorithm/jacobian.hpp"
 #include "pinocchio/algorithm/frames.hpp"
+#include "pinocchio/algorithm/center-of-mass.hpp"
 
 namespace controller {
     MPCController::MPCController(double control_rate, std::string robot_urdf, const std::string &foot_type, int nv,
@@ -70,6 +71,8 @@ namespace controller {
         for (auto& ee : fk_traj_) {
             ee.resize(info.num_nodes + 1);
         }
+
+        log_file_.open("mpc_controller_log.txt");
     }
 
     void MPCController::InitSolver(const vector_t& full_body_state, const vector_t& mpc_state) {
@@ -112,8 +115,17 @@ namespace controller {
                                                  const vector_t& a, const controller::Contact& contact,
                                                  double time) {
 
+        if (kp_joints_.size() != num_inputs_) {
+            throw std::runtime_error("kp joints wrong size!");
+        }
+
+        if (kv_joints_.size() != num_inputs_) {
+            throw std::runtime_error("kv joints wrong size!");
+        }
 
         const vector_t state = ReconstructState(q, v, a);
+        std::cout << "expected lin momentum: " << traj_.GetState(traj_.GetNode(time)).segment<3>(3).transpose() << std::endl;
+        std::cout << "expected ang momentum: " << traj_.GetState(traj_.GetNode(time)).tail(3).transpose() << std::endl;
         std::vector<mpc::vector_3t> ee_locations = model_.GetEndEffectorLocations(q);
 
         state_time_mut_.lock();
@@ -134,10 +146,11 @@ namespace controller {
 
         // Get MPC update (not gait opt yet)
         mpc::Trajectory traj = traj_;
-//        if (!(run_num % 20)) {
-//            mpc_.AdjustForCurrentContacts(time, contact);
-//            traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
-//        }
+        if (!(run_num % 10)) {
+ //            vector_t state2 = traj_.GetState(traj_.GetNode(time));
+            mpc_.AdjustForCurrentContacts(time, contact);
+            traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
+        }
         FullBodyTrajUpdate(traj);
         UpdateTrajViz();
 
@@ -148,74 +161,7 @@ namespace controller {
         contact1.contact_frames_ = contact.contact_frames_;
 //        mpc_res_mut_.unlock();
 
-//        q_des_ << 0., 0., 0.36, 0, 0, 0, 1.0, -0.22, -0.2, -0.977,
-//                0.02, 0.2, -0.977,  0.02, 0.45, -1.03, -0.02, 0.45, -1.03;
-//        v_des_.setZero();
-
-        vector_t tau_fb = kp_joints_.cwiseProduct((q_des_ - q).tail(num_inputs_))
-                + kv_joints_.cwiseProduct((v_des_ - v).tail(num_inputs_));
-//        tau_fb.setZero();
-
-        pinocchio::forwardKinematics(pin_model_, *pin_data_, q);
-        // Get C
-        pinocchio::computeCoriolisMatrix(pin_model_, *pin_data_, q, v);
-        // Get g
-        pinocchio::computeGeneralizedGravity(pin_model_, *pin_data_, q);
-        // Get M
-        pinocchio::crba(pin_model_, *pin_data_,  q);
-        // Make M symmetric
-        pin_data_->M.triangularView<Eigen::StrictlyLower>() =
-                pin_data_->M.transpose().triangularView<Eigen::StrictlyLower>();
-
-        const int num_sw = (4-contact.GetNumContacts())*3;
-        const int num_st = contact.GetNumContacts()*3;
-        vector_t tau_ff(num_inputs_); //pin_data_->g.tail(num_inputs_);
-
-        for (int ee = 0; ee < contact1.in_contact_.size(); ee++) {
-            if (contact1.in_contact_.at(ee)) {
-                // Stance foot
-//                const mpc::matrix_33t J = model_.GetEEJacobian(ee, q);
-//                const mpc::matrix_33t Jdot = model_.GetEEJacobianDeriv(ee, q, v);
-
-                matrix_t J = matrix_t::Zero(6, 18);
-                pinocchio::computeFrameJacobian(pin_model_, *pin_data_, q, contact1.contact_frames_.at(ee),
-                                                pinocchio::LOCAL_WORLD_ALIGNED, J); // TODO: Consider frame
-
-                // force in generalized coordinates
-                vector_t qf = -J.transpose().leftCols<3>()*traj.GetForce(ee, time);
-
-//                std::cout << "J^T: \n" << J.transpose() << std::endl;
-//                std::cout << "force: \n" << traj_.GetForce(ee, time) << std::endl;
-//
-//                std::cout << "qf: \n" << qf << std::endl;
-
-                tau_ff.segment(3*ee, 3) = qf.segment<3>(6 + 3*ee); // .setZero();
-            } else {
-                // Swing foot
-                tau_ff.segment(3*ee, 3) = (-pin_data_->g + pin_data_->C*v + pin_data_->M*a).segment(6 + 3*ee,3);
-            }
-//            std::cout << "ee: " << ee << ", contact: " << contact.in_contact_.at(ee) << std::endl;
-        }
-//        tau_ff.setZero();
-
         vector_t control_action = vector_t::Zero(3*num_inputs_);    // joints, joint velocities, torques
-
-        control_action.head(num_inputs_) = q_des_.tail(num_inputs_);
-        control_action.segment(num_inputs_, num_inputs_) = vector_t::Zero(12); //v_des_.tail(num_inputs_);
-        control_action.tail(num_inputs_) = tau_fb + tau_ff;
-
-//        for (int ee = 0; ee < contact1.in_contact_.size(); ee++) {
-            // TODO: Should I be going on actual or desired contacts?
-//            if (contact1.in_contact_.at(ee)) {
-//                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeGroundForceTorques(ee); // TODO: Make not hard coded
-//            } else {
-//                control_action.segment(num_inputs_*2 + 3*ee, 3) = ComputeSwingTorques(ee); // TODO: Make not hard coded
-//            }
-//        }
-
-//        control_action.segment(num_inputs_*2 + 6, 3) = vector_t::Zero(3);
-
-//        return control_action;
 
         qp_controller_.UpdateTargetConfig(q_des_);
         qp_controller_.UpdateTargetVel(v_des_);
@@ -235,6 +181,12 @@ namespace controller {
 
         run_num++;
 
+        for (int ee = 0; ee < 4; ee++) {
+            log_file_ << std::setw(15) << traj.GetForce(ee, time).transpose();
+        }
+
+        log_file_ << std::endl;
+
         return qp_controller_.ComputeControlAction(q, v, a, contact1, time);
     }
 
@@ -243,12 +195,17 @@ namespace controller {
 
         vector_t state = vector_t::Zero(mpc_.GetModel()->GetNumManifoldStates());
 
-        // TODO: Is q head COM or someother frame?
-        // COM position
+        // Note I don't think I actually want the COM (?)
+        pinocchio::centerOfMass(pin_model_, *pin_data_, q, v, false);
+//        pin_data_->com[0];
+//        pin_data_->vcom[0];
+
+        // Floating base position
         state.head<POS_VARS>() = q.head<3>();
 
         // COM momentum
-        state.segment<POS_VARS>(mpc::SingleRigidBodyModel::LIN_MOM_START) = v.head<3>() * mpc_.GetModel()->GetMass();
+        // TODO: investigate
+        state.segment<POS_VARS>(mpc::SingleRigidBodyModel::LIN_MOM_START) = v.head<3>() * mpc_.GetModel()->GetMass(); // * mpc_.GetModel()->GetMass();
 
         // Orientation
         Eigen::Quaterniond quat(static_cast<Eigen::Vector4d>(q.segment<4>(3)));
@@ -260,10 +217,26 @@ namespace controller {
         state(mpc::SingleRigidBodyModel::ORIENTATION_START + 3) = quat.w();
 
         // Angular Momentum
+        Eigen::Quaterniond vel_quat;
+        pinocchio::quaternion::exp3(v.segment<POS_VARS>(3), vel_quat);
+        Eigen::Quaterniond orientation(static_cast<Eigen::Vector4d>(q.segment<4>(3)));
+        vel_quat = orientation.inverse()*vel_quat;
+        Eigen::Vector3d vel_frame = pinocchio::quaternion::log3(vel_quat);
+
         // TODO: Is the angular velocity correct?
         // TODO: The state is the angular momentum, not just the velocity
-        state.segment<POS_VARS>(mpc::SingleRigidBodyModel::ANG_VEL_START + 1) =
-                model_.GetIr() * v.segment<POS_VARS>(mpc::SingleRigidBodyModel::QUAT_SIZE);
+        state.segment<POS_VARS>(mpc::SingleRigidBodyModel::ANG_VEL_START + 1).setZero();
+//                model_.GetIr() * v.segment<POS_VARS>(3); //v.segment<POS_VARS>(3); //model_.GetIr() *
+
+//        std::cout << "vel frame: " << vel_frame.transpose() << std::endl;
+//        std::cout << "v: " << v.segment<3>(3).transpose() << std::endl;
+//        std::cout << "vcom: " << pin_data_->vcom[0].transpose() << std::endl;
+        std::cout << "I*v: " << (model_.GetIr()*v.segment<3>(3)).transpose() << std::endl;
+//        std::cout << "I*vel frame: " << (model_.GetIr()*vel_frame).transpose() << std::endl;
+//        std::cout << "I*vcom: " << (model_.GetIr()*pin_data_->vcom[0]).transpose() << std::endl;
+
+        std::cout << "lin v: " << v.head<3>().transpose() << std::endl;
+        std::cout << "v*m: " << model_.GetMass()*v.head<3>().transpose() << std::endl;
 
         return state;
     }
@@ -349,19 +322,21 @@ namespace controller {
                                                               traj_ee_locations, state_guess,
                                                               info_.joint_bounds_ub,
                                                               info_.joint_bounds_lb));
+            // TODO: Convert the quaternion to the global frame - I think it already is
+
             state_guess = traj.GetFullConfig(i);
 
             if (i >= 1) {
-                // TODO: Do the velocity IK (better vel estimate...)
-
                 vector_t vel(model_.GetFullModelConfigSpace() - 1);
-                vel.head<6>() << traj.GetState(i).segment<3>(3), traj.GetState(i).segment<3>(9);
+                // TODO: Just grab the pre-inverted matrix
+                vel.head<6>() << traj.GetState(i).segment<3>(3)/model_.GetMass(), model_.GetIr().inverse()*traj.GetState(i).segment<3>(10); //model_.GetIr().inverse()*
                 vel.tail(num_inputs_) = (traj.GetFullConfig(i) - traj.GetFullConfig(i-1)).tail(num_inputs_)/info_.integrator_dt;
 
-                traj.UpdateFullVelocity(i-1, vel);
+                traj.UpdateFullVelocity(i, vel);
             }
         }
-        traj.UpdateFullVelocity(traj.GetStates().size() - 1, vector_t::Zero(pin_model_.nv));
+//        traj.UpdateFullVelocity(traj.GetStates().size() - 1, vector_t::Zero(pin_model_.nv));
+        traj.UpdateFullVelocity(0, vector_t::Zero(pin_model_.nv));
     }
 
     void MPCController::GetTargetsFromTraj(const mpc::Trajectory& traj, double time) {
@@ -369,14 +344,16 @@ namespace controller {
             time = traj.GetTime(0);
         }
 
-        int node = traj.GetNode(time)+1; // TODO: +1 or +0
+        const int nodes_ahead = 1;
+
+        int node = traj.GetNode(time)+nodes_ahead; // TODO: +1 or +0
 
         q_des_ = traj.GetFullConfig(node);
         v_des_ = traj.GetFullVelocity(node);
 
         // TODO: Do I want to use the ZoH or the full spline force?
         for (int ee = 0; ee < 4; ee++) {
-            force_des_.at(ee) = traj.GetForce(ee, time + info_.integrator_dt);
+            force_des_.at(ee) = traj.GetForce(ee, time + nodes_ahead*info_.integrator_dt);
         }
     }
 

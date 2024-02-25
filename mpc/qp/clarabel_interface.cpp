@@ -161,8 +161,8 @@ namespace mpc {
 
     void ClarabelInterface::ConfigureForRealTime(double run_time_iters) {
         // Note: the higher quality definetly shows
-         settings_.tol_gap_rel = 1e-8; //1e-15;
-         settings_.tol_gap_abs = 1e-8; //1e-15;
+         settings_.tol_gap_rel = 1e-15; //1e-15;
+         settings_.tol_gap_abs = 1e-15; //1e-15;
     }
 
 

@@ -582,7 +582,7 @@ namespace mpc {
 //            times.push_back(0);
 //            times.push_back(0.2);
 //            times.push_back(0.4);
-//            times.push_back(0.65);
+//            times.push_back(0.6);
 //            times.push_back(0.8);
 //            times.push_back(1);
 //            }

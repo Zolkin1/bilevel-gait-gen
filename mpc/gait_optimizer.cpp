@@ -121,6 +121,7 @@ namespace mpc {
 
                 //                std::cout << "qp partial dA: \n" << qp_partials_.dA.toDense().topLeftCorner<48+24,48+24>() << std::endl;
 
+                // TODO: Fix sizes to account for TD constraints
                 dldAth = qp_partials_.dA.cwiseProduct(param_partial.dA);
                 dldGth = qp_partials_.dG.cwiseProduct(param_partial.dG);
 //                dldPth = qp_partials_.dP.cwiseProduct(param_partial.dP);

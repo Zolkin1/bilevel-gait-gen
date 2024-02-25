@@ -151,9 +151,9 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
         viz.UpdateViz(viz_rate);
 
         // Gait optimization
-        if (!(i % 2)) {
-            prev_cost = GaitOptLS(mpc, gait_opt, cost_red, time, info, config, mpc_des_state,
-                                  ee_locations, warm_start, fixed_pos);
+        if (!(i % 20000000)) {
+//            prev_cost = GaitOptLS(mpc, gait_opt, cost_red, time, info, config, mpc_des_state,
+//                                  ee_locations, warm_start, fixed_pos);
 
             prev_traj = mpc.GetTrajectory();
 //            prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
@@ -237,20 +237,24 @@ int main() {
     const vector_t init_state = config.ParseEigenVector("srb_init");
 //    init_state.tail(standing.size()) = standing;
 
-    // Create the warm start
-    const std::vector<vector_t> warm_start(info.num_nodes+1, init_state);
-
     // Create the goal state
     vector_t mpc_des_state = init_state;
     mpc_des_state.head<2>() << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
     mpc_des_state.segment<2>(3) << config.ParseNumber<double>("xdot_des"), config.ParseNumber<double>("ydot_des");
+    mpc_des_state.segment<4>(6) << 0, 0, 0, 1;
+
+    // Create the warm start
+    std::vector<vector_t> warm_start(info.num_nodes+1); //, init_state);
+    for (int i = 0; i < warm_start.size(); i++) {
+        warm_start.at(i) = (i/warm_start.size())*(mpc_des_state - init_state) + init_state;
+    }
 
     // Inital guess end effector positions
     std::array<std::array<double, 3>, 4> ee_pos{};
-    ee_pos.at(0) = {0.2, 0.2, 0};
-    ee_pos.at(1) = {0.2, -0.2, 0};
-    ee_pos.at(2) = {-0.2, 0.2, 0};
-    ee_pos.at(3) = {-0.2, -0.2, 0};
+    ee_pos.at(0) = {0.1526, 0.12523, 0.011089};
+    ee_pos.at(1) = {0.1526, -0.12523, 0.011089};
+    ee_pos.at(2) = {-0.208321844, 0.1363286, 0.01444};
+    ee_pos.at(3) = {-0.208321844, -0.1363286, 0.01444};
 
     std::vector<Eigen::Vector3d> ee_locations(4);
     for (int i = 0; i < ee_locations.size(); i++) {

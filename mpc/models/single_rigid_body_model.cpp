@@ -177,7 +177,7 @@ namespace mpc {
     vector_3t SingleRigidBodyModel::ConvertManifoldToTangentQuat(const Eigen::Vector4d& state,
                                                                  const Eigen::Vector4d& ref_state) {
         Eigen::Quaterniond quat(state);
-        Eigen::Quaterniond quat_ref(ref_state);
+        Eigen::Quaterniond quat_ref = Eigen::Quaterniond::Identity(); //(ref_state);
         vector_3t tangent_state = pinocchio::quaternion::log3(quat_ref.inverse()*quat);
 
         return tangent_state;
@@ -205,7 +205,7 @@ namespace mpc {
 
         Eigen::Quaterniond quat;
         pinocchio::quaternion::exp3(state.segment<3>(QUAT_START), quat);
-        Eigen::Quaterniond quat_ref(static_cast<Eigen::Vector4d>(ref_state.segment<4>(QUAT_START)));
+        Eigen::Quaterniond quat_ref = Eigen::Quaterniond::Identity(); //(static_cast<Eigen::Vector4d>(ref_state.segment<4>(QUAT_START)));
         quat = quat_ref*quat;
         manifold_state(QUAT_START) = quat.x();
         manifold_state(1+QUAT_START) = quat.y();

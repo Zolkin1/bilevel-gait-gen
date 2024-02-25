@@ -60,7 +60,7 @@ namespace mpc {
         AddHessianApproxCost();
         AddGradientCost();
         AddFinalCost();
-        AddDiagonalCost();
+//        AddDiagonalCost();
 
 //        AddEEPosCost();
 

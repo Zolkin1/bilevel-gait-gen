@@ -9,6 +9,7 @@
 #include "pinocchio/algorithm/rnea.hpp"
 #include "pinocchio/algorithm/jacobian.hpp"
 #include "pinocchio/algorithm/frames.hpp"
+#include "pinocchio/algorithm/center-of-mass.hpp"
 
 #include "qp_control.h"
 
@@ -99,7 +100,6 @@ namespace controller {
         AssignPositionControl(control_action);
         AssignVelocityControl(control_action);
 
-        // TODO: Grab the grf for the ones even not in contact
         vector_t grf(12);
         int j = 0;
         for (int i = 0; i < contact.in_contact_.size(); i++) {
@@ -109,7 +109,17 @@ namespace controller {
                 grf.segment(i*3, 3) << Eigen::Vector3d::Zero();
             }
         }
-        LogInfo(time, config_target_, vel_target_, q, v, a, grf);
+
+        // Note: Do I really want the COM?
+        // Get the com
+//        pinocchio::centerOfMass(pin_model_, *pin_data_, q, v, a, false);
+
+// Currently using the floating base coordinates and NOT the COM
+        Eigen::Vector3d com = q.head<3>(); //pin_data_->com[0];
+        Eigen::Vector3d vcom = v.head<3>(); //pin_data_->vcom[0];
+        Eigen::Vector3d acom = a.head<3>(); //pin_data_->acom[0];
+
+        LogInfo(time, config_target_, vel_target_, com, q.tail(q.size() - 3), vcom, v.tail(v.size() - 3), acom, a.tail(a.size()-3), grf);
 
         return control_action;
     }
@@ -182,16 +192,16 @@ namespace controller {
 //            std::cout << "Js: \n" << Js_ << std::endl;
 
             pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, 0*v);
-            for (int i = 0; i < contact.in_contact_.size(); i++) {
-                if (contact.in_contact_.at(i)) {
-                    int frame_id = static_cast<int>(pin_model_.getFrameId(pin_model_.frames.at(contact.contact_frames_.at(i)).name,
-                                                                          pin_model_.frames.at(contact.contact_frames_.at(i)).type));
+            for (int i = 0; i < des_contact_.in_contact_.size(); i++) {
+                if (contact.in_contact_.at(i) && des_contact_.in_contact_.at(i)) {
+                    int frame_id = static_cast<int>(pin_model_.getFrameId(pin_model_.frames.at(des_contact_.contact_frames_.at(i)).name,
+                                                                          pin_model_.frames.at(des_contact_.contact_frames_.at(i)).type));
                     lb_.segment(FLOATING_VEL_OFFSET + i*3, 3) =
                             -pinocchio::getFrameClassicalAcceleration(pin_model_, *pin_data_,
                                                                      frame_id, pinocchio::LOCAL_WORLD_ALIGNED).linear(); //-Jsdot_ * v;
                 }
             }
-            const int num_contacts = contact.GetNumContacts();
+            const int num_contacts = GetNumBothContacts(des_contact_, contact);
             ub_.segment(FLOATING_VEL_OFFSET, num_contacts*3) =
                     lb_.segment(FLOATING_VEL_OFFSET, num_contacts*3);
 
@@ -250,7 +260,7 @@ namespace controller {
         for (int i = 0; i < num_contacts; i++) {
             A_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i,
                      num_vel_ + 2 + 3*i) = 1;
-            ub_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i) = 1e30;
+            ub_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i) = 200;
             lb_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i) = 0;
         }
     }
@@ -274,8 +284,12 @@ namespace controller {
         P_.topLeftCorner(POS_VARS, POS_VARS) =
                 torso_tracking_weight_*2*Eigen::MatrixXd::Identity(POS_VARS, POS_VARS);
 
-        Eigen::VectorXd target = acc_target_.head(POS_VARS) + kv_pos_ * (vel_target_.head(POS_VARS) - v.head(POS_VARS)) +
-                kp_pos_*(config_target_.head(POS_VARS) - q.head(POS_VARS));
+        // Calculate the com
+        pinocchio::centerOfMass(pin_model_, *pin_data_, q, v, false);
+
+        Eigen::VectorXd target = acc_target_.head(POS_VARS)
+                + kv_pos_ * (vel_target_.head(POS_VARS) - v.head<3>()) //pin_data_->vcom[0])
+                + kp_pos_*(config_target_.head(POS_VARS) - q.head<3>()); //pin_data_->com[0]);
 
 //        std::cout << "torso acc target: " << target.transpose() << std::endl;
 
@@ -283,20 +297,29 @@ namespace controller {
 
         // Add the orientation costs
         // TODO: Orientation costs break the system
-//        P_.block(POS_VARS, POS_VARS, 3, 3) =
-//                torso_tracking_weight_*2*Eigen::MatrixXd::Identity(3,3);
+        P_.block(POS_VARS, POS_VARS, 3, 3) =
+                torso_tracking_weight_*2*Eigen::MatrixXd::Identity(3,3);
 
         Eigen::Quaternion<double> orientation(static_cast<Eigen::Vector4d>(q.segment(POS_VARS, 4)));
         orientation.normalize();
         Eigen::Quaternion<double> des_orientation(static_cast<Eigen::Vector4d>(config_target_.segment(POS_VARS, 4)));
         des_orientation.normalize();
-        Eigen::VectorXd angle_target = kv_ang_*(vel_target_.segment(POS_VARS, 3) - v.segment(POS_VARS, 3)) +
+
+        // Note: velocity orientations are in different frames. Need to convert.
+        // Should be able to exp the vel back to the surface. Then invert to the local frame then log back to the tangent space
+        Eigen::Quaterniond vel_quat;
+        Eigen::Vector3d temp = vel_target_.segment<3>(POS_VARS);
+        pinocchio::quaternion::exp3(temp, vel_quat);
+        vel_quat = orientation.inverse()*vel_quat;
+        Eigen::Vector3d vel_frame = pinocchio::quaternion::log3(vel_quat);
+
+        Eigen::VectorXd angle_target = kv_ang_*(vel_frame - v.segment(POS_VARS, 3)) +
                 kp_ang_*pinocchio::quaternion::log3(orientation.inverse()*des_orientation);
 // //        std::cout << "quat mult: " << orientation.inverse()*des_orientation << std::endl;
 // //        Eigen::Quaterniond quat;
 // //        pinocchio::quaternion::exp3(angle_target, quat);
 
-//        w_.segment(POS_VARS, 3) = -angle_target*torso_tracking_weight_;
+        w_.segment(POS_VARS, 3) = -2*angle_target*torso_tracking_weight_;
     }
 
     void QPControl::AddForceTrackingCost(const Contact& contact) {
@@ -340,7 +363,7 @@ namespace controller {
         acc_target_.head(FLOATING_VEL_OFFSET).setZero();
 
         AddDynamicsConstraints(v, contact);
-        AddContactMotionConstraints(q, v, contact); // TODO: Fix -- there is a possiblity it is somehow a frame issue
+        AddContactMotionConstraints(q, v, contact);
         AddTorqueConstraints(v, contact);
         AddFrictionConeConstraints(contact);
         AddPositiveGRFConstraints(contact);
@@ -355,25 +378,25 @@ namespace controller {
 //        std::cout << "Constraints: \n" << A_ << std::endl;
 //        std::cout << "ub: \n" << ub_ << std::endl;
 //        std::cout << "lb: \n" <<  lb_ << std::endl;
-        std::cout << "Quadratic cost: \n" << P_ << std::endl;
-        std::cout << "Linear cost: \n" << w_ << std::endl;
+//        std::cout << "Quadratic cost: \n" << P_ << std::endl;
+//        std::cout << "Linear cost: \n" << w_ << std::endl;
 
-        pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, a);
-
-        for (int i = 0; i < contact.in_contact_.size(); i++) {
-            if (contact.in_contact_.at(i)) {
-                int frame_id = static_cast<int>(pin_model_.getFrameId(
-                        pin_model_.frames.at(contact.contact_frames_.at(i)).name,
-                        pin_model_.frames.at(contact.contact_frames_.at(i)).type));
-                const auto classic_frame_acc = pinocchio::getFrameClassicalAcceleration(pin_model_, *pin_data_, frame_id,
-                                                         pinocchio::LOCAL_WORLD_ALIGNED);
-                std::cout << "classic frame acc for ee " << i << ": \n" << classic_frame_acc << std::endl;
-
-                const auto frame_acc = pinocchio::getFrameAcceleration(pin_model_, *pin_data_, frame_id,
-                                                                                      pinocchio::LOCAL_WORLD_ALIGNED);
-                std::cout << "frame acc for ee " << i << ": \n" << frame_acc << std::endl;
-            }
-        }
+//        pinocchio::forwardKinematics(pin_model_, *pin_data_, q, v, a);
+//
+//        for (int i = 0; i < contact.in_contact_.size(); i++) {
+//            if (contact.in_contact_.at(i)) {
+//                int frame_id = static_cast<int>(pin_model_.getFrameId(
+//                        pin_model_.frames.at(contact.contact_frames_.at(i)).name,
+//                        pin_model_.frames.at(contact.contact_frames_.at(i)).type));
+//                const auto classic_frame_acc = pinocchio::getFrameClassicalAcceleration(pin_model_, *pin_data_, frame_id,
+//                                                         pinocchio::LOCAL_WORLD_ALIGNED);
+//                std::cout << "classic frame acc for ee " << i << ": \n" << classic_frame_acc << std::endl;
+//
+//                const auto frame_acc = pinocchio::getFrameAcceleration(pin_model_, *pin_data_, frame_id,
+//                                                                                      pinocchio::LOCAL_WORLD_ALIGNED);
+//                std::cout << "frame acc for ee " << i << ": \n" << frame_acc << std::endl;
+//            }
+//        }
 
         // Check if the sparsity pattern changed
         if (num_contacts != prev_num_contacts_) {
@@ -427,9 +450,9 @@ namespace controller {
         Eigen::VectorXd tau =
                 (pin_data_->M*qp_sol.head(num_vel_) - Js_.transpose()*qp_sol.tail(CONSTRAINT_PER_FOOT*
                                                               GetNumBothContacts(contact, des_contact_))
-                                                      + pin_data_->C*v + pin_data_->g).tail(num_inputs_); // - pin_data_->g
+                                                      + pin_data_->C*v + pin_data_->g).tail(num_inputs_); // + pin_data_->g
 
-        std::cout << "tau: \n" << tau << std::endl;
+//        std::cout << "tau: \n" << tau << std::endl;
 
         for (int i = 2*num_inputs_; i < 3*num_inputs_; i++) {
             control(i) = tau(i - 2*num_inputs_);
@@ -503,14 +526,23 @@ namespace controller {
     }
 
     void QPControl::LogInfo(double time,
-                            const Eigen::VectorXd& q_des, const Eigen::VectorXd& v_des, const Eigen::VectorXd& q,
-                            const Eigen::VectorXd& v, const Eigen::VectorXd& a,
+                            const Eigen::VectorXd& q_des,
+                            const Eigen::VectorXd& v_des,
+                            const Eigen::Vector3d& com,
+                            const Eigen::VectorXd& q,
+                            const Eigen::Vector3d& vcom,
+                            const Eigen::VectorXd& v,
+                            const Eigen::Vector3d& acom,
+                            const Eigen::VectorXd& a,
                             const Eigen::VectorXd& grf) {
         log_file_ << std::setw(15) << time
                 << std::setw(15) << q_des.transpose()
                 << std::setw(15) << v_des.transpose()
+                << std::setw(15) << com.transpose()
                 << std::setw(15) << q.transpose()
+                << std::setw(15) << vcom.transpose()
                 << std::setw(15) << v.transpose()
+                << std::setw(15) << acom.transpose()
                 << std::setw(15) << a.transpose()
                 << std::setw(15) << grf.transpose() << std::endl;
 

@@ -92,8 +92,6 @@ namespace simulator {
             cntrl[i] = muj_control.at(i);
         }
 
-        std::cout << "Mujoco constraint jacobain: " << std::endl;
-
 //        for (int i = 0; i < muj_model_->nq; i++) {
 //            data->qpos[i] = control2(i);
 //        }

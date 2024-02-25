@@ -159,8 +159,11 @@ namespace controller {
         void LogInfo(double time,
                      const Eigen::VectorXd& q_des,
                      const Eigen::VectorXd& v_des,
+                     const Eigen::Vector3d& com,
                      const Eigen::VectorXd& q,
+                     const Eigen::Vector3d& vcom,
                      const Eigen::VectorXd& v,
+                     const Eigen::Vector3d& acom,
                      const Eigen::VectorXd& a,
                      const Eigen::VectorXd& grf);
 

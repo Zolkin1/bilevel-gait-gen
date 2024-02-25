@@ -106,6 +106,8 @@ namespace controller {
         vector_t kv_joints_;
 
         int run_num;
+
+        std::ofstream log_file_;
     };
 } // controller
 
