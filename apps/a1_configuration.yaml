@@ -129,7 +129,7 @@ num_polys: 3
 
 x_des: 1
 y_des: 0
-xdot_des: 5
+xdot_des: 0
 ydot_des: 0
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
@@ -153,7 +153,7 @@ Q_diag: [1, 1, 1,          # linear momentum
          60000, 500, 10]       # RR leg
 
 # can try higher weight with less nodes
-Q_srbd_diag: [50.0, 0.0, 800, 150, 50, 10, 700, 700, 700, 1, 1, 1] # 80, 80 for diag walking
+Q_srbd_diag: [80.0, 0.0, 800, .150, 50, 10, 700, 700, 700, 1, 1, 1] # 80, 80 for diag walking
 
 
 # Walk to position weights:

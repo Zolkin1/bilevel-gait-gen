@@ -106,7 +106,7 @@ namespace mpc {
         primal_ = sol.x;
 
         if (solve_quality_ == PrimalInfeasible) {
-            primal_ = vector_t::Constant(sol.x.size(), 1e10);
+            primal_ = vector_t::Constant(sol.x.size(), 0);
 
             vector_t temp = data.sparse_constraint_*primal_ + slacks_ - data.ub_;
             vector_t primal_product = data.sparse_constraint_*primal_;

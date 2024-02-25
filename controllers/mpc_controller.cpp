@@ -225,8 +225,8 @@ namespace controller {
 
         // TODO: Is the angular velocity correct?
         // TODO: The state is the angular momentum, not just the velocity
-        state.segment<POS_VARS>(mpc::SingleRigidBodyModel::ANG_VEL_START + 1).setZero();
-//                model_.GetIr() * v.segment<POS_VARS>(3); //v.segment<POS_VARS>(3); //model_.GetIr() *
+        state.segment<POS_VARS>(mpc::SingleRigidBodyModel::ANG_VEL_START + 1) = //.setZero();
+                model_.GetIr() * v.segment<POS_VARS>(3); //v.segment<POS_VARS>(3); //model_.GetIr() *
 
 //        std::cout << "vel frame: " << vel_frame.transpose() << std::endl;
 //        std::cout << "v: " << v.segment<3>(3).transpose() << std::endl;
