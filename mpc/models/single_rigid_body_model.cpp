@@ -571,6 +571,10 @@ namespace mpc {
         return Ir_;
     }
 
+    matrix_33t SingleRigidBodyModel::GetIrInv() const {
+        return Ir_inv_;
+    }
+
 //    vector_t SingleRigidBodyModel::VelocityInverseKinematics(const vector_t& config,
 //                                                             const std::vector<vector_3t>& end_effector_velocity,
 //                                                             const vector_t& vel_guess) {

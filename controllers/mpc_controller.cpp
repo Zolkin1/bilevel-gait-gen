@@ -115,6 +115,9 @@ namespace controller {
                                                  const vector_t& a, const controller::Contact& contact,
                                                  double time) {
 
+        utils::Timer timer("mpc controller");
+        timer.StartTimer();
+
         if (kp_joints_.size() != num_inputs_) {
             throw std::runtime_error("kp joints wrong size!");
         }
@@ -180,6 +183,9 @@ namespace controller {
         }
 
         log_file_ << std::endl;
+
+        timer.StopTimer();
+        timer.PrintElapsedTime();
 
         return qp_controller_.ComputeControlAction(q, v, a, contact1, time);
     }
@@ -298,7 +304,8 @@ namespace controller {
 
     void MPCController::FullBodyTrajUpdate(mpc::Trajectory& traj) {
         vector_t state_guess = q_des_;
-        for (int i = 0; i < traj.GetStates().size(); i++) {
+        const int num_to_update = 5; //traj.GetStates().size()
+        for (int i = 0; i < num_to_update; i++) {
             std::vector<mpc::vector_3t> traj_ee_locations(4);
             for (int ee = 0; ee < 4; ee++) {
                 // Grab state and end effector locations at that time
@@ -308,14 +315,12 @@ namespace controller {
                                                               traj_ee_locations, state_guess,
                                                               info_.joint_bounds_ub,
                                                               info_.joint_bounds_lb));
-            // TODO: Convert the quaternion to the global frame - I think it already is
 
             state_guess = traj.GetFullConfig(i);
 
             if (i >= 1) {
                 vector_t vel(model_.GetFullModelConfigSpace() - 1);
-                // TODO: Just grab the pre-inverted matrix
-                vel.head<6>() << traj.GetState(i).segment<3>(3)/model_.GetMass(), model_.GetIr().inverse()*traj.GetState(i).segment<3>(10); //model_.GetIr().inverse()*
+                vel.head<6>() << traj.GetState(i).segment<3>(3)/model_.GetMass(), model_.GetIrInv()*traj.GetState(i).segment<3>(10); //model_.GetIr().inverse()*
                 vel.tail(num_inputs_) = (traj.GetFullConfig(i) - traj.GetFullConfig(i-1)).tail(num_inputs_)/info_.integrator_dt;
 
                 traj.UpdateFullVelocity(i, vel);

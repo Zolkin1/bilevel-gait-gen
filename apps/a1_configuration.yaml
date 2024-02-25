@@ -71,7 +71,7 @@ srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
 
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
-control_rate: 500  # Hz
+control_rate: 250  # Hz
 torque_bounds: [30, 30, 30,
                 30, 30, 30,
                 30, 30, 30,
@@ -180,8 +180,8 @@ Q_srbd_diag: [80.0, 80.0, 800, .150, .50, 10, 700, 700, 700, 1, 1, 1] # 80, 80 f
 # force weight 0.001
 
 
-mpc_verbosity: 1
+mpc_verbosity: 0
 
 ## --- Temp --- ##
 #viz_rate: 0.025
-viz_rate: 0.002
+viz_rate: 0.004

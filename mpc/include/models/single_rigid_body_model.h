@@ -80,6 +80,8 @@ namespace mpc {
 
         matrix_33t GetIr() const;
 
+        matrix_33t GetIrInv() const;
+
         vector_2t GetCOMHipOffset(int ee) const;
 
         static constexpr int QUAT_SIZE = 4;

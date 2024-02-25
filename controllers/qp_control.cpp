@@ -12,6 +12,7 @@
 #include "pinocchio/algorithm/center-of-mass.hpp"
 
 #include "qp_control.h"
+#include "timer.h"
 
 namespace controller {
     // TODO: Change the vector to be const refs
@@ -72,6 +73,8 @@ namespace controller {
                                                     const Eigen::VectorXd& a,
                                                     const Contact& contact,
                                                     double time) {
+        utils::Timer timer("qp control");
+        timer.StartTimer();
         Contact contact2(4);
 //        contact2.in_contact_ = {true, true, true, true};
 //        contact2.contact_frames_ = contact.contact_frames_;
@@ -120,6 +123,9 @@ namespace controller {
         Eigen::Vector3d acom = a.head<3>(); //pin_data_->acom[0];
 
         LogInfo(time, config_target_, vel_target_, com, q.tail(q.size() - 3), vcom, v.tail(v.size() - 3), acom, a.tail(a.size()-3), grf);
+
+        timer.StopTimer();
+        timer.PrintElapsedTime();
 
         return control_action;
     }
