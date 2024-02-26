@@ -227,7 +227,7 @@ namespace mpc {
                 const std::vector<time_v>& contact_times = GetContactTimes();
                 double last_diff = contact_times.at(ee).at(contact_times.at(ee).size()-1).GetTime()
                         - contact_times.at(ee).at(contact_times.at(ee).size()-2).GetTime();
-                ee_spline.AddPoly(last_diff);    // TODO: Make not hard coded, 0.2
+                ee_spline.AddPoly(std::max(last_diff, 0.2));    // TODO: Make not hard coded, 0.2
             }
             ee++;
         }

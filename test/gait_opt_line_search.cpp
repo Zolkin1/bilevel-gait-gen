@@ -151,9 +151,9 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
         viz.UpdateViz(viz_rate);
 
         // Gait optimization
-        if (!(i % 20000000)) {
-//            prev_cost = GaitOptLS(mpc, gait_opt, cost_red, time, info, config, mpc_des_state,
-//                                  ee_locations, warm_start, fixed_pos);
+        if (!(i % 5)) {
+            prev_cost = GaitOptLS(mpc, gait_opt, cost_red, time, info, config, mpc_des_state,
+                                  ee_locations, warm_start, fixed_pos);
 
             prev_traj = mpc.GetTrajectory();
 //            prev_traj = mpc.GetRealTimeUpdate(prev_traj.GetState(1), time, ee_locations, false);
@@ -285,7 +285,8 @@ int main() {
                                                                  warm_start,
                                                                  mpc_des_state,
                                                                  config.ParseNumber<int>("num_polys"),
-                                                                 config.ParseEigenVector("Q_srbd_diag").asDiagonal());
+                                                                 config.ParseEigenVector("Q_srbd_diag").asDiagonal(),
+                                                                 config.ParseNumber<int>("gait_opt_freq"));
 
     // Make the robot for visualization
     auto robot_file = config.ParseString("robot_xml");

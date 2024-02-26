@@ -199,7 +199,8 @@ int main() {
                                                                  warm_start,
                                                                  mpc_des_state,
                                                                  config.ParseNumber<int>("num_polys"),
-                                                                 config.ParseEigenVector("Q_srbd_diag").asDiagonal());
+                                                                 config.ParseEigenVector("Q_srbd_diag").asDiagonal(),
+                                                                 config.ParseNumber<int>("gait_opt_freq"));
 
     // Make the robot for visualization
     auto robot_file = config.ParseString("robot_xml");
@@ -243,7 +244,7 @@ int main() {
 
     sim.PauseSim();
 
-    int constexpr N = 1000;
+    int constexpr N = 1500;
     for (int i = 0; i < N; i++) {
         double time = i*info.integrator_dt;
 

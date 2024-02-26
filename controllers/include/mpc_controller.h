@@ -35,7 +35,8 @@ namespace controller {
                   const std::vector<vector_t>& warm_start_states,
                   const vector_t& state_des,
                   int num_polys,
-                  const matrix_t& Q);
+                  const matrix_t& Q,
+                  int gait_opt_freq);
 
         vector_t ComputeControlAction(const vector_t& q,
                                       const vector_t& v,
@@ -62,6 +63,8 @@ namespace controller {
 
         void GetTargetsFromTraj(const mpc::Trajectory& traj, double time);
 
+        double GaitOptLS(double cost_red, double time, const std::vector<Eigen::Vector3d>& ee_locations);
+
         vector_t ComputeGroundForceTorques(int end_effector);
 
         vector_t ComputeSwingTorques(int end_effector);
@@ -72,6 +75,10 @@ namespace controller {
 
         QPControl qp_controller_;
         mpc::MPCSingleRigidBody mpc_;
+        mpc::GaitOptimizer gait_opt_;
+
+        int gait_opt_freq_;
+
         bool computed_;
 
         std::thread mpc_computations_;
@@ -106,6 +113,8 @@ namespace controller {
         vector_t kv_joints_;
 
         int run_num;
+
+        Contact contact_;
 
         std::ofstream log_file_;
     };

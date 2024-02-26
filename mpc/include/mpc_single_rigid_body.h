@@ -43,6 +43,8 @@ namespace mpc {
 
         void AddTDPositionConstraints();
 
+        void AddTDPositionConstraintPartial(utils::SparseMatrixBuilder& builder, vector_t& b, int contact_idx, int eq_idx, int ee);
+
         int GetForceSplineStartIdx() const override;
         int GetPosSplineStartIdx() const override;
 
@@ -54,7 +56,7 @@ namespace mpc {
 
         int num_run_;
 
-        static constexpr int EE_NODE_START = 5;
+        static constexpr int EE_NODE_START = 4; // TODO: Tune
     private:
     };
 } // mpc

@@ -20,7 +20,7 @@ namespace mpc {
         settings_.verbose = verbose;
         settings_.tol_gap_rel = 1e-8;
         settings_.tol_gap_abs = 1e-8;
-        settings_.tol_feas = 1e-9;
+        settings_.tol_feas = 1e-10;
 //        settings_.linesearch_backtrack_step = 0.2;
 //        settings_.min_switch_step_length = 1e-2;
 //        settings_.max_iter = 10;
@@ -104,10 +104,12 @@ namespace mpc {
         slacks_ = sol.s;
         dual_ = sol.z;
         primal_ = sol.x;
-
         if (solve_quality_ == PrimalInfeasible) {
+            const std::string& error = "Primal infeasible.";
+            throw (error);
+
             // TODO: Is this the behavior I want?
-            primal_ = vector_t::Constant(sol.x.size(), 0);
+            primal_ = vector_t::Constant(sol.x.size(), 1e10);
 
             vector_t temp = data.sparse_constraint_*primal_ + slacks_ - data.ub_;
             vector_t primal_product = data.sparse_constraint_*primal_;
@@ -162,6 +164,7 @@ namespace mpc {
 
     void ClarabelInterface::ConfigureForRealTime(double run_time_iters) {
         // Note: the higher quality definetly shows
+        // TODO: Tune tolerances
          settings_.tol_gap_rel = 1e-15; //1e-15;
          settings_.tol_gap_abs = 1e-15; //1e-15;
     }
@@ -275,7 +278,7 @@ namespace mpc {
         utils::Timer timer("KKT mat solve");
         timer.StartTimer();
 
-        num_equality_constraints_ = data.num_equality_ - data.num_td_pos_constraints_;
+        num_equality_constraints_ = data.num_equality_; // - data.num_td_pos_constraints_
         num_inequality_constraints_ = data.num_inequality_;
 
         // TODO: Speed up! The setup for the solve is about 20ms
@@ -425,7 +428,15 @@ namespace mpc {
                     gen_idx += data.num_cone_constraints_;
                     break;
                 case Constraints::TDPosition:
-                    // TODO: Add this in the derivative term
+                    mat_builder.SetMatrix(data.sparse_constraint_.middleRows(gen_idx, data.num_td_pos_constraints_).transpose(),
+                                        0, data.num_decision_vars + data.num_inequality_ + eq_idx);
+                    mat_builder.SetMatrix(data.sparse_constraint_.middleRows(gen_idx, data.num_td_pos_constraints_),
+                                          data.num_decision_vars + data.num_inequality_ + eq_idx,
+                                          0);
+
+                    nu_.segment(eq_idx, data.num_td_pos_constraints_) =
+                            dual_.segment(gen_idx, data.num_td_pos_constraints_);
+
                     eq_idx += data.num_td_pos_constraints_;
                     gen_idx += data.num_td_pos_constraints_;
                     break;
@@ -434,8 +445,8 @@ namespace mpc {
 
         mat_builder.SetMatrix(data.sparse_cost_, 0, 0);
 
-        sp_matrix_t diff_mat(data.num_decision_vars + data.GetTotalNumConstraints() - data.num_td_pos_constraints_,
-                             data.num_decision_vars + data.GetTotalNumConstraints() - data.num_td_pos_constraints_);
+        sp_matrix_t diff_mat(data.num_decision_vars + data.GetTotalNumConstraints(),
+                             data.num_decision_vars + data.GetTotalNumConstraints());
 
         diff_mat.setFromTriplets(mat_builder.GetTriplet().begin(), mat_builder.GetTriplet().end());
 
@@ -544,7 +555,7 @@ namespace mpc {
         solver.factorize(diff_mat); // diff_mat
 
         if (solver.info() != Eigen::Success) {
-            throw std::runtime_error("Could not factorize the differential matrix.");
+            throw std::runtime_error("Could not factor the differential matrix.");
         }
 
         vector_t x = solver.solve(temp2);

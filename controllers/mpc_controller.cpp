@@ -23,7 +23,8 @@ namespace controller {
                                  const std::vector<vector_t>& warm_start_states,
                                  const vector_t& state_des,
                                  int num_polys,
-                                 const matrix_t& Q) : Controller(control_rate, robot_urdf, foot_type),
+                                 const matrix_t& Q,
+                                 int gait_opt_freq) : Controller(control_rate, robot_urdf, foot_type),
                                  qp_controller_(control_rate, robot_urdf, foot_type, nv,
                                                torque_bounds, friction_coef,
                                                base_pos_gains,
@@ -40,9 +41,12 @@ namespace controller {
                                  fk_traj_(5),
                                  gait_optimizer_(4, 10, 10, 10, 1, 0.05),
                                  info_(info),
-                                 model_(robot_urdf, info.ee_frames, info.discretization_steps, info.integrator_dt, info.nom_state){  // TODO: Not hard coded
+                                 model_(robot_urdf, info.ee_frames, info.discretization_steps, info.integrator_dt, info.nom_state),
+                                 gait_opt_(4, 10, 10, 10, 1, 0.05) {  // TODO: Not hard coded
 
         num_polys_ = num_polys;
+
+        gait_opt_freq_ = gait_opt_freq;
 
         // TODO: Do I need the model if the basic controller also has pinocchio data?
 
@@ -131,7 +135,7 @@ namespace controller {
 //        std::cout << "expected ang momentum: " << traj_.GetState(traj_.GetNode(time)).tail(3).transpose() << std::endl;
         std::vector<mpc::vector_3t> ee_locations = model_.GetEndEffectorLocations(q);
 
-        state_time_mut_.lock();
+        state_time_mut_.lock(); // -------- Setting MPC Variables -------- //
         state_ = state;
 
         if (time > time_) {
@@ -139,53 +143,54 @@ namespace controller {
         }
 
         ee_locations_ = ee_locations;
-        state_time_mut_.unlock();
+        contact_ = contact;
+        state_time_mut_.unlock(); // -------- End Setting MPC Variables -------- //
 
         // For now, single thread everything
-
         // Get MPC update (not gait opt yet)
-        mpc::Trajectory traj = traj_;
-        if (!(run_num % 10)) {
-            mpc_.AdjustForCurrentContacts(time, contact);
-            traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
-        }
-        FullBodyTrajUpdate(traj);
-        UpdateTrajViz();
+//        mpc::Trajectory traj = traj_;
+//        if (!(run_num % 10)) {
+//            mpc_.AdjustForCurrentContacts(time, contact);
+//            traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
+//        }
+//        FullBodyTrajUpdate(traj);
+//        UpdateTrajViz();
 
-//        mpc_res_mut_.lock();
-        GetTargetsFromTraj(traj, time); // TODO: IK for velocties.
-        Contact contact1 = traj.GetDesiredContacts(time);
+        mpc_res_mut_.lock(); // -------- Accessing MPC Result -------- //
+        GetTargetsFromTraj(traj_, time);
+        Contact contact1 = traj_.GetDesiredContacts(time);
         contact1.contact_frames_ = contact.contact_frames_;
-//        mpc_res_mut_.unlock();
+
+        vector_t force_des(contact1.GetNumContacts()*3);
+        int j = 0;
+        for (int i = 0; i < contact1.in_contact_.size(); i++) {
+            if (contact1.in_contact_.at(i)) {
+                force_des.segment<3>(3*j) = traj_.GetForce(i, time);
+                j++;
+            }
+        }
+        // TODO: Consider removing the logging and/or redoing it
+        for (int ee = 0; ee < 4; ee++) {
+            log_file_ << std::setw(15) << traj_.GetForce(ee, time).transpose();
+        }
+        mpc_res_mut_.unlock(); // -------- End Accessing MPC Result -------- //
 
         vector_t control_action = vector_t::Zero(3*num_inputs_);    // joints, joint velocities, torques
 
         qp_controller_.UpdateTargetConfig(q_des_);
         qp_controller_.UpdateTargetVel(v_des_);
-        vector_t force_des(contact1.GetNumContacts()*3);
-        int j = 0;
-        for (int i = 0; i < contact1.in_contact_.size(); i++) {
-            if (contact1.in_contact_.at(i)) {
-                force_des.segment<3>(3*j) = traj.GetForce(i, time);
-                j++;
-            }
-        }
         qp_controller_.UpdateForceTargets(force_des);
 
         qp_controller_.UpdateDesiredContacts(contact1);
 
-        traj_ = traj;
+//        traj_ = traj;
 
         run_num++;
-
-        for (int ee = 0; ee < 4; ee++) {
-            log_file_ << std::setw(15) << traj.GetForce(ee, time).transpose();
-        }
 
         log_file_ << std::endl;
 
         timer.StopTimer();
-        timer.PrintElapsedTime();
+//        timer.PrintElapsedTime();
 
         return qp_controller_.ComputeControlAction(q, v, a, contact1, time);
     }
@@ -247,46 +252,91 @@ namespace controller {
     }
 
     void MPCController::MPCUpdate() {
-//        vector_t state;
-//        double time = -1;
-//        std::vector<mpc::vector_3t> ee_locations(4);
-//
-//        while(true) {
-//            state_time_mut_.lock();
-//            double time_act = time_;
-//            state_time_mut_.unlock();
-//            if (time_act - time >= 0.1) {
-//                state_time_mut_.lock();
-//                state = state_;
-//                time = time_;
-//                ee_locations = ee_locations_;
-//                state_time_mut_.unlock();
-//
-//                mpc::Trajectory traj = mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
-//
-//                // ----------------------- IK On Trajectory ----------------------- //
-//                FullBodyTrajUpdate(traj);
-//                // ----------------------- ----------------------- //
-//
-//                mpc_res_mut_.lock();
-//                traj_ = traj;
-//                UpdateTrajViz();
-//                mpc_res_mut_.unlock();
+        vector_t state;
+        double time = 0;
+        std::vector<mpc::vector_3t> ee_locations(4);
+        Contact contact;
 
-//                gait_optimizer_.UpdateSizes(mpc_.GetNumDecisionVars(), mpc_.GetNumConstraints());
-//                mpc_.ComputeDerivativeTerms();
-//                mpc_.GetQPPartials(gait_optimizer_.GetQPPartials());
+        int run_num = 0;
+        double prev_cost = 1e10;
+        double cost_red = 0;
 
-//                gait_optimizer_.SetParameterPartials()
+        while(true) {
+            state_time_mut_.lock(); // Get time
+            double time_act = time_;
+            state_time_mut_.unlock();
 
-//                gait_optimizer_.ComputeCostFcnDerivWrtContactTimes();
+            if (time_act - time >= info_.integrator_dt) {
+                state_time_mut_.lock(); // Get time and state
+                state = state_;
+                time = time_;
+                ee_locations = ee_locations_;
+                contact = contact_;
+                state_time_mut_.unlock();
 
-//                gait_optimizer_.OptimizeContactTimes();
+                // Run MPC
+                mpc_.AdjustForCurrentContacts(time, contact);
 
-//                mpc_.UpdateContactTimes(gait_optimizer_.GetContactTimes());
+                if (!(run_num % gait_opt_freq_) && run_num > 0) {
+                    // Print contact times
+                    std::cout << "Time: " << time << std::endl;
+                    const auto& contact_times = mpc_.GetTrajectory().GetContactTimes();
+                    for (int ee = 0; ee < contact_times.size(); ee++) {
+                        std::cout << "End effector: " << ee << ".   ";
+                        for (int node = 0; node < contact_times.at(ee).size(); node++) {
+                            std::cout << std::setw(5) << contact_times.at(ee).at(node).GetTime() << " | ";
+                        }
+                        std::cout << std::endl;
+                    }
 
-//            }
-//        }
+                    prev_cost = GaitOptLS(cost_red, time, ee_locations);
+
+                    // Print contact times
+                    std::cout << "Time: " << time << std::endl;
+                    const auto& contact_times2 = mpc_.GetTrajectory().GetContactTimes();
+                    for (int ee = 0; ee < contact_times2.size(); ee++) {
+                        std::cout << "End effector: " << ee << ".   ";
+                        for (int node = 0; node < contact_times2.at(ee).size(); node++) {
+                            std::cout << std::setw(5) << contact_times2.at(ee).at(node).GetTime() << " | ";
+                        }
+                        std::cout << std::endl;
+                    }
+
+                } else {
+                    // Print contact times
+                    std::cout << "Time: " << time << std::endl;
+                    const auto& contact_times = mpc_.GetTrajectory().GetContactTimes();
+                    for (int ee = 0; ee < contact_times.size(); ee++) {
+                        std::cout << "End effector: " << ee << ".   ";
+                        for (int node = 0; node < contact_times.at(ee).size(); node++) {
+                            std::cout << std::setw(5) << contact_times.at(ee).at(node).GetTime() << " | ";
+                        }
+                        std::cout << std::endl;
+                    }
+                    mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
+                }
+
+                // TODO: Look into the contacts - I feel like something is up here
+
+                mpc::Trajectory traj = mpc_.GetTrajectory();
+                cost_red = prev_cost - mpc_.GetCost();
+
+
+                // IK on the trajectory
+                utils::Timer ik_timer("traj ik");
+                ik_timer.StartTimer();
+                FullBodyTrajUpdate(traj);
+                ik_timer.StopTimer();
+                ik_timer.PrintElapsedTime();
+
+                mpc_res_mut_.lock(); // Set results
+                traj_ = traj;
+                UpdateTrajViz();
+                mpc_res_mut_.unlock();
+
+                run_num++;
+            }
+        }
     }
 
     std::vector<std::vector<Eigen::Vector3d>> MPCController::GetTrajViz() {
@@ -304,7 +354,7 @@ namespace controller {
 
     void MPCController::FullBodyTrajUpdate(mpc::Trajectory& traj) {
         vector_t state_guess = q_des_;
-        const int num_to_update = 5; //traj.GetStates().size()
+        const int num_to_update = 10; // traj.GetStates().size();
         for (int i = 0; i < num_to_update; i++) {
             std::vector<mpc::vector_3t> traj_ee_locations(4);
             for (int ee = 0; ee < 4; ee++) {
@@ -350,6 +400,65 @@ namespace controller {
     std::vector<Eigen::Vector2d> MPCController::GetEEBoxCenter() {
         // TODO: Deal with multithreading
         return mpc_.GetEEBoxCenter();
+    }
+
+    double MPCController::GaitOptLS(double cost_red, double time, const std::vector<Eigen::Vector3d>& ee_locations) {
+        utils::Timer gait_opt_timer("gait opt + derivatives");
+        gait_opt_timer.StartTimer();
+
+        const mpc::Trajectory prev_traj = mpc_.GetTrajectory();
+
+        // Create a new MPC and solve with it
+        if (mpc_.ComputeDerivativeTerms()) {
+
+            gait_opt_.SetContactTimes(mpc_.GetTrajectory().GetContactTimes());
+            gait_opt_.UpdateSizes(mpc_.GetNumDecisionVars(), mpc_.GetNumConstraints());
+            double original_cost = mpc_.GetCost();
+
+            utils::Timer qp_partials_timer("qp partials");
+            qp_partials_timer.StartTimer();
+            mpc_.GetQPPartials(gait_opt_.GetQPPartials());
+            qp_partials_timer.StopTimer();
+            qp_partials_timer.PrintElapsedTime();
+
+
+            utils::Timer partials_timer("param partials");
+            partials_timer.StartTimer();
+            for (int ee = 0; ee < 4; ee++) {
+                gait_opt_.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
+                for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {
+                    mpc_.ComputeParamPartialsClarabel(prev_traj, gait_opt_.GetParameterPartials(ee, idx), ee, idx);
+                }
+            }
+            partials_timer.StopTimer();
+            partials_timer.PrintElapsedTime();
+
+            gait_opt_.ModifyQPPartials(mpc_.GetQPSolution());
+
+            utils::Timer cost_fcn_timer("cost fcn gradient");
+            cost_fcn_timer.StartTimer();
+            gait_opt_.ComputeCostFcnDerivWrtContactTimes();
+            cost_fcn_timer.StopTimer();
+            cost_fcn_timer.PrintElapsedTime();
+
+            gait_opt_.OptimizeContactTimes(time, cost_red);
+
+            // Apply the minimizing contact time
+            std::vector<mpc::time_v> contact_times;
+            double cost_min;
+            std::tie(contact_times, cost_min) = gait_opt_.LineSearch(mpc_);
+//        mpc.UpdateContactTimes(contact_times);
+
+            gait_opt_timer.StopTimer();
+            gait_opt_timer.PrintElapsedTime();
+
+            return cost_min;
+        } else {
+            std::cerr << "Can't perform gait optimization because MPC was not solved to tolerance." << std::endl;
+            gait_opt_timer.StopTimer();
+            gait_opt_timer.PrintElapsedTime();
+            return 1e30;
+        }
     }
 
 } // controller

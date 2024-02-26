@@ -449,28 +449,43 @@ namespace mpc {
     }
 
     void EndEffectorSplines::RemovePoly(double start_time) {
-        for (int i = 0; i < times_.size(); i++) {
-            std::vector<int> mut_nodes = GetMutableNodes(Position, 0);
-
-            for (int node = 1; node < mut_nodes.size(); node++) {
-                if (times_.at(mut_nodes.at(node)).GetTime() < start_time) {
-                    for (int j = 0; j < mut_nodes.at(node); j++) {
-                        times_.erase(times_.begin());
-                        for (int coord = 0; coord < POS_VARS; coord++) {
-                            forces_.at(coord).erase(forces_.at(coord).begin());
-                            positions_.at(coord).erase(positions_.at(coord).begin());
-                        }
-                    }
-//                    std::cerr << "nodes removed" << std::endl;
+        const int lower_node = GetLowerNodeIdx(Position, 0, start_time);
+        if (lower_node != 0) {
+            for (int i = 0; i < lower_node; i++) {
+                times_.erase(times_.begin());
+                for (int coord = 0; coord < POS_VARS; coord++) {
+                    forces_.at(coord).erase(forces_.at(coord).begin());
+                    positions_.at(coord).erase(positions_.at(coord).begin());
                 }
-                mut_nodes = GetMutableNodes(Position, 0);
             }
         }
 
-        for (int coord = 0; coord < POS_VARS; coord++) {
-            assert(forces_.at(coord).at(0).GetType() != Empty);
-            assert(positions_.at(coord).at(0).GetType() != Empty);
+        if (GetLowerNodeIdx(Position, 0, start_time) != 0) {
+            throw std::runtime_error("Poly remove did not work.");
         }
+
+//        for (int i = 0; i < times_.size(); i++) {
+//            std::vector<int> mut_nodes = GetMutableNodes(Position, 0);
+//
+//            for (int node = 1; node < mut_nodes.size(); node++) {
+//                if (times_.at(mut_nodes.at(node)).GetTime() < start_time) {
+//                    for (int j = 0; j < mut_nodes.at(node); j++) {
+//                        times_.erase(times_.begin());
+//                        for (int coord = 0; coord < POS_VARS; coord++) {
+//                            forces_.at(coord).erase(forces_.at(coord).begin());
+//                            positions_.at(coord).erase(positions_.at(coord).begin());
+//                        }
+//                    }
+////                    std::cerr << "nodes removed" << std::endl;
+//                }
+//                mut_nodes = GetMutableNodes(Position, 0);
+//            }
+//        }
+//
+//        for (int coord = 0; coord < POS_VARS; coord++) {
+//            assert(forces_.at(coord).at(0).GetType() != Empty);
+//            assert(positions_.at(coord).at(0).GetType() != Empty);
+//        }
 
 //        for (int node = 1; node < mut_nodes.size(); node++) {
 //            if (times_.at(mut_nodes.at(node-1)) < start_time && times_.at(mut_nodes.at(node)) < start_time) {

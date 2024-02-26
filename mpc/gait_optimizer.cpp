@@ -223,10 +223,11 @@ namespace mpc {
         ub_.resize(num_constraints);
         ub_.setZero();
 
-        int next_row = CreatePolytopeConstraint(0);
+        //TODO: Inspect constraints. I think I am allowing something to move when it shouldn't which gives really jerky behavior
+        int next_row = CreatePolytopeConstraint(0, time);
 //        next_row = CreateStepBoundConstraint(next_row);
         next_row = CreateStartConstraint(next_row);
-        next_row = CreateTrustRegionConstraint(next_row);
+        next_row = CreateTrustRegionConstraint(next_row); // TODO: Remove the trust region constraint
         CreateNextNodeConstraints(next_row, time);
 
         sp_matrix_t A(num_constraints, num_decision_vars);
@@ -278,6 +279,8 @@ namespace mpc {
         // TODO: Consider building a sparse matrix in the first place
         sp_matrix_t P = Bk_.sparseView();
 
+        PrintConstraints(A, lb_, ub_);
+
         // ------------------- Run Solver ------------------- //
 //        PrintConstraints(A.toDense(), lb_, ub_);
 
@@ -309,6 +312,7 @@ namespace mpc {
 
         if (qp_solver_.getStatus() != OsqpEigen::Status::Solved && qp_solver_.getStatus() != OsqpEigen::Status::SolvedInaccurate
             && qp_solver_.getStatus() != OsqpEigen::Status::MaxIterReached) {
+            PrintConstraints(A, lb_, ub_);
             std::cerr << "Could not solve the gait optimization problem." << std::endl;
             std::cerr << "Solve type: " << GetSolveQualityAsString() << std::endl;
             step_.setZero();
@@ -401,25 +405,51 @@ namespace mpc {
         xkp1_ = ContactTimesToQPVec();    // TODO: Is this the vector I want to assign to?
     }
 
-    int GaitOptimizer::CreatePolytopeConstraint(int start_row) {
+    int GaitOptimizer::CreatePolytopeConstraint(int start_row, double time) {
         // Each node is constrained to be between the node before and after it. At the ends there are constant bounds
-        double constexpr MIN_TIME = 0.15; // 0.12, 0.19
+        double constexpr MIN_TIME = 0.2; // 0.12, 0.19
 
         int end_row = start_row;
         for (int ee = 0; ee < num_ee_; ee++) {
             const int nodes = contact_times_.at(ee).size();
             matrix_t A = matrix_t::Zero(nodes, nodes);
+
+            int next_node = -1;
+            for (int j = 1; j < contact_times_.at(ee).size(); j++) {
+                if (contact_times_.at(ee).at(j).GetTime() >= time) {
+                    next_node = j;
+                    break;
+                }
+            }
+
+            if (contact_times_.at(ee).at(next_node).GetType() == TouchDown) {
+                // Constrained - no min time requirement
+                ub_(start_row + GetNumTimeNodes(ee) + next_node - 1) = contact_times_.at(ee).at(next_node).GetTime()
+                                                               - contact_times_.at(ee).at(next_node - 1).GetTime();
+                lb_(start_row + GetNumTimeNodes(ee) + next_node - 1) = -3;
+            }
+
             for (int i = 1; i < nodes; i++) {
                 A(i-1,i-1) = 1;
                 A(i-1,i) = -1;
-                ub_(start_row + GetNumTimeNodes(ee) + i-1) = contact_times_.at(ee).at(i).GetTime()
-                        - contact_times_.at(ee).at(i-1).GetTime() - MIN_TIME;
-                lb_(start_row + GetNumTimeNodes(ee) + i-1) = -2;
+
+                if (i != next_node || contact_times_.at(ee).at(next_node).GetType() != TouchDown) {
+                    ub_(start_row + GetNumTimeNodes(ee) + i - 1) = contact_times_.at(ee).at(i).GetTime()
+                                                                   - contact_times_.at(ee).at(i - 1).GetTime() -
+                                                                   MIN_TIME;
+
+                    lb_(start_row + GetNumTimeNodes(ee) + i - 1) = -2;
+                }
+
+
+                if (ub_(start_row + GetNumTimeNodes(ee) + i-1) < 0) {
+                    std::cerr << "negative upper bound in gait opt problem: " << ub_(start_row + GetNumTimeNodes(ee) + i-1) << std::endl;
+                }
             }
             A(nodes-1,nodes-1) = 1;
 
             lb_(start_row + GetNumTimeNodes(ee) + nodes - 1) = 0; //-0.2; // TODO: Check this
-            ub_(start_row + GetNumTimeNodes(ee) + nodes - 1) = 0.2;
+            ub_(start_row + GetNumTimeNodes(ee) + nodes - 1) = 1;
 
             assert(GetNumTimeNodes(ee) + nodes <= GetNumTimeNodes(num_ee_));
 
@@ -696,8 +726,6 @@ namespace mpc {
                 indx_min = i;
             }
         }
-
-        // TODO: Return the solved MPC solution!
 
         const double alpha = static_cast<double>(indx_min)/LS_SIZE;
 

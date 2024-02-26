@@ -60,7 +60,7 @@ namespace mpc {
         AddHessianApproxCost();
         AddGradientCost();
         AddFinalCost();
-//        AddDiagonalCost();
+        AddDiagonalCost();
 
 //        AddEEPosCost();
 
@@ -103,7 +103,13 @@ namespace mpc {
         utils::Timer qp_solve_timer("QP solve");
         qp_solve_timer.StartTimer();
         // TODO: DMA
-        const vector_t sol = qp_solver->Solve(data_);
+        vector_t sol;
+        try {
+            sol = qp_solver->Solve(data_);
+        } catch (const std::string& error) {
+            std::cerr << error << " Using previous solution instead." << std::endl;
+            sol = prev_qp_sol;
+        }
         qp_solve_timer.StopTimer();
 
 //        std::cout << "friction cone constraint dual: " << qp_solver->GetDualSolution().transpose().segment(
@@ -735,12 +741,12 @@ namespace mpc {
                     ineq_idx += data_.num_force_box_constraints_;
                 } else if (data_.constraints_.at(i) == JointBox) {
                     throw std::runtime_error("Joint box not implemented with Clarabel yet.");
-
                 } else if (data_.constraints_.at(i) == FrictionCone) {
-                    // TODO: Note: when this is removed the derivatives are at least the right order of magnitude...
                     AddFrictionConeConstraintPartials(G_builder, contact_time_idx, ineq_idx, ee);
                     ineq_idx += data_.num_cone_constraints_;
-
+                } else if (data_.constraints_.at(i) == TDPosition) {
+                    AddTDPositionConstraintPartial(A_builder, partials.db, contact_time_idx, eq_idx, ee);
+                    eq_idx += data_.num_td_pos_constraints_;
                 }
             }
 
@@ -830,4 +836,31 @@ namespace mpc {
         assert(row_idx == data_.num_td_pos_constraints_);
         constraint_idx_ += row_idx;
     }
+
+    void MPCSingleRigidBody::AddTDPositionConstraintPartial(utils::SparseMatrixBuilder& builder, vector_t& b, int contact_idx,
+                                                            int eq_idx, int ee) {
+        const int start_pos_idx = GetPosSplineStartIdx();
+        int row_idx = 0; // need to start at the correct row
+        for (int i = 0; i < ee; i++) {
+            if (prev_traj_.GetNextContactTime(i, init_time_) - init_time_ < prev_traj_.GetCurrentSwingTime(i)/2) {
+                row_idx+=2;
+            }
+        }
+
+        if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < prev_traj_.GetCurrentSwingTime(ee)/2) {
+            const double td_time = prev_traj_.GetNextContactTime(ee, init_time_);
+            b.segment<2>( eq_idx +row_idx) = prev_traj_.GetPositionPartialWrtContactTime(ee, td_time, contact_idx).head<2>();
+            for (int coord = 0; coord < 2; coord++) {
+                int vars_idx, vars_affecting;
+                std::tie(vars_idx, vars_affecting) =
+                        prev_traj_.GetPositionSplineIndex(ee, td_time, coord);
+
+                vector_t vars_lin = prev_traj_.GetPositionCoefPartialsWrtContactTime(ee, coord, td_time, contact_idx);
+                builder.SetMatrix(vars_lin.transpose(), eq_idx + row_idx,
+                                                start_pos_idx + vars_idx);
+                row_idx++;
+            }
+        }
+    }
+
 } // mpc

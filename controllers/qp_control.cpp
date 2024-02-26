@@ -81,7 +81,7 @@ namespace controller {
         contact2 = des_contact_;
 //        des_contact_ = contact2;
 
-        UpdateConstraintsAndCost(q, v, a, contact2);
+        UpdateConstraintsAndCost(q, v, a, contact);
 
         // Solve qp
         if (qp_solver_.solveProblem() != OsqpEigen::ErrorExitFlag::NoError) {
@@ -125,7 +125,7 @@ namespace controller {
         LogInfo(time, config_target_, vel_target_, com, q.tail(q.size() - 3), vcom, v.tail(v.size() - 3), acom, a.tail(a.size()-3), grf);
 
         timer.StopTimer();
-        timer.PrintElapsedTime();
+//        timer.PrintElapsedTime();
 
         return control_action;
     }

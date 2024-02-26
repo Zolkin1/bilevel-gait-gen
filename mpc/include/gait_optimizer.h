@@ -95,7 +95,7 @@ namespace mpc {
     private:
         int GetNumTimeNodes(int ee) const;
 
-        int CreatePolytopeConstraint(int start_row);
+        int CreatePolytopeConstraint(int start_row, double time);
 
         int CreateStepBoundConstraint(int start_row);
 
@@ -160,7 +160,7 @@ namespace mpc {
         matrix_t Bk_;
         vector_t step_, last_step_;
 
-        static constexpr int LS_SIZE = 2; // TODO: Can tune this value
+        static constexpr int LS_SIZE = 20; // TODO: Can tune this value
 
         double pred_red_cost_;
         double gamma_; // Trust region shrinking scalar
