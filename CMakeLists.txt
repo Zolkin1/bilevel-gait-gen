@@ -38,3 +38,5 @@ add_subdirectory(controllers)
 
 add_subdirectory(apps)
 
+add_subdirectory(hardware)
+
