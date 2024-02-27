@@ -130,11 +130,11 @@ namespace mpc {
         if (qp_solver->GetSolveQuality() != SolvedInacc && qp_solver->GetSolveQuality() != Solved
             && qp_solver->GetSolveQuality() != MaxIter) {
             std::cerr << "Warning: " << qp_solver->GetSolveQualityAsString() << std::endl;
-//            IncreaseEEBox();
+            IncreaseEEBox();
 
 //            throw std::runtime_error("Bad solve.");
         } else {
-//            DecreaseEEBox();
+            DecreaseEEBox();
         }
 
         if (info_.verbose == All) {
@@ -838,7 +838,7 @@ namespace mpc {
         const int start_pos_idx = GetPosSplineStartIdx();
         int row_idx = 0;
         for (int ee = 0; ee < num_ee_; ee++) {
-            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < 0.75*prev_traj_.GetCurrentSwingTime(ee)) {
+            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < td_fraction_*prev_traj_.GetCurrentSwingTime(ee)) {
                 const double td_time = prev_traj_.GetNextContactTime(ee, init_time_);
                 data_.td_pos_constants_.segment<2>(row_idx) = prev_traj_.GetEndEffectorLocation(ee, td_time).head<2>();
                 for (int coord = 0; coord < 2; coord++) {
@@ -863,7 +863,7 @@ namespace mpc {
         const int start_pos_idx = GetPosSplineStartIdx();
         int row_idx = 0; // need to start at the correct row
         for (int i = 0; i < ee; i++) {
-            if (prev_traj_.GetNextContactTime(i, init_time_) - init_time_ < 0.75*prev_traj_.GetCurrentSwingTime(i)) {
+            if (prev_traj_.GetNextContactTime(i, init_time_) - init_time_ < td_fraction_*prev_traj_.GetCurrentSwingTime(i)) {
                 row_idx+=2;
             }
         }

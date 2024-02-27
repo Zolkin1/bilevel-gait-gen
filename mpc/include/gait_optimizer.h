@@ -161,7 +161,7 @@ namespace mpc {
         matrix_t Bk_;
         vector_t step_, last_step_;
 
-        static constexpr int LS_SIZE = 20; // TODO: Can tune this value
+        static constexpr int LS_SIZE = 25; // TODO: Can tune this value
 
         double pred_red_cost_;
         double gamma_; // Trust region shrinking scalar

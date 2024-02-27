@@ -228,9 +228,9 @@ namespace simulation {
 //                    d->qvel[4] = 0;
 //                    d->qvel[5] = 0;
 
-//                    if (d->time >= 2.5 && d->time <= 2.51) {
-//                        d->xfrc_applied[0] = .25;
-//                        d->xfrc_applied[1] = .25;
+//                    if (d->time >= 2.5 && d->time <= 2.52) {
+//                        d->xfrc_applied[0] = .5;
+//                        d->xfrc_applied[1] = .5;
 //                        std::cout << "--- Force Applied ---" << std::endl;
 //                    } else {
 //                        d->xfrc_applied[0] = 0.0;

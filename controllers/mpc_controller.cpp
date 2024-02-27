@@ -119,8 +119,6 @@ namespace controller {
                                                  const vector_t& a, const controller::Contact& contact,
                                                  double time) {
 
-        static vector_t prev_q;
-
         utils::Timer timer("mpc controller");
         timer.StartTimer();
 
@@ -144,19 +142,6 @@ namespace controller {
 
         if (time > time_) {
             time_ = time;
-        }
-
-        // Check for teleporting ee
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 3; j++) {
-                if (std::abs(ee_locations_.at(i)(j) - ee_locations.at(i)(j)) > 0.2) {
-                    std::cerr << "Teleporting end effectors." << std::endl;
-                    std::cerr << "prev vals info: ee: " << i << " coord: " << j << " val: " << ee_locations_.at(i)(j) << std::endl;
-                    std::cerr << "current vals info: ee: " << i << " coord: " << j << " val: " << ee_locations.at(i)(j) << std::endl;
-                    std::cerr << "prev config: " << prev_q.transpose() << std::endl;
-                    std::cerr << "current config: " << q.transpose() << std::endl;
-                }
-            }
         }
 
         ee_locations_ = ee_locations;
@@ -212,8 +197,6 @@ namespace controller {
         timer.PrintElapsedTime();
 
 //        sync_mut_.unlock();
-
-        prev_q = q;
 
         return qp_controller_.ComputeControlAction(q, v, a, contact1, time);
     }
@@ -391,7 +374,7 @@ namespace controller {
 
     void MPCController::FullBodyTrajUpdate(mpc::Trajectory& traj) {
         vector_t state_guess = q_des_;
-        const int num_to_update = 15; // traj.GetStates().size();
+        const int num_to_update = 50; // traj.GetStates().size();
         for (int i = 0; i < num_to_update; i++) {
             std::vector<mpc::vector_3t> traj_ee_locations(4);
             for (int ee = 0; ee < 4; ee++) {

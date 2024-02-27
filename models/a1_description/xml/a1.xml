@@ -57,17 +57,17 @@
 
             <body name="FR_hip" pos="0.183 -0.047 0" gravcomp="0">
                 <inertial pos="-0.003311 -0.000635 3.1e-05" quat="0.507528 0.506268 0.491507 0.494499" mass="0.696" diaginertia="0.000807752 0.00055293 0.000468983" />
-                <joint name="FR_hip_joint" pos="0 0 0" axis="1 0 0" limited="false" range="-0.802851 0.802851" damping="2" />
+                <joint name="FR_hip_joint" pos="0 0 0" axis="1 0 0" limited="true" range="-0.802851 0.802851" damping="2" />
                 <geom quat="0 1 0 0" type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="hip" />
                 <geom size="0.04 0.04" pos="0 -0.055 0" quat="0.707107 0.707107 0 0" type="cylinder" material="body" />
                 <body name="FR_thigh" pos="0 -0.08505 0" gravcomp="0">
                     <inertial pos="-0.003237 0.022327 -0.027326" quat="0.999125 -0.00256393 -0.0409531 -0.00806091" mass="1.013" diaginertia="0.00555739 0.00513936 0.00133944" />
-                    <joint name="FR_thigh_joint" pos="0 0 0" axis="0 1 0" limited="false" range="-1.0472 4.18879" /> <!-- limited = "true" -->
+                    <joint name="FR_thigh_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-1.0472 4.18879" /> <!-- limited = "true" -->
                     <geom type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="thigh_mirror" />
                     <geom size="0.1 0.01225 0.017" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" material="body" />
                     <body name="FR_calf" pos="0 0 -0.2" gravcomp="0"> <!-- gravcomp="1" -->
                         <inertial pos="0.00472659 0 -0.131975" quat="0.706886 0.017653 0.017653 0.706886" mass="0.226" diaginertia="0.00340344 0.00339393 3.54834e-05" />
-                        <joint name="FR_calf_joint" pos="0 0 0" axis="0 1 0" limited="false" range="-2.69653 -0.916298" />
+                        <joint name="FR_calf_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-2.69653 -0.916298" />
                         <geom type="mesh" contype="0" conaffinity="0" group="1" material="trunk" mesh="calf" />
                         <geom size="0.1 0.008 0.008" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" rgba="0 0 0 0" />
                         <geom size="0.01" pos="0 0 -0.2" contype="0" conaffinity="0" group="1" material="trunk" />
@@ -77,17 +77,17 @@
             </body>
             <body name="FL_hip" pos="0.183 0.047 0" gravcomp="0">
                 <inertial pos="-0.003311 0.000635 3.1e-05" quat="0.494499 0.491507 0.506268 0.507528" mass="0.696" diaginertia="0.000807752 0.00055293 0.000468983" />
-                <joint name="FL_hip_joint" pos="0 0 0" axis="1 0 0" limited="false" range="-0.802851 0.802851" damping="2"/>
+                <joint name="FL_hip_joint" pos="0 0 0" axis="1 0 0" limited="true" range="-0.802851 0.802851" damping="2"/>
                 <geom type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="hip" />
                 <geom size="0.04 0.04" pos="0 0.055 0" quat="0.707107 0.707107 0 0" type="cylinder" material="body" />
                 <body name="FL_thigh" pos="0 0.08505 0" gravcomp="0">
                     <inertial pos="-0.003237 -0.022327 -0.027326" quat="0.999125 0.00256393 -0.0409531 0.00806091" mass="1.013" diaginertia="0.00555739 0.00513936 0.00133944" />
-                    <joint name="FL_thigh_joint" pos="0 0 0" axis="0 1 0" limited="false" range="-1.0472 4.18879" />
+                    <joint name="FL_thigh_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-1.0472 4.18879" />
                     <geom type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="thigh" />
                     <geom size="0.1 0.01225 0.017" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" material="body" />
                     <body name="FL_calf" pos="0 0 -0.2" gravcomp="0">
                         <inertial pos="0.00472659 0 -0.131975" quat="0.706886 0.017653 0.017653 0.706886" mass="0.226" diaginertia="0.00340344 0.00339393 3.54834e-05" />
-                        <joint name="FL_calf_joint" pos="0 0 0" axis="0 1 0" limited="false" range="-2.69653 -0.916298" />
+                        <joint name="FL_calf_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-2.69653 -0.916298" />
                         <geom type="mesh" contype="0" conaffinity="0" group="1" material="trunk" mesh="calf" />
                         <geom size="0.1 0.008 0.008" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" rgba="0 0 0 0" />
                         <geom size="0.01" pos="0 0 -0.2" contype="0" conaffinity="0" group="1" material="trunk" />
@@ -97,17 +97,17 @@
             </body>
             <body name="RR_hip" pos="-0.183 -0.047 0" gravcomp="0">
                 <inertial pos="0.003311 -0.000635 3.1e-05" quat="0.491507 0.494499 0.507528 0.506268" mass="0.696" diaginertia="0.000807752 0.00055293 0.000468983" />
-                <joint name="RR_hip_joint" pos="0 0 0" axis="1 0 0" limited="false" range="-0.802851 0.802851" damping="2"/>
+                <joint name="RR_hip_joint" pos="0 0 0" axis="1 0 0" limited="true" range="-0.802851 0.802851" damping="2"/>
                 <geom quat="0 0 0 -1" type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="hip" />
                 <geom size="0.04 0.04" pos="0 -0.055 0" quat="0.707107 0.707107 0 0" type="cylinder" material="body" />
                 <body name="RR_thigh" pos="0 -0.08505 0" gravcomp="0">
                     <inertial pos="-0.003237 0.022327 -0.027326" quat="0.999125 -0.00256393 -0.0409531 -0.00806091" mass="1.013" diaginertia="0.00555739 0.00513936 0.00133944" />
-                    <joint name="RR_thigh_joint" pos="0 0 0" axis="0 1 0" limited="false" range="-1.0472 4.18879" />
+                    <joint name="RR_thigh_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-1.0472 4.18879" />
                     <geom type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="thigh_mirror" />
                     <geom size="0.1 0.01225 0.017" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" material="body" />
                     <body name="RR_calf" pos="0 0 -0.2" gravcomp="0">
                         <inertial pos="0.00472659 0 -0.131975" quat="0.706886 0.017653 0.017653 0.706886" mass="0.226" diaginertia="0.00340344 0.00339393 3.54834e-05" />
-                        <joint name="RR_calf_joint" pos="0 0 0" axis="0 1 0" limited="false" range="-2.69653 -0.916298" />
+                        <joint name="RR_calf_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-2.69653 -0.916298" />
                         <geom type="mesh" contype="0" conaffinity="0" group="1" material="trunk" mesh="calf" />
                         <geom size="0.1 0.008 0.008" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" rgba="0 0 0 0" />
                         <geom size="0.01" pos="0 0 -0.2" contype="0" conaffinity="0" group="1" material="trunk" />
@@ -117,17 +117,17 @@
             </body>
             <body name="RL_hip" pos="-0.183 0.047 0" gravcomp="0">
                 <inertial pos="0.003311 0.000635 3.1e-05" quat="0.506268 0.507528 0.494499 0.491507" mass="0.696" diaginertia="0.000807752 0.00055293 0.000468983" />
-                <joint name="RL_hip_joint" pos="0 0 0" axis="1 0 0" limited="false" range="-0.802851 0.802851" damping="2"/>
+                <joint name="RL_hip_joint" pos="0 0 0" axis="1 0 0" limited="true" range="-0.802851 0.802851" damping="2"/>
                 <geom quat="0 0 1 0" type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="hip" />
                 <geom size="0.04 0.04" pos="0 0.055 0" quat="0.707107 0.707107 0 0" type="cylinder" material="body" />
                 <body name="RL_thigh" pos="0 0.08505 0" gravcomp="0">
                     <inertial pos="-0.003237 -0.022327 -0.027326" quat="0.999125 0.00256393 -0.0409531 0.00806091" mass="1.013" diaginertia="0.00555739 0.00513936 0.00133944" />
-                    <joint name="RL_thigh_joint" pos="0 0 0" axis="0 1 0" limited="false" range="-1.0472 4.18879" />
+                    <joint name="RL_thigh_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-1.0472 4.18879" />
                     <geom type="mesh" contype="0" conaffinity="0" group="1" material="body" mesh="thigh" />
                     <geom size="0.1 0.01225 0.017" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" material="body" />
                     <body name="RL_calf" pos="0 0 -0.2" gravcomp="0">
                         <inertial pos="0.00472659 0 -0.131975" quat="0.706886 0.017653 0.017653 0.706886" mass="0.226" diaginertia="0.00340344 0.00339393 3.54834e-05" />
-                        <joint name="RL_calf_joint" pos="0 0 0" axis="0 1 0" limited="false" range="-2.69653 -0.916298" />
+                        <joint name="RL_calf_joint" pos="0 0 0" axis="0 1 0" limited="true" range="-2.69653 -0.916298" />
                         <geom type="mesh" contype="0" conaffinity="0" group="1" material="trunk" mesh="calf" />
                         <geom size="0.1 0.008 0.008" pos="0 0 -0.1" quat="0.707107 0 0.707107 0" type="box" rgba="0 0 0 0" />
                         <geom size="0.01" pos="0 0 -0.2" contype="0" conaffinity="0" group="1" material="trunk" />

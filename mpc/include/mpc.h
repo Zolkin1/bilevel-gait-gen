@@ -311,6 +311,9 @@ namespace mpc {
         RKIntegrator integrator_;
 
         static constexpr int FB_PER_FORCE = 10;
+
+        double td_fraction_;
+
     private:
     };
 } // mpc

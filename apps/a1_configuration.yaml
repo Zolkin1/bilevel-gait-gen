@@ -121,21 +121,22 @@ joint_bounds_ub: [0.802851, 4.18879, -0.916298,
                   0.802851, 4.18879, -0.916298]
 
 num_switches: 2
-force_bound: 150 #2500000 #150
+force_bound: 125 #2500000 #150
 
 swing_height: 0.075
 
 num_polys: 3
 
 x_des: 1
-y_des: 0
+y_des: 1
 xdot_des: 0
 ydot_des: 0
 
 gait_opt_freq: 5 #5
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
-ee_box_size: [0.12, 0.1] # 0.15, 0.1 for the sim, 0.2 0.15 for the MPC viz
+ee_box_size: [0.15, 0.15] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this
+# 0.15, 0.15 is good for diag
 
 run_time_iterations: 6000 # 150 works well
 
@@ -155,7 +156,7 @@ Q_diag: [1, 1, 1,          # linear momentum
          60000, 500, 10]       # RR leg
 
 # can try higher weight with less nodes
-Q_srbd_diag: [180.0, 40.0, 12000, 0.015, 0.015, 10, 1000, 1000, 1000, 1, 1, 1] # 80, 80 for diag walking or 180, 180
+Q_srbd_diag: [140.0, 140.0, 12000, .01500, .0150, 10, 3000, 3000, 3000, 1, 1, 1] # 80, 80 for diag walking or 180, 180
 
 # Q_srbd_diag: [80.0, 80.0, 800, .150, .50, 10, 700, 700, 700, 1, 1, 1]
 

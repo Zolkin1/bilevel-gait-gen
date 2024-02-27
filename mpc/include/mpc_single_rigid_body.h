@@ -63,6 +63,7 @@ namespace mpc {
         static constexpr int EE_NODE_START = 4; // TODO: Tune
 
         vector_2t ee_bounds_;
+
     private:
     };
 } // mpc

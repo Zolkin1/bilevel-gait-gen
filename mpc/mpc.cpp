@@ -68,6 +68,8 @@ namespace mpc {
         in_real_time_ = false;
 
         data_.using_clarabel_ = using_clarabel_;
+
+        td_fraction_ = 0.75;
     }
 
     Trajectory MPC::CreateInitialRun(const mpc::vector_t& state, const std::vector<vector_3t>& ee_start_locations) {
@@ -1089,7 +1091,7 @@ namespace mpc {
     int MPC::GetNumTDConstraints() const {
         int num_constraints = 0;
         for (int ee = 0; ee < num_ee_; ee++) {
-            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < 0.75*prev_traj_.GetCurrentSwingTime(ee) ) {
+            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < td_fraction_*prev_traj_.GetCurrentSwingTime(ee) ) {
                 num_constraints += 2;
             }
         }
