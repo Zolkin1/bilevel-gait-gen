@@ -58,7 +58,7 @@ namespace mpc {
         utils::Timer constraint_costs_timer("constraints and costs");
         constraint_costs_timer.StartTimer();
         // ----------------------- Costs ------------------------- //
-        AddForceCost(force_weight_);
+        AddForceCost(info_.force_cost);
         AddHessianApproxCost();
         AddGradientCost();
         AddFinalCost();

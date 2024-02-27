@@ -55,6 +55,7 @@ namespace mpc {
         Eigen::Vector2d ee_box_size;
         int real_time_iters;
         MPCVerbosityLevel verbose;
+        double force_cost;
 
         MPCInfo();
         MPCInfo(const MPCInfo& info);
@@ -163,6 +164,10 @@ namespace mpc {
         SolveQuality GetSolveQuality() const;
 
         void UpdateInitTime(double time);
+
+        void PrintStatLineToFile(std::ofstream& log_file);
+
+        double GetAvgCost() const;
 
     protected:
         // ---------------- Protected Member Functions ---------------- //
@@ -313,6 +318,8 @@ namespace mpc {
         static constexpr int FB_PER_FORCE = 10;
 
         double td_fraction_;
+
+        bool used_log_file_;
 
     private:
     };

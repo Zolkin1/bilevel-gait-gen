@@ -32,6 +32,7 @@ namespace mpc {
         ee_box_size = info.ee_box_size;
         real_time_iters = info.real_time_iters;
         verbose = info.verbose;
+        force_cost = info.force_cost;
     }
 
     MPC::MPC(const MPCInfo& info, const std::string& robot_urdf) :
@@ -70,6 +71,8 @@ namespace mpc {
         data_.using_clarabel_ = using_clarabel_;
 
         td_fraction_ = 0.75;
+
+        used_log_file_ = false;
     }
 
     Trajectory MPC::CreateInitialRun(const mpc::vector_t& state, const std::vector<vector_3t>& ee_start_locations) {
@@ -780,12 +783,10 @@ namespace mpc {
     }
 
 
-    // TODO: Make this weight only on force values, so we don't hit the derivatives
     void MPC::AddForceCost(double weight) {
-        force_weight_ = weight;
         const int num_forces = prev_traj_.GetTotalForceSplineVars();
         Q_forces_.resize(num_forces, num_forces);
-        Q_forces_.setZero();        // TODO: Note. Without this my performance was totally shot and occasional errors
+        Q_forces_.setZero();
         for (int i = 0; i < num_forces; i++) {
             double weight1 = weight;
             if (i < prev_traj_.GetTotalForceSplineVars()/num_ee_) {
@@ -883,6 +884,101 @@ namespace mpc {
                       << setw(col_width) << cost_.at(i) << std::endl;
         }
         std::cout << std::endl;
+    }
+
+    void MPC::PrintStatLineToFile(std::ofstream& log_file) {
+        using std::setw;
+        using std::setfill;
+
+        const int col_width = 15;
+        const int table_width = 10*col_width;
+
+        if (!used_log_file_) {
+            log_file << setfill('-') << setw(table_width) << "" << std::endl;
+            log_file << std::left << setfill(' ') << setw(table_width/2 - 7) << "" << "MPC Statistics" << std::endl;
+            log_file << std::left << "Number of nodes: " << info_.num_nodes << std::endl;
+            log_file << std::left << "MPC time step: " << info_.integrator_dt << std::endl;
+            log_file << std::left << "Force bounds: " << info_.force_bound << std::endl;
+            log_file << std::left << "End Effector box size: " << info_.ee_box_size.transpose() << std::endl;
+            log_file << std::left << "Force cost: " << info_.force_cost << std::endl;
+            log_file << std::left << "Foot offset: " << info_.foot_offset << std::endl;
+            log_file << std::left << "Swing height: " << info_.swing_height << std::endl;
+            log_file << setfill('-') << setw(table_width) << "" << std::endl;
+
+            log_file << setfill(' ');
+            log_file << setw(col_width) << "Solve #"
+                      << setw(col_width) << "Time (ms)"
+                      << setw(col_width) << "Constraints"
+                      << setw(col_width) << "Step Norm"
+                      << setw(col_width) << "Alpha"
+                      << setw(col_width) << "Cost"
+                      << setw(col_width) << "Merit"
+                      << setw(col_width) << "Merit dd"
+                      << setw(col_width) << "Solve Type"
+                      << setw(col_width) << "QP Cost" << std::endl;
+            log_file << std::setfill('-') << setw(table_width) << "" << std::endl;
+            log_file << setfill(' ');
+
+            used_log_file_ = true;
+        }
+
+        const int i = alpha_.size() - 1;
+
+        for (int j = 0; j < contact_sched_change_.size(); j++) {
+            if (i == contact_sched_change_.at(j)) {
+                std::cout << "Contact schedule changed " << setw(table_width - 25) << std::endl;
+            }
+        }
+
+        std::string solve_type;
+        switch (solve_type_.at(i)) {
+            case Solved:
+                solve_type = "Solved";
+                break;
+            case SolvedInacc:
+                solve_type = "Solved Inacc";
+                break;
+            case PrimalInfeasible:
+                solve_type = "P - Infeasible";
+                break;
+            case DualInfeasible:
+                solve_type = "D - Infeasible";
+                break;
+            case PrimalInfeasibleInacc:
+                solve_type = "P - Infeasible Inacc";
+                break;
+            case DualInfeasibleInacc:
+                solve_type = "D - Infeasible Inacc";
+                break;
+            case MaxIter:
+                solve_type = "Max Iter";
+                break;
+            case Unsolved:
+                solve_type = "Unsolved";
+                break;
+            default:
+                solve_type = "Other";
+        }
+
+        log_file << setw(col_width) << i
+                  << setw(col_width) << solve_time_.at(i)
+                  << setw(col_width) << equality_constraint_violations_.at(i)
+                  << setw(col_width) << step_norm_.at(i)
+                  << setw(col_width) << alpha_.at(i)
+                  << setw(col_width) << cost_result_.at(i)
+                  << setw(col_width) << merit_result_.at(i)
+                  << setw(col_width) << merit_directional_deriv_.at(i)
+                  << setw(col_width) << solve_type
+                  << setw(col_width) << cost_.at(i) << std::endl;
+    }
+
+    double MPC::GetAvgCost() const {
+        double avg_cost = 0;
+        for (double i : cost_) {
+            avg_cost += i;
+        }
+
+        return avg_cost/cost_.size();
     }
 
     controller::Contact MPC::GetDesiredContacts(double time) const {
@@ -1041,6 +1137,8 @@ namespace mpc {
             line_search_res_ = mpc.line_search_res_;
             prev_dual_sol_ = mpc.prev_dual_sol_;
             mu_ = mpc.mu_;
+            td_fraction_ = mpc.td_fraction_;
+            used_log_file_ = mpc.used_log_file_;
 
             // TODO: Do the recording stuff
 

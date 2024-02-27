@@ -70,6 +70,7 @@ int main() {
     info.nom_state = config.ParseEigenVector("init_config");
     info.ee_box_size = config.ParseEigenVector("ee_box_size");
     info.real_time_iters = config.ParseNumber<int>("run_time_iterations");
+    info.force_cost = config.ParseNumber<double>("force_cost");
     switch (config.ParseNumber<int>("mpc_verbosity")) {
         case 0:
             info.verbose = mpc::Nothing;
@@ -137,7 +138,8 @@ int main() {
                                                                  mpc_des_state,
                                                                  config.ParseNumber<int>("num_polys"),
                                                                  config.ParseEigenVector("Q_srbd_diag").asDiagonal(),
-                                                                 config.ParseNumber<int>("gait_opt_freq"));
+                                                                 config.ParseNumber<int>("gait_opt_freq"),
+                                                                 config.ParseString("log_file"));
 
     // Make the robot for visualization
     auto robot_file = config.ParseString("robot_xml");

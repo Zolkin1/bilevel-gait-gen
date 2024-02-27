@@ -24,7 +24,8 @@ namespace controller {
                                  const vector_t& state_des,
                                  int num_polys,
                                  const matrix_t& Q,
-                                 int gait_opt_freq) : Controller(control_rate, robot_urdf, foot_type),
+                                 int gait_opt_freq,
+                                 const std::string& log_file) : Controller(control_rate, robot_urdf, foot_type),
                                  qp_controller_(control_rate, robot_urdf, foot_type, nv,
                                                torque_bounds, friction_coef,
                                                base_pos_gains,
@@ -60,7 +61,7 @@ namespace controller {
         std::cout << "Desired state: \n" << des_alg << std::endl;
 
         mpc_.AddQuadraticTrackingCost(des_alg, Q);
-        mpc_.AddForceCost(0.00);
+        mpc_.AddForceCost(info_.force_cost);
         mpc_.SetQuadraticFinalCost(1*Q);
         mpc_.SetLinearFinalCost(-1*Q*des_alg);
 
@@ -76,7 +77,7 @@ namespace controller {
             ee.resize(info.num_nodes + 1);
         }
 
-        log_file_.open("mpc_controller_log.txt");
+        log_file_.open(log_file);
     }
 
     void MPCController::InitSolver(const vector_t& full_body_state, const vector_t& mpc_state) {
@@ -173,10 +174,10 @@ namespace controller {
                 j++;
             }
         }
-        // TODO: Consider removing the logging and/or redoing it
-        for (int ee = 0; ee < 4; ee++) {
-            log_file_ << std::setw(15) << traj_.GetForce(ee, time).transpose();
-        }
+
+//        for (int ee = 0; ee < 4; ee++) {
+//            log_file_ << std::setw(15) << traj_.GetForce(ee, time).transpose();
+//        }
         mpc_res_mut_.unlock(); // -------- End Accessing MPC Result -------- //
 
         vector_t control_action = vector_t::Zero(3*num_inputs_);    // joints, joint velocities, torques
@@ -191,7 +192,7 @@ namespace controller {
 
         run_num++;
 
-        log_file_ << std::endl;
+//        log_file_ << std::endl;
 
         timer.StopTimer();
         timer.PrintElapsedTime();
@@ -268,12 +269,16 @@ namespace controller {
         double cost_red = 0;
         bool deriv_ready = false;
 
+        utils::Timer loop_timer("MPC loop");
+
         while(true) {
             state_time_mut_.lock(); // Get time
             double time_act = time_;
             state_time_mut_.unlock();
 
             if (time_act - time > 0) { // info_.integrator_dt) {
+                loop_timer.StartTimer();
+
 //                sync_mut_.lock(); // Mutex for running in sync
                 state_time_mut_.lock(); // Get time and state
                 state = state_;
@@ -294,7 +299,11 @@ namespace controller {
                     // Apply the minimizing contact time
                     std::vector<mpc::time_v> contact_times_new;
                     double cost_min;
+                    utils::Timer ls_timer("line search");
+                    ls_timer.StartTimer();
                     std::tie(contact_times_new, cost_min) = gait_opt_.LineSearch(mpc_, time, ee_locations, state);
+                    ls_timer.StopTimer();
+                    ls_timer.PrintElapsedTime();
                     prev_cost = mpc_.GetCost();
                     deriv_ready = false;
 
@@ -339,13 +348,13 @@ namespace controller {
 
 
                 // IK on the trajectory
-                utils::Timer ik_timer("traj ik");
-                ik_timer.StartTimer();
-                model_mut_.lock();
-                FullBodyTrajUpdate(traj);
-                model_mut_.unlock();
-                ik_timer.StopTimer();
-                ik_timer.PrintElapsedTime();
+//                utils::Timer ik_timer("traj ik");
+//                ik_timer.StartTimer();
+//                model_mut_.lock();
+//                FullBodyTrajUpdate(traj);
+//                model_mut_.unlock();
+//                ik_timer.StopTimer();
+//                ik_timer.PrintElapsedTime();
 
                 mpc_res_mut_.lock(); // Set results
                 traj_ = traj;
@@ -355,6 +364,11 @@ namespace controller {
 
                 run_num++;
 //                sync_mut_.unlock();
+
+                mpc_.PrintStatLineToFile(log_file_);
+                std::cout << "Avg cost: " << mpc_.GetAvgCost() << std::endl;
+                loop_timer.StopTimer();
+                loop_timer.PrintElapsedTime();
             }
         }
     }
@@ -372,9 +386,10 @@ namespace controller {
         traj_viz_mut_.unlock();
     }
 
+    // TODO: Remove this function
     void MPCController::FullBodyTrajUpdate(mpc::Trajectory& traj) {
         vector_t state_guess = q_des_;
-        const int num_to_update = 50; // traj.GetStates().size();
+        const int num_to_update = 10; // traj.GetStates().size();
         for (int i = 0; i < num_to_update; i++) {
             std::vector<mpc::vector_3t> traj_ee_locations(4);
             for (int ee = 0; ee < 4; ee++) {
@@ -405,11 +420,30 @@ namespace controller {
         }
 
         const int nodes_ahead = 0; // TODO: Check value
-
         int node = traj.GetNode(time)+nodes_ahead;
 
-        q_des_ = traj.GetFullConfig(node);
-        v_des_ = traj.GetFullVelocity(node);
+        // Calc the IK here
+        std::vector<mpc::vector_3t> traj_ee_locations(4);
+        for (int ee = 0; ee < 4; ee++) {
+            // Grab state and end effector locations at that time
+            traj_ee_locations.at(ee) = traj.GetEndEffectorLocation(ee, traj.GetTime(node));
+        }
+
+        q_des_ = model_.InverseKinematics(traj.GetState(node),traj_ee_locations, q_des_,
+                                          info_.joint_bounds_ub,
+                                          info_.joint_bounds_lb);
+
+
+        v_des_.resize(pin_model_.nv);
+        v_des_.setZero();
+        v_des_.head<6>() << traj.GetState(node).segment<3>(3)/model_.GetMass(), model_.GetIrInv()*traj.GetState(node).segment<3>(10); //model_.GetIr().inverse()*
+        if (node != 0) {
+            v_des_.tail(num_inputs_) = (traj.GetFullConfig(node) - traj.GetFullConfig(node - 1)).tail(num_inputs_) /
+                                    info_.integrator_dt;
+        } else {
+            v_des_.tail(num_inputs_) = (traj.GetFullConfig(node+1) - traj.GetFullConfig(node)).tail(num_inputs_) /
+                                    info_.integrator_dt;
+        }
 
         // TODO: Do I want to use the ZoH or the full spline force?
         for (int ee = 0; ee < 4; ee++) {
@@ -423,7 +457,7 @@ namespace controller {
     }
 
     bool MPCController::GaitOpt(double cost_red, double time, const std::vector<Eigen::Vector3d>& ee_locations) {
-        utils::Timer gait_opt_timer("gait opt + derivatives");
+        utils::Timer gait_opt_timer("gait opt + derivatives (no LS)");
         gait_opt_timer.StartTimer();
 
 //        mpc_.UpdateInitTime(time); // Not going to update the time (see above)

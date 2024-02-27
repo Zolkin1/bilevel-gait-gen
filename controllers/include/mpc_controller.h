@@ -36,7 +36,8 @@ namespace controller {
                   const vector_t& state_des,
                   int num_polys,
                   const matrix_t& Q,
-                  int gait_opt_freq);
+                  int gait_opt_freq,
+                  const std::string& log_file);
 
         vector_t ComputeControlAction(const vector_t& q,
                                       const vector_t& v,
