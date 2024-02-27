@@ -45,69 +45,6 @@ void PrintContactSched(const std::vector<mpc::time_v>& contact_times) {
     }
 }
 
-double GaitOptLS(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt,
-                 double cost_red, double time, const MPCInfo& info, utils::ConfigParser& config,
-                 const vector_t& mpc_des_state, const std::vector<Eigen::Vector3d>& ee_locations,
-                 const std::vector<vector_t>& warm_start, bool fixed_pos) {
-    utils::Timer gait_opt_timer("gait opt + derivatives");
-    gait_opt_timer.StartTimer();
-
-    double prev_cost = INFINITY;
-    const Trajectory prev_traj = mpc.GetTrajectory();
-
-    // Create a new MPC and solve with it
-    if (mpc.ComputeDerivativeTerms()) {
-
-        gait_opt.SetContactTimes(mpc.GetTrajectory().GetContactTimes());
-        gait_opt.UpdateSizes(mpc.GetNumDecisionVars(), mpc.GetNumConstraints());
-        double original_cost = mpc.GetCost();
-
-        utils::Timer qp_partials_timer("qp partials");
-        qp_partials_timer.StartTimer();
-        mpc.GetQPPartials(gait_opt.GetQPPartials());
-        qp_partials_timer.StopTimer();
-        qp_partials_timer.PrintElapsedTime();
-
-
-        utils::Timer partials_timer("param partials");
-        partials_timer.StartTimer();
-        for (int ee = 0; ee < 4; ee++) {
-            gait_opt.SetNumContactTimes(ee, prev_traj.GetNumContactNodes(ee));
-            for (int idx = 0; idx < prev_traj.GetNumContactNodes(ee); idx++) {
-                mpc.ComputeParamPartialsClarabel(prev_traj, gait_opt.GetParameterPartials(ee, idx), ee, idx);
-            }
-        }
-        partials_timer.StopTimer();
-        partials_timer.PrintElapsedTime();
-
-        gait_opt.ModifyQPPartials(mpc.GetQPSolution());
-
-        utils::Timer cost_fcn_timer("cost fcn gradient");
-        cost_fcn_timer.StartTimer();
-        gait_opt.ComputeCostFcnDerivWrtContactTimes();
-        cost_fcn_timer.StopTimer();
-        cost_fcn_timer.PrintElapsedTime();
-
-        gait_opt.OptimizeContactTimes(time, cost_red);
-
-        // Apply the minimizing contact time
-        std::vector<time_v> contact_times;
-        double cost_min;
-        std::tie(contact_times, cost_min) = gait_opt.LineSearch(mpc);
-
-        gait_opt_timer.StopTimer();
-        gait_opt_timer.PrintElapsedTime();
-
-        return cost_min;
-    } else {
-        std::cerr << "Can't perform gait optimization because MPC was not solved to tolerance." << std::endl;
-        gait_opt_timer.StopTimer();
-        gait_opt_timer.PrintElapsedTime();
-        return 1e30;
-    }
-
-}
-
 int main() {
     // TODO: when I make the file local via the cmake file then I only get it copied over after a compilation
     std::string config_file("/home/zolkin/AmberLab/bilevel-gait-gen/apps/a1_configuration.yaml");
@@ -244,15 +181,35 @@ int main() {
 
     sim.PauseSim();
 
-    int constexpr N = 1500;
+    int constexpr N = 6500;
+    utils::Timer timer("sim loop");
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < N; i++) {
         double time = i*info.integrator_dt;
 
-        robot->GetControlAction(sim.GetDataPointer(), sim.GetControlPointer());
+        std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 
-        // Update Sim
-        sim.GetTrajViz(robot->GetTrajViz(), info.ee_box_size, robot->GetEEBoxCenter());
-        sim.UpdateSim(viz_rate);
+        const std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+        if (time_span.count() >= viz_rate) {
+            t1 = std::chrono::high_resolution_clock::now();
+
+            timer.StartTimer();
+
+            robot->GetControlAction(sim.GetDataPointer(), sim.GetControlPointer());
+
+            // Update Sim
+            sim.GetTrajViz(robot->GetTrajViz(), info.ee_box_size, robot->GetEEBoxCenter());
+            sim.UpdateSim(viz_rate);
+            timer.StopTimer();
+        } else {
+            const double time_left = -time_span.count() + viz_rate;
+            const int time_left_us = static_cast<int>(time_left*1e6);
+            std::this_thread::sleep_for(std::chrono::microseconds(time_left_us));
+        }
+
+//        std::this_thread::sleep_for(std::chrono::milliseconds (10));
+
+//        timer.PrintElapsedTime();
     }
 
     // Print the final trajectory to a file for viewing

@@ -28,6 +28,8 @@ namespace mpc {
             }
             assert(switching_times.at(i).at(0) == 0);
 
+            init_time_ = 0;
+
             ee_splines_.emplace_back(switching_times.at(i).size(), switching_times.at(i),
                                      in_contact, 3); // TODO: Make this not hard coded
         }

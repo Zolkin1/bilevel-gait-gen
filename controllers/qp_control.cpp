@@ -78,8 +78,8 @@ namespace controller {
         Contact contact2(4);
 //        contact2.in_contact_ = {true, true, true, true};
 //        contact2.contact_frames_ = contact.contact_frames_;
-        contact2 = des_contact_;
-//        des_contact_ = contact2;
+//        contact2 = des_contact_;
+        des_contact_ = contact;
 
         UpdateConstraintsAndCost(q, v, a, contact);
 
@@ -125,7 +125,7 @@ namespace controller {
         LogInfo(time, config_target_, vel_target_, com, q.tail(q.size() - 3), vcom, v.tail(v.size() - 3), acom, a.tail(a.size()-3), grf);
 
         timer.StopTimer();
-//        timer.PrintElapsedTime();
+        timer.PrintElapsedTime();
 
         return control_action;
     }

@@ -18,6 +18,8 @@ namespace mpc {
 
         prev_qp_sol = vector_t::Zero(data_.num_decision_vars);
         line_search_res_ = vector_t::Zero(data_.num_decision_vars);
+
+        ee_bounds_ = info_.ee_box_size;
     }
 
     Trajectory MPCSingleRigidBody::Solve(const mpc::vector_t& state, double init_time,
@@ -109,7 +111,17 @@ namespace mpc {
         } catch (const std::string& error) {
             std::cerr << error << " Using previous solution instead." << std::endl;
             sol = prev_qp_sol;
+
+//            std::cout << "Force box constraint: \n" <<
+//                    data_.sparse_constraint_.middleRows(data_.num_dynamics_constraints,
+//                                                        data_.num_force_box_constraints_) << std::endl;
+
+//            std::cout << "Force box ub: " << data_.ub_.segment(data_.num_dynamics_constraints, data_.num_force_box_constraints_) .transpose()<< std::endl;
+//            std::cout << "Force box lb: " << data_.lb_.segment(data_.num_dynamics_constraints, data_.num_force_box_constraints_).transpose() << std::endl;
+
+//            throw std::runtime_error("Primal infeasible.");
         }
+
         qp_solve_timer.StopTimer();
 
 //        std::cout << "friction cone constraint dual: " << qp_solver->GetDualSolution().transpose().segment(
@@ -118,8 +130,11 @@ namespace mpc {
         if (qp_solver->GetSolveQuality() != SolvedInacc && qp_solver->GetSolveQuality() != Solved
             && qp_solver->GetSolveQuality() != MaxIter) {
             std::cerr << "Warning: " << qp_solver->GetSolveQualityAsString() << std::endl;
+//            IncreaseEEBox();
 
 //            throw std::runtime_error("Bad solve.");
+        } else {
+//            DecreaseEEBox();
         }
 
         if (info_.verbose == All) {
@@ -143,7 +158,6 @@ namespace mpc {
 
         utils::Timer line_search_timer("line search");
         double alpha = 1;
-        // TODO: Put back
         if (num_run_ >= 0 && sol.size() == prev_qp_sol.size()) {
             line_search_timer.StartTimer();
             alpha = LineSearch(p, prev_traj_.GetState(0));
@@ -750,8 +764,15 @@ namespace mpc {
                 }
             }
 
-            partials.dG.setFromTriplets(G_builder.GetTriplet().begin(), G_builder.GetTriplet().end());
+            // TODO: Investigate double free
+
+            QPPartials partials2;
+            partials2.dG.resize(data_.num_inequality_, data_.num_decision_vars);
+
+            partials2.dG.setFromTriplets(G_builder.GetTriplet().begin(), G_builder.GetTriplet().end());
             partials.dA.setFromTriplets(A_builder.GetTriplet().begin(), A_builder.GetTriplet().end());
+
+            partials.dG = partials2.dG;
 
             return true;
         } else {
@@ -817,7 +838,7 @@ namespace mpc {
         const int start_pos_idx = GetPosSplineStartIdx();
         int row_idx = 0;
         for (int ee = 0; ee < num_ee_; ee++) {
-            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < prev_traj_.GetCurrentSwingTime(ee)/2) {
+            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < 0.75*prev_traj_.GetCurrentSwingTime(ee)) {
                 const double td_time = prev_traj_.GetNextContactTime(ee, init_time_);
                 data_.td_pos_constants_.segment<2>(row_idx) = prev_traj_.GetEndEffectorLocation(ee, td_time).head<2>();
                 for (int coord = 0; coord < 2; coord++) {
@@ -842,7 +863,7 @@ namespace mpc {
         const int start_pos_idx = GetPosSplineStartIdx();
         int row_idx = 0; // need to start at the correct row
         for (int i = 0; i < ee; i++) {
-            if (prev_traj_.GetNextContactTime(i, init_time_) - init_time_ < prev_traj_.GetCurrentSwingTime(i)/2) {
+            if (prev_traj_.GetNextContactTime(i, init_time_) - init_time_ < 0.75*prev_traj_.GetCurrentSwingTime(i)) {
                 row_idx+=2;
             }
         }
@@ -861,6 +882,16 @@ namespace mpc {
                 row_idx++;
             }
         }
+    }
+
+    void MPCSingleRigidBody::IncreaseEEBox() {
+        info_.ee_box_size(0) += 0.05;
+        info_.ee_box_size(1) += 0.05;
+    }
+
+    void MPCSingleRigidBody::DecreaseEEBox() {
+        info_.ee_box_size(0) = std::max(info_.ee_box_size(0) - 0.05, ee_bounds_(0));
+        info_.ee_box_size(1) = std::max(info_.ee_box_size(1) - 0.05, ee_bounds_(1));
     }
 
 } // mpc

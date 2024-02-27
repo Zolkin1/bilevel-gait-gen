@@ -554,6 +554,7 @@ namespace mpc {
 
         solver.factorize(diff_mat); // diff_mat
 
+        // TODO: Handle gracefully
         if (solver.info() != Eigen::Success) {
             throw std::runtime_error("Could not factor the differential matrix.");
         }

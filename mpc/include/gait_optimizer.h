@@ -89,7 +89,8 @@ namespace mpc {
 
         std::vector<time_v> GetContactTimes(double alpha) const;
 
-        std::pair<std::vector<time_v>, double> LineSearch(MPCSingleRigidBody& mpc);
+        std::pair<std::vector<time_v>, double> LineSearch(MPCSingleRigidBody& mpc, double time,
+                                                          const std::vector<vector_3t>& ee_locations, const vector_t& state);
 
     protected:
     private:

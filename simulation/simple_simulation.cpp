@@ -3,6 +3,7 @@
 //
 
 #include "simple_simulation.h"
+#include "timer.h"
 
 #include <cstdio>
 #include <cstring>
@@ -191,6 +192,8 @@ namespace simulation {
         glfwSetCursorPosCallback(window, mouse_move);
         glfwSetMouseButtonCallback(window, mouse_button);
         glfwSetScrollCallback(window, scroll);
+
+        run_num_ = 0;
     }
 
     void SimpleSimulation::UpdateSim(double dt) {
@@ -198,15 +201,17 @@ namespace simulation {
         steady_clock::time_point t1 = steady_clock::now();
 
         duration<double> time_span(0);
+        double time = d->time;
         while(!glfwWindowShouldClose(window) && time_span.count() < dt) {
 
             if (!pause) {
-                double time = d->time;
                 // Allows for multiple steps before the controller is re-computed
 
                 // Set for debugging
 
 
+                utils::Timer timer("sim physics");
+                timer.StartTimer();
                 while (d->time < time + dt) {
 //                    d->qpos[0] = 0;
 //                    d->qpos[1] = 0;
@@ -223,8 +228,19 @@ namespace simulation {
 //                    d->qvel[4] = 0;
 //                    d->qvel[5] = 0;
 
+//                    if (d->time >= 2.5 && d->time <= 2.51) {
+//                        d->xfrc_applied[0] = .25;
+//                        d->xfrc_applied[1] = .25;
+//                        std::cout << "--- Force Applied ---" << std::endl;
+//                    } else {
+//                        d->xfrc_applied[0] = 0.0;
+//                        d->xfrc_applied[1] = 0.0;
+//                    }
+
                     mj_step(m, d);
                 }
+                timer.StopTimer();
+//                timer.PrintElapsedTime();
             }
 
 //            d->qpos[0] = 0;
@@ -242,32 +258,38 @@ namespace simulation {
 //            d->qvel[4] = 0;
 //            d->qvel[5] = 0;
 
-            // get framebuffer viewport
-            mjrRect viewport = {0, 0, 0, 0};
-            glfwGetFramebufferSize(window, &viewport.width, &viewport.height);
+            constexpr double FRAME_RATE = 1.0/60.0;
+            const int runs_per_frame = std::floor(FRAME_RATE/dt);
+            if (!(run_num_ % runs_per_frame) || pause) {
 
-            // update scene and render
-            mjv_updateScene(m, d, &opt, NULL, &cam, mjCAT_ALL, &scn);
-            UpdateTrajViz();
-            for (int i = 0; i < d->ncon; i++) {
-                mjv_addGeoms(m, d, &opt, NULL, mjCAT_DECOR, &scn);
-                mjtNum force[6];
-                mj_contactForce(m, d, i, force);
-                mjtNum force3[3];
-                force3[0] = .005; //force[0];
-                force3[1] = .005;//force[1];
-                force3[2] = .01*std::sqrt(std::pow(force[0],2) + std::pow(force[1],2) + std::pow(force[2],2));//force[2];
+                // get framebuffer viewport
+                mjrRect viewport = {0, 0, 0, 0};
+                glfwGetFramebufferSize(window, &viewport.width, &viewport.height);
 
-                const float color[4] = {0.5, 0.75, 0.5, 1};
+                // update scene and render
+                mjv_updateScene(m, d, &opt, NULL, &cam, mjCAT_ALL, &scn);
+                UpdateTrajViz();
+//            for (int i = 0; i < d->ncon; i++) {
+//                mjv_addGeoms(m, d, &opt, NULL, mjCAT_DECOR, &scn);
+//                mjtNum force[6];
+//                mj_contactForce(m, d, i, force);
+//                mjtNum force3[3];
+//                force3[0] = .005; //force[0];
+//                force3[1] = .005;//force[1];
+//                force3[2] = .01*std::sqrt(std::pow(force[0],2) + std::pow(force[1],2) + std::pow(force[2],2));//force[2];
+//
+//                const float color[4] = {0.5, 0.75, 0.5, 1};
+//
+//                scn.ngeom += 1;
+//                mjv_initGeom(&scn.geoms[scn.ngeom - 1], mjtGeom::mjGEOM_ARROW,
+//                             force3, d->contact[i].pos, nullptr, color); //d->contact[i].frame
+//            }
+                mjr_render(viewport, &scn, &con);
 
-                scn.ngeom += 1;
-                mjv_initGeom(&scn.geoms[scn.ngeom - 1], mjtGeom::mjGEOM_ARROW,
-                             force3, d->contact[i].pos, nullptr, color); //d->contact[i].frame
+                // swap OpenGL buffers (blocking call due to v-sync)
+                glfwSwapBuffers(window);
+
             }
-            mjr_render(viewport, &scn, &con);
-
-            // swap OpenGL buffers (blocking call due to v-sync)
-            glfwSwapBuffers(window);
 
             // process pending GUI events, call GLFW callbacks
             glfwPollEvents();
@@ -279,6 +301,9 @@ namespace simulation {
                 time_span = duration_cast<duration<double>>(t2 - t1);
             }
         }
+
+        run_num_++;
+
 
         if (glfwWindowShouldClose(window)) {
             //free visualization storage

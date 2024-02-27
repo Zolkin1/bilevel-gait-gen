@@ -20,11 +20,11 @@ namespace mpc {
                                                int discretization_steps, double dt, const vector_t& nom_state) :
             Model(robot_urdf, frames, discretization_steps, dt, false,
                   {Constraints::Dynamics,
-                   Constraints::ForceBox,
+                   Constraints::ForceBox, // TODO: Force box causes infeasibility issues (2/26 5:49pm)
                    Constraints::FrictionCone,
                    Constraints::EndEffectorLocation,
                    Constraints::TDPosition
-                  }),
+                  }), // TODO: In the sim we still get infeasibility w/o force constraints, although that might be due to getting a wacky traj
             num_tangent_states_(MOMENTUM_OFFSET + FLOATING_VEL_OFFSET),
             num_manifold_states_(MOMENTUM_OFFSET + FLOATING_BASE_OFFSET) {
         // Populate Ir

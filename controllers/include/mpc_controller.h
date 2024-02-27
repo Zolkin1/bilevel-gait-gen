@@ -63,13 +63,15 @@ namespace controller {
 
         void GetTargetsFromTraj(const mpc::Trajectory& traj, double time);
 
-        double GaitOptLS(double cost_red, double time, const std::vector<Eigen::Vector3d>& ee_locations);
+        bool GaitOpt(double cost_red, double time, const std::vector<Eigen::Vector3d>& ee_locations);
 
         vector_t ComputeGroundForceTorques(int end_effector);
 
         vector_t ComputeSwingTorques(int end_effector);
 
         vector_t NormalizeQuat(const vector_t& state);
+
+        void PrintContactTimes() const;
 
         double prev_time_;
 
@@ -94,6 +96,8 @@ namespace controller {
         std::mutex state_time_mut_;
         std::mutex mpc_res_mut_;
         std::mutex traj_viz_mut_;
+        std::mutex sync_mut_;
+        std::mutex model_mut_;
 
         std::vector<std::vector<Eigen::Vector3d>> fk_traj_;
 

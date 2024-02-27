@@ -346,6 +346,8 @@ namespace mpc {
         step_ = alpha*step_; // used for line-search/debugging
         xkp1_ = xk_ + step_;
 
+        std::cout << "gait opt step: " << step_.transpose() << std::endl;
+
         contact_times_ = ConvertQPVecToContactTimes(xkp1_);
 
         last_step_ = step_;
@@ -666,11 +668,15 @@ namespace mpc {
         return contacts;
     }
 
-    std::pair<std::vector<time_v>, double>  GaitOptimizer::LineSearch(MPCSingleRigidBody& mpc) {
+    std::pair<std::vector<time_v>, double>  GaitOptimizer::LineSearch(MPCSingleRigidBody& mpc,
+                                                                      double time,
+                                                                      const std::vector<vector_3t>& ee_locations,
+                                                                      const vector_t& state) {
         utils::Timer ls_timer("gait opt line search");
         ls_timer.StartTimer();
         std::array<double, LS_SIZE> costs{};
         std::array<int, LS_SIZE> idx{};
+        std::array<mpc::SolveQuality, LS_SIZE> solve_quality{};
 
         // TODO: Do this better
         std::vector<Trajectory> trajectories;
@@ -698,17 +704,11 @@ namespace mpc {
             // Compute the MPC as if you were at the next state
 
             // Get mpc trajectory to get some information from it
-            const Trajectory& prev_traj = mpc.GetTrajectory();
-            const double time = prev_traj.GetTime(1);
-
-            std::vector<vector_3t> ee_locations(num_ee_);
-            for (int j = 0; j < ee_locations.size(); j++) {
-                ee_locations.at(j) = prev_traj.GetEndEffectorLocation(j, time);
-            }
+            const Trajectory& prev_traj = mpc_ls.GetTrajectory();
 
             utils::Timer mpc_ls_timer("ls mpc");
             mpc_ls_timer.StartTimer();
-            mpc_ls.GetRealTimeUpdate(prev_traj.GetState(1), time,
+            mpc_ls.GetRealTimeUpdate(state, time,
                                      ee_locations, false);
             mpc_ls_timer.StopTimer();
 //            mpc_ls_timer.PrintElapsedTime();
@@ -716,18 +716,26 @@ namespace mpc {
             costs.at(i) = mpc_ls.GetCost();
             idx.at(i) = i;
             trajectories.at(i) = mpc_ls.GetTrajectory();
+            solve_quality.at(i) = mpc_ls.GetSolveQuality();
         }
 
         int indx_min = -1;
         double cost_min = 1e10;
         for (int i = 0; i < LS_SIZE; i++) {
-            if (costs.at(i) < cost_min) {
+            if (costs.at(i) < cost_min && solve_quality.at(i) != PrimalInfeasible) {
                 cost_min = costs.at(i);
                 indx_min = i;
             }
         }
 
         const double alpha = static_cast<double>(indx_min)/LS_SIZE;
+
+        if (indx_min == -1) {
+            std::cerr << "no valid trajectories... using the current one." << std::endl;
+            indx_min = 0;
+        }
+
+        std::cout << "traj init time: " << trajectories.at(indx_min).GetTime(0) << std::endl;
 
         mpc.SetWarmStartTrajectory(trajectories.at(indx_min));
 

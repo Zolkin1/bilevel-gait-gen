@@ -93,7 +93,7 @@ double GaitOptLS(mpc::MPCSingleRigidBody& mpc, mpc::GaitOptimizer& gait_opt,
         // Apply the minimizing contact time
         std::vector<time_v> contact_times;
         double cost_min;
-        std::tie(contact_times, cost_min) = gait_opt.LineSearch(mpc);
+        std::tie(contact_times, cost_min) = gait_opt.LineSearch(mpc, time, ee_locations, prev_traj.GetState(1));
 //        mpc.UpdateContactTimes(contact_times);
 
         gait_opt_timer.StopTimer();

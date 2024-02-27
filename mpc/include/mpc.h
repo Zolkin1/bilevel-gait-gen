@@ -160,6 +160,10 @@ namespace mpc {
 
         void AdjustForCurrentContacts(double time, const controller::Contact& contact);
 
+        SolveQuality GetSolveQuality() const;
+
+        void UpdateInitTime(double time);
+
     protected:
         // ---------------- Protected Member Functions ---------------- //
         // Assumes flat ground and constant coef of friction

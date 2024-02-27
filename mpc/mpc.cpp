@@ -356,7 +356,7 @@ namespace mpc {
             extra_runs = 2;
         }
 
-        constexpr double FB_LB = 0.0;
+        constexpr double FB_LB = -0.0;
 
         const std::vector<time_v> contact_times = prev_traj_.GetContactTimes();
         for (int j = 0; j < extra_runs; j++) {
@@ -370,11 +370,15 @@ namespace mpc {
                                     (static_cast<double>(i) / static_cast<double>(FB_PER_FORCE)) * (upper_time - lower_time) +
                                     lower_time;
                             assert(prev_traj_.IsForceMutable(ee, time));
+                            if (!prev_traj_.IsForceMutable(ee, time)) {
+                                throw std::runtime_error("Force is not mutable here.");
+                            }
 
 
                             int vars_index, vars_affecting;
                             std::tie(vars_index, vars_affecting) = prev_traj_.GetForceSplineIndex(ee, time, coord);
-                            const vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force, ee, coord,
+                            const vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Force,
+                                                                              ee, coord,
                                                                               time);
 
                             if (j == 0) {
@@ -986,7 +990,7 @@ namespace mpc {
         for (int ee = 0; ee < num_ee_; ee++) {
             for (int i = 0; i < contact_times.at(ee).size() - 1; i++) {
                 if (contact_times.at(ee).at(i).GetType() == TouchDown) {
-                    num_constraints += 2*FB_PER_FORCE;
+                    num_constraints += 2*(FB_PER_FORCE);
                 }
             }
         }
@@ -1085,11 +1089,27 @@ namespace mpc {
     int MPC::GetNumTDConstraints() const {
         int num_constraints = 0;
         for (int ee = 0; ee < num_ee_; ee++) {
-            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < prev_traj_.GetCurrentSwingTime(ee)/2) {
+            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < 0.75*prev_traj_.GetCurrentSwingTime(ee) ) {
                 num_constraints += 2;
             }
         }
 
         return num_constraints;
+    }
+
+    SolveQuality MPC::GetSolveQuality() const {
+        return qp_solver->GetSolveQuality();
+    }
+
+    void MPC::UpdateInitTime(double time) {
+        init_time_ = time;
+        prev_traj_.SetInitTime(init_time_);
+        prev_traj_.AddPolys(info_.integrator_dt*info_.num_nodes + init_time_);
+        prev_traj_.RemoveUnusedPolys(init_time_);
+
+        UpdateNumInputs();
+
+        UpdateQPSizes();
+        data_.InitQPMats(); // Note: this zero's all the data matricies
     }
 } // mpc

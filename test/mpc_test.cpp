@@ -95,10 +95,10 @@ TEST_CASE("Basic MPC", "[mpc]") {
 
     // Inital guess end effector positions
     std::array<std::array<double, 3>, 4> ee_pos{};
-    ee_pos.at(0) = {0.2, 0.2, 0};
-    ee_pos.at(1) = {0.2, -0.2, 0};
-    ee_pos.at(2) = {-0.2, 0.2, 0};
-    ee_pos.at(3) = {-0.2, -0.2, 0};
+    ee_pos.at(0) = {0.1526, 0.12523, 0.011089};
+    ee_pos.at(1) = {0.1526, -0.12523, 0.011089};
+    ee_pos.at(2) = {-0.208321844, 0.1363286, 0.01444};
+    ee_pos.at(3) = {-0.208321844, -0.1363286, 0.01444};
 
     std::vector<Eigen::Vector3d> ee_locations(4);
     for (int i = 0; i < ee_locations.size(); i++) {
@@ -155,6 +155,13 @@ TEST_CASE("Basic MPC", "[mpc]") {
                                                                                 data.num_cone_constraints_)
                                         - data.sparse_constraint_.middleRows(data.num_dynamics_constraints +
                                         data.num_force_box_constraints_,data.num_cone_constraints_))/dt;
+
+                REQUIRE(data2.num_td_pos_constraints_ == data.num_td_pos_constraints_);
+                matrix_t finite_diff_td = (data2.sparse_constraint_.middleRows(data.num_dynamics_constraints + data.num_force_box_constraints_ + data.num_cone_constraints_,
+                                                                               data.num_td_pos_constraints_)
+                                           - data.sparse_constraint_.middleRows(data.num_dynamics_constraints +
+                                                                                data.num_force_box_constraints_ + data.num_cone_constraints_,
+                                                                                data.num_td_pos_constraints_))/dt;
 
 //                std::cout << "finite diff cone (top rows): \n" << finite_diff_cone.topRightCorner(50, 150) << std::endl;
 
@@ -218,6 +225,20 @@ TEST_CASE("Basic MPC", "[mpc]") {
                             std::cout << "ee: " << ee << ", contact idx: " << idx << std::endl;
                         }
                         REQUIRE_THAT(dConeConstraints(row, col) - finite_diff_cone(row, col), WithinAbs(0, DERIV_MARGIN));
+                    }
+                }
+
+                matrix_t dTDConstraints = dA.bottomRows(data.num_td_pos_constraints_);
+                for (int row = 0; row < dTDConstraints.rows(); row++) {
+                    for (int col = 0; col < dTDConstraints.cols(); col++) {
+                        if (std::abs(dTDConstraints(row, col) - finite_diff_td(row, col)) >= DERIV_MARGIN) {
+                            std::cout << "Cone MISMATCH at row " << row << ", col " << col << std::endl;
+                            std::cout << "finite_diff: " << finite_diff_td(row, col) << std::endl;
+                            std::cout << "partial: " << dTDConstraints(row, col) << std::endl;
+                            std::cout << "next partial: " << dTDConstraints(row, col+1) << std::endl;
+                            std::cout << "ee: " << ee << ", contact idx: " << idx << std::endl;
+                        }
+                        REQUIRE_THAT(dTDConstraints(row, col) - finite_diff_td(row, col), WithinAbs(0, DERIV_MARGIN));
                     }
                 }
 
@@ -894,9 +915,9 @@ TEST_CASE("Clarabel Solver", "[mpc][clarabel]") {
     vector_t zero = vector_t::Zero(1);
     clarabel.SetupDerivativeCalcs(clara_dx, zero, zero, clar_data);
 
-    sp_matrix_t dP(clar_data.sparse_cost_.rows(), clar_data.sparse_cost_.cols());
-    sp_matrix_t dA(clar_data.num_dynamics_constraints, 3);
-    sp_matrix_t dG(clar_data.num_force_box_constraints_, 3);
+    matrix_t dP(clar_data.sparse_cost_.rows(), clar_data.sparse_cost_.cols());
+    matrix_t dA(clar_data.num_dynamics_constraints, 3);
+    matrix_t dG(clar_data.num_force_box_constraints_, 3);
     clarabel.CalcDerivativeWrtMats(dP, dA, dG);
 
 
@@ -924,9 +945,8 @@ TEST_CASE("Clarabel Solver", "[mpc][clarabel]") {
     std::cout << "clara dual: " << clarabel.GetDualSolution().transpose() << std::endl;
     std::cout << "osqp dual: " << osqp.GetDualSolution().transpose() << std::endl;
 
-    matrix_t c_dP = dP.toDense();
     matrix_t o_dP = osqp_dP.toDense();
-    std::cout << "Clara dP: " << c_dP << std::endl;
+    std::cout << "Clara dP: " << dP << std::endl;
     std::cout << "OSQP dP: " << o_dP << std::endl;
 
     for (int i = 0; i < clar_data.num_decision_vars; i++) {
@@ -935,12 +955,10 @@ TEST_CASE("Clarabel Solver", "[mpc][clarabel]") {
         }
     }
 
-    matrix_t c_dA = dA.toDense();
-    matrix_t c_dG = dG.toDense();
     matrix_t o_dA = osqp_dA.toDense();
 
-    std::cout << "Clara dA: \n" << c_dA << std::endl;
-    std::cout << "Clara dG: \n" << c_dG << std::endl;
+    std::cout << "Clara dA: \n" << dA << std::endl;
+    std::cout << "Clara dG: \n" << dG << std::endl;
     std::cout << "OSQP dA: \n" << o_dA << std::endl;
 
     // TODO: OSQP dA only matches mine where the sparsity pattern is non-zero! (my implementation is correct afaik)
@@ -948,7 +966,7 @@ TEST_CASE("Clarabel Solver", "[mpc][clarabel]") {
     for (int i = 0; i < osqp_data.num_dynamics_constraints; i++) {
         for (int j = 0; j < osqp_data.num_decision_vars; j++) {
             if (osqp_data.sparse_constraint_.toDense()(i,j) != 0) {   // Due to OSQP bug can only expect this to match when the term is non-zero
-                REQUIRE_THAT(c_dA(i, j) - o_dA(i, j), WithinAbs(0, MARGIN));
+                REQUIRE_THAT(dA(i, j) - o_dA(i, j), WithinAbs(0, MARGIN));
             }
         }
     }
@@ -957,7 +975,7 @@ TEST_CASE("Clarabel Solver", "[mpc][clarabel]") {
         for (int j = 0; j < osqp_data.num_decision_vars; j++) {
             int idx = i + osqp_data.num_dynamics_constraints;
             if (osqp_data.sparse_constraint_.toDense()(idx, j) != 0) { // Due to OSQP bug can only expect this to match when the term is non-zero
-                REQUIRE_THAT(c_dG(i, j) + c_dG(i + osqp_data.num_force_box_constraints_, j)
+                REQUIRE_THAT(dG(i, j) + dG(i + osqp_data.num_force_box_constraints_, j)
                              - o_dA(idx, j), WithinAbs(0, MARGIN));
             }
         }

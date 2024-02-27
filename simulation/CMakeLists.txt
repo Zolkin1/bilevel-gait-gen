@@ -62,4 +62,5 @@ find_package(pinocchio)
 target_link_libraries(simulator PRIVATE pinocchio)
 
 target_link_libraries(simulator PRIVATE controller)
+target_link_libraries(simulator PRIVATE utils)
 

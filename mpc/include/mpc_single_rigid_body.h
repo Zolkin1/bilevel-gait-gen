@@ -54,9 +54,15 @@ namespace mpc {
 
         void AddEEPosCost();
 
+        void IncreaseEEBox();
+
+        void DecreaseEEBox();
+
         int num_run_;
 
         static constexpr int EE_NODE_START = 4; // TODO: Tune
+
+        vector_2t ee_bounds_;
     private:
     };
 } // mpc
