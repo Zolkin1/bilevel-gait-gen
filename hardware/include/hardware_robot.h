@@ -12,27 +12,46 @@
 #include "../unitree_lib/loop.h"
 #include "../unitree_lib/udp.h"
 #include "../unitree_lib/comm.h"
+#include "../unitree_lib/safety.h"
 
 namespace hardware {
     using vector_t = Eigen::VectorXd;
 
     class HardwareRobot {
     public:
+        enum State {
+            Hold,
+            Stand,
+            MPC,
+            Testing
+        };
+
         HardwareRobot(const vector_t& init_config, const vector_t& init_vel,
                       std::unique_ptr<controller::MPCController>& controller,
-                      int robot_id);
+                      int robot_id, double joint_kp, double joint_kv);
 
-        void StartControlLoop();
+        void ControlCallback();
+
+        void SendUDP();
+        void RecieveUDP();
+
+        void ChangeState(State new_state);
+        void SetNominalStandingState(const vector_t& q);
+
     protected:
     private:
-        void ControlCallback();
+
+        static std::string StateToString(const State& robot_state);
 
         vector_t ComputeControlAction(double time, const vector_t& q, const vector_t& v);
 
         bool VerifyControlAction(const vector_t& control);
 
-        void SendUDP();
-        void RecieveUDP();
+        static void AssignConfigToMotors(const vector_t& q, UNITREE_LEGGED_SDK::LowCmd& cmd);
+        static void AssignVelToMotors(const vector_t& v, UNITREE_LEGGED_SDK::LowCmd& cmd);
+        static void AssignTorqueToMotors(const vector_t& tau, UNITREE_LEGGED_SDK::LowCmd& cmd);
+        static void RecoverStateFromMotors(vector_t& q, vector_t& v, vector_t& a,
+                                           const UNITREE_LEGGED_SDK::LowState& state);
 
         vector_t ConvertHardwareJointsToPinocchio(const vector_t& q);
         vector_t ConvertHardwareConfigToPinocchio(const vector_t& q);
@@ -45,6 +64,7 @@ namespace hardware {
         std::unique_ptr<controller::MPCController> controller_;
 
         ofstream log_file_;
+        ofstream state_log_file_;
 
         vector_t init_config_;
         vector_t init_vel_;
@@ -64,13 +84,25 @@ namespace hardware {
         UNITREE_LEGGED_SDK::UDP udp;
         UNITREE_LEGGED_SDK::LowCmd cmd = {0};
         UNITREE_LEGGED_SDK::LowState state = {0};
-        UNITREE_LEGGED_SDK::LoopFunc control_loop;
+        UNITREE_LEGGED_SDK::Safety safe;
+
+        State robot_state_;
+
         const double dt = 0.002;
 
-        const double motor_kp = 20;
-        const double motor_kv = 7;
+        double motor_kp_; //20;
+        double motor_kv_; //7;
+
+        const int state_record_pattern = 20;
+
+        double standing_time_;
+        double standing_start_;
+        vector_t standing_start_config_;
+        vector_t hold_state_;
 
         int packet_recieved_;
+        vector_t standing_nominal_;
+        double prev_time_;
     };
 } // hardware
 

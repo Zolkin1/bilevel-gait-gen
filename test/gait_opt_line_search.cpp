@@ -286,7 +286,8 @@ int main() {
                                                                  mpc_des_state,
                                                                  config.ParseNumber<int>("num_polys"),
                                                                  config.ParseEigenVector("Q_srbd_diag").asDiagonal(),
-                                                                 config.ParseNumber<int>("gait_opt_freq"));
+                                                                 config.ParseNumber<int>("gait_opt_freq"),
+                                                                 config.ParseString("log_file"));
 
     // Make the robot for visualization
     auto robot_file = config.ParseString("robot_xml");

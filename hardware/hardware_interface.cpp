@@ -8,7 +8,7 @@
 using namespace hardware;
 
 int main() {
-    std::string config_file("/home/zolkin/AmberLab/bilevel-gait-gen/apps/a1_configuration.yaml");
+    std::string config_file("/home/zolkin/AmberLab/bilevel-gait-gen/hardware/hardware_a1_config.yaml");
     utils::ConfigParser config = utils::ConfigParser(config_file);
 
     const double viz_rate = config.ParseNumber<double>("viz_rate");
@@ -61,12 +61,13 @@ int main() {
     mpc_des_state.head<2>() << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
     mpc_des_state.segment<2>(3) << config.ParseNumber<double>("xdot_des"), config.ParseNumber<double>("ydot_des");
 
+    // TODO: Get this from hardware!
     // Inital guess end effector positions
     std::array<std::array<double, 3>, 4> ee_pos{};
-    ee_pos.at(0) = {0.2, 0.2, 0};
-    ee_pos.at(1) = {0.2, -0.2, 0};
-    ee_pos.at(2) = {-0.2, 0.2, 0};
-    ee_pos.at(3) = {-0.2, -0.2, 0};
+    ee_pos.at(0) = {0.1526, 0.12523, 0.011089};
+    ee_pos.at(1) = {0.1526, -0.12523, 0.011089};
+    ee_pos.at(2) = {-0.208321844, 0.1363286, 0.01444};
+    ee_pos.at(3) = {-0.208321844, -0.1363286, 0.01444};
 
     std::vector<Eigen::Vector3d> ee_locations(4);
     for (int i = 0; i < ee_locations.size(); i++) {
@@ -97,14 +98,48 @@ int main() {
                                                                  mpc_des_state,
                                                                  config.ParseNumber<int>("num_polys"),
                                                                  config.ParseEigenVector("Q_srbd_diag").asDiagonal(),
-                                                                 config.ParseNumber<int>("gait_opt_freq"));
+                                                                 config.ParseNumber<int>("gait_opt_freq"),
+                                                                 config.ParseString("log_file"));
 
     const vector_t init_vel = config.ParseEigenVector("init_vel");
-    HardwareRobot robot(standing, init_vel, mpc_controller, 2);
+    HardwareRobot robot(standing, init_vel, mpc_controller, 2,
+                        config.ParseNumber<double>("joint_kp"), config.ParseNumber<double>("joint_kd"));
 
-    robot.StartControlLoop();
+    robot.ChangeState(hardware::HardwareRobot::Hold);
+
+//    robot.StartControlLoop();
+
+    const double dt = 0.002;
+    UNITREE_LEGGED_SDK::LoopFunc control_loop("control_loop", dt, boost::bind(&HardwareRobot::ControlCallback, &robot));
+    UNITREE_LEGGED_SDK::LoopFunc udp_send("udp_send", dt, 3, boost::bind(&HardwareRobot::SendUDP, &robot));
+    UNITREE_LEGGED_SDK::LoopFunc udp_recv("udp_recv", dt, 3, boost::bind(&HardwareRobot::RecieveUDP, &robot));
+
+    udp_send.start();
+    udp_recv.start();
+    control_loop.start();
 
     while (true) {
-        sleep(10);
+        std::cout << "Enter the next robot state: [H] Hold, [S] Stand, [M] MPC, [T] Testing." << std::endl;
+        string next_state;
+        std::cin >> next_state;
+
+        if (next_state == "H") {
+            robot.ChangeState(hardware::HardwareRobot::Hold);
+            std::cout << "Robot entering Hold mode." << std::endl;
+        } else if (next_state == "S") {
+            robot.ChangeState(hardware::HardwareRobot::Stand);
+            std::cout << "Robot entering Stand mode." << std::endl;
+        } else if (next_state == "M") {
+            robot.ChangeState(hardware::HardwareRobot::MPC);
+            std::cout << "Robot entering MPC mode." << std::endl;
+        } else if (next_state == "T") {
+            robot.ChangeState(hardware::HardwareRobot::Testing);
+            std::cout << "Robot entering Testing mode." << std::endl;
+        } else {
+            std::cout << "Invalid robot state." << std::endl;
+        }
+
+        sleep(0.01);
+//        robot.ControlCallback();
     }
 }

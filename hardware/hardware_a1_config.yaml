@@ -101,8 +101,8 @@ force_tracking_weight: 1 #10
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
-num_nodes: 50 # 50, 20
-integrator_dt: 0.02 #0.02, 0.05  # 0.015
+num_nodes: 20 # 50
+integrator_dt: 0.05 #0.02  # 0.015
 num_qp: 1
 
 vel_bounds: [10, 10, 10,
@@ -128,11 +128,11 @@ swing_height: 0.075
 num_polys: 3
 
 x_des: 1
-y_des: 1
+y_des: 0
 xdot_des: 0
 ydot_des: 0
 
-gait_opt_freq: 10 #5
+gait_opt_freq: 100000000 #5
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
 ee_box_size: [0.15, 0.15] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this
@@ -143,8 +143,8 @@ run_time_iterations: 6000 # 150 works well
 foot_offset: 0.015  # 0.01 works well -- can be sensitive
 
 force_cost: 0.01 # Note: without this cost, the problem is much more poorly
-                  # conditioned and can return infeasible, also the derivative computations are much worse
-                  # without this force cost, the QP cost is almost constant in steady state.
+  # conditioned and can return infeasible, also the derivative computations are much worse
+# without this force cost, the QP cost is almost constant in steady state.
 
 Q_diag: [1, 1, 1,          # linear momentum
          1, 1, 1,           # angular momentum
@@ -186,6 +186,10 @@ Q_srbd_diag: [640.0, 140.0, 12000, .01500, .0150, 10, 3000, 3000, 3000, 1, 1, 1]
 log_file: "2-27-mpc-log-1.txt"
 
 mpc_verbosity: 0
+
+## --- Hardware --- ##
+joint_kp: 30
+joint_kd: 7
 
 ## --- Temp --- ##
 #viz_rate: 0.025
