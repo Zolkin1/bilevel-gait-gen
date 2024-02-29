@@ -16,6 +16,8 @@ target_link_libraries(hardware PUBLIC /home/zolkin/AmberLab/bilevel-gait-gen/har
 
 target_include_directories(hardware PUBLIC include unitree_lib)
 
+add_executable(optitrack_client optitrack_client.cpp)
+
 # Eigen
 find_package(Eigen3 REQUIRED)
 target_link_libraries(hardware PUBLIC Eigen3::Eigen)
@@ -31,3 +33,8 @@ target_link_libraries(hardware_interface PUBLIC utils)
 
 # LCM
 target_link_libraries(hardware PUBLIC lcm)
+
+# optitrack stream client
+find_package(optitrack-stream-client REQUIRED)
+target_link_libraries(hardware PUBLIC optitrack-stream-client::stream_client)
+target_link_libraries(optitrack_client PUBLIC optitrack-stream-client::stream_client)

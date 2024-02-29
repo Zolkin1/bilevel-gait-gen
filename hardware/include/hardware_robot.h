@@ -14,6 +14,8 @@
 #include "../unitree_lib/comm.h"
 #include "../unitree_lib/safety.h"
 
+#include "optitrack-stream-client/client_interface.h"
+
 namespace hardware {
     using vector_t = Eigen::VectorXd;
 
@@ -27,8 +29,9 @@ namespace hardware {
         };
 
         HardwareRobot(const vector_t& init_config, const vector_t& init_vel,
+                      const vector_t& init_mpc_state,
                       std::unique_ptr<controller::MPCController>& controller,
-                      int robot_id, double joint_kp, double joint_kv);
+                      int robot_id, double joint_kp, double joint_kv, double optitrack_rate);
 
         void ControlCallback();
 
@@ -40,6 +43,10 @@ namespace hardware {
 
     protected:
     private:
+
+        void OptiTrackMonitor();
+
+        void ComputeCOMStateEstimate(vector_t& q, vector_t& v, vector_t& a, const UNITREE_LEGGED_SDK::LowState& state);
 
         static std::string StateToString(const State& robot_state);
 
@@ -65,6 +72,7 @@ namespace hardware {
 
         ofstream log_file_;
         ofstream state_log_file_;
+        ofstream optitrack_log_file_;
 
         vector_t init_config_;
         vector_t init_vel_;
@@ -86,6 +94,11 @@ namespace hardware {
         UNITREE_LEGGED_SDK::LowState state = {0};
         UNITREE_LEGGED_SDK::Safety safe;
 
+        std::thread optitrack_client_;
+        std::mutex optitrack_mut_;
+        Eigen::Vector<double, 7> opti_data_, prev_opti_data_;
+        stream_client::ClientInterface client_interface_;
+
         State robot_state_;
 
         const double dt = 0.002;
@@ -103,6 +116,7 @@ namespace hardware {
         int packet_recieved_;
         vector_t standing_nominal_;
         double prev_time_;
+        double optitrack_rate_;
     };
 } // hardware
 

@@ -102,8 +102,11 @@ int main() {
                                                                  config.ParseString("log_file"));
 
     const vector_t init_vel = config.ParseEigenVector("init_vel");
-    HardwareRobot robot(standing, init_vel, mpc_controller, 2,
-                        config.ParseNumber<double>("joint_kp"), config.ParseNumber<double>("joint_kd"));
+    HardwareRobot robot(standing, init_vel,
+                        config.ParseEigenVector("srb_init"),
+                        mpc_controller, 2,
+                        config.ParseNumber<double>("joint_kp"),
+                        config.ParseNumber<double>("joint_kd"), 1.0/300.0);
 
     robot.ChangeState(hardware::HardwareRobot::Hold);
 

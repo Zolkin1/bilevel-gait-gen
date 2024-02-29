@@ -195,7 +195,7 @@ namespace controller {
 //        log_file_ << std::endl;
 
         timer.StopTimer();
-        timer.PrintElapsedTime();
+//        timer.PrintElapsedTime();
 
 //        sync_mut_.unlock();
 

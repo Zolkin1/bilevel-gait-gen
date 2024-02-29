@@ -589,6 +589,11 @@ namespace mpc {
             times.push_back(1.2);
 
 //            times.push_back(0);
+//            times.push_back(0.5);
+//            times.push_back(1.0);
+//            times.push_back(1.2);
+
+//            times.push_back(0);
 //            times.push_back(0.2);
 //            times.push_back(0.4);
 //            times.push_back(0.6);
@@ -675,7 +680,7 @@ namespace mpc {
 //                    }
 //                }
 
-                prev_traj_.PrintTrajectoryToFile("trot_test.txt");
+//                prev_traj_.PrintTrajectoryToFile("trot_test.txt");
                 break;
             }
             case Amble: {

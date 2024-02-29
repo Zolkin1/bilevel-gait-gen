@@ -7,8 +7,9 @@
 
 namespace hardware {
     HardwareRobot::HardwareRobot(const hardware::vector_t& init_config, const hardware::vector_t& init_vel,
+                                 const hardware::vector_t& init_mpc_state,
                                  std::unique_ptr<controller::MPCController>& controller, int robot_id,
-                                 double joint_kp, double joint_kv) :
+                                 double joint_kp, double joint_kv, double optitrack_rate) :
                                  udp(UNITREE_LEGGED_SDK::LOWLEVEL),
                                  safe(UNITREE_LEGGED_SDK::LeggedType::A1),
 //                                 8080, UNITREE_LEGGED_SDK::UDP_SERVER_IP_BASIC,
@@ -19,6 +20,7 @@ namespace hardware {
         log_file_ << "Initializing hardware..." << std::endl;
 
         state_log_file_.open("hardware_state_log.txt");
+        optitrack_log_file_.open("optitrack_client_data.txt");
 
         init_config_ = init_config;
         init_vel_ = init_vel;
@@ -38,6 +40,14 @@ namespace hardware {
 
         motor_kp_ = joint_kp;
         motor_kv_ = joint_kv;
+
+        // Initialize the controller and MPC
+        controller_->InitSolver(init_config, init_mpc_state);
+
+        optitrack_rate_ = optitrack_rate;
+
+        // Start the optitrack monitor
+        optitrack_client_ = std::thread(&HardwareRobot::OptiTrackMonitor, this);
     }
 
     void HardwareRobot::SendUDP() {
@@ -71,26 +81,17 @@ namespace hardware {
             a.resize(NUM_INPUTS + FLOATING_VEL_OFFSET);
             RecoverStateFromMotors(q, v, a, state);
 
-            // TODO: Get global x,y,z position
+            ComputeCOMStateEstimate(q, v, a, state);
 
-            // Get the quaternion
-            q(POS_VARS) = state.imu.quaternion[1];
-            q(POS_VARS + 1) = state.imu.quaternion[2];
-            q(POS_VARS + 2) = state.imu.quaternion[3];
-            q(POS_VARS + 3) = state.imu.quaternion[4];
 
-            // TODO: Filter
-            v(POS_VARS) = state.imu.gyroscope[0];
-            v(POS_VARS + 1) = state.imu.gyroscope[1];
-            v(POS_VARS + 2) = state.imu.gyroscope[2];
-
-            // TODO: Filter
-            a(POS_VARS) = state.imu.accelerometer[0];
-            a(POS_VARS + 1) = state.imu.accelerometer[1];
-            a(POS_VARS + 2) = state.imu.accelerometer[2];
+            Eigen::Vector4d grf;
+            grf(0) = state.footForce[FL_];
+            grf(1) = state.footForce[FR_];
+            grf(2) = state.footForce[RL_];
+            grf(3) = state.footForce[RR_];
 
             if (!(packet_recieved_%state_record_pattern)) {
-                state_log_file_ << time_s << q.transpose() << " " << v.transpose() << " " << a.transpose() << std::endl;
+                state_log_file_ << time_s << " " << q.transpose() << " " << v.transpose() << " " << a.transpose() << " " << grf.transpose() << std::endl;
             }
 
 
@@ -134,10 +135,7 @@ namespace hardware {
                     }
 
                 } else if (robot_state_ == MPC) {
-
-                    // TODO: Handle initial longer run
-
-                    // TODO: Handle non-zero location (i.e. zero certain things out here for the first run)
+                    // Assuming we are close the "init mpc state" value in the constructor
 
                     // TODO: Check which sensor measurement to use
                     controller::Contact contact;
@@ -175,7 +173,6 @@ namespace hardware {
                             cmd.motorCmd[i].Kd = motor_kv_; // TODO: tune
                         }
                     } else {
-                        // TODO: Maybe change the mode to standing here
                         log_file_ << "[Control] Reverting to a default state." << std::endl;
                         AssignConfigToMotors(init_config_.tail<NUM_INPUTS>(), cmd);
                         AssignVelToMotors(init_vel_.tail<NUM_INPUTS>(), cmd);
@@ -185,6 +182,9 @@ namespace hardware {
                             cmd.motorCmd[i].Kp = motor_kp_; // TODO: tune
                             cmd.motorCmd[i].Kd = motor_kv_; // TODO: tune
                         }
+
+                        // To be safe, move back to standing
+                        ChangeState(Stand);
                     }
                 }
 
@@ -235,6 +235,53 @@ namespace hardware {
     void HardwareRobot::ChangeState(hardware::HardwareRobot::State new_state) {
         robot_state_ = new_state;
         log_file_ << "[State] Robot changed state to " << StateToString(new_state) << std::endl;
+    }
+
+    void HardwareRobot::OptiTrackMonitor() {
+        std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
+        optitrack_mut_.lock();
+        prev_opti_data_ = opti_data_;
+//        client_interface_.ReadOptiTrackData(opti_data_);
+        optitrack_mut_.unlock();
+
+        optitrack_log_file_ << opti_data_ << std::endl;
+
+        std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+
+        const long time_left = 30000000 - std::ceil(time_span.count()*1e9);
+
+        timespec* remaining;
+        const timespec request = {0, time_left};
+        nanosleep(&request, remaining);
+    }
+
+    void HardwareRobot::ComputeCOMStateEstimate(hardware::vector_t& q, hardware::vector_t& v, hardware::vector_t& a,
+                                                const UNITREE_LEGGED_SDK::LowState& state) {
+        optitrack_mut_.lock();
+        q.head<7>() = opti_data_;
+        // TODO: Filter
+        v.head<3>() = (opti_data_.head<3>() - prev_opti_data_.head<3>())/optitrack_rate_;
+        optitrack_mut_.unlock();
+
+        // TODO: Consider merging with the IMU data
+
+
+        // Get the quaternion
+//            q(POS_VARS) = state.imu.quaternion[1];
+//            q(POS_VARS + 1) = state.imu.quaternion[2];
+//            q(POS_VARS + 2) = state.imu.quaternion[3];
+//            q(POS_VARS + 3) = state.imu.quaternion[4];
+
+//        v(POS_VARS) = state.imu.gyroscope[0];
+//        v(POS_VARS + 1) = state.imu.gyroscope[1];
+//        v(POS_VARS + 2) = state.imu.gyroscope[2];
+
+        // TODO: Verify the data
+        a(POS_VARS) = state.imu.accelerometer[0];
+        a(POS_VARS + 1) = state.imu.accelerometer[1];
+        a(POS_VARS + 2) = state.imu.accelerometer[2];
     }
 
     // Hard coded for the urdf to the a1
