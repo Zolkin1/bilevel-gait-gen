@@ -16,6 +16,8 @@ namespace hardware {
 //                                     8007, sizeof(UNITREE_LEGGED_SDK::LowCmd),
 //                                     sizeof(UNITREE_LEGGED_SDK::LowState)),
                                  controller_(std::move(controller)) {
+        init_time_ = std::chrono::high_resolution_clock::now();
+
         log_file_.open("hardware_log.txt");
         log_file_ << "Initializing hardware..." << std::endl;
 
@@ -40,6 +42,10 @@ namespace hardware {
 
         motor_kp_ = joint_kp;
         motor_kv_ = joint_kv;
+
+        mpc_time_offset_ = 0;
+        mpc_offsets_.setZero();
+        in_mpc_ = false;
 
         // Initialize the controller and MPC
         controller_->InitSolver(init_config, init_mpc_state);
@@ -135,6 +141,17 @@ namespace hardware {
                     }
 
                 } else if (robot_state_ == MPC) {
+
+                    if (!in_mpc_) {
+                        // Gather initial offsets
+                        mpc_offsets_ = q.head<3>();
+                        mpc_offsets_(2) -= 0.3; // TODO: Check this
+                        mpc_time_offset_ = time_s;
+                        in_mpc_ = true;
+                        log_file_ << "[Robot] mpc offsets: " << mpc_offsets_.transpose() << std::endl;
+                        log_file_ << "[Robot] time offset: " << time_s << std::endl;
+                    }
+
                     // Assuming we are close the "init mpc state" value in the constructor
 
                     // TODO: Check which sensor measurement to use
@@ -159,7 +176,9 @@ namespace hardware {
                               << a.transpose()
                               << std::endl;
 
-                    vector_t control_action = controller_->ComputeControlAction(q, v, a, contact, time_s);
+                    // Apply the offsets
+                    q.head<3>() -= mpc_offsets_;
+                    vector_t control_action = controller_->ComputeControlAction(q, v, a, contact, time_s - mpc_time_offset_);
 
                     control_action.setZero();
 
@@ -194,6 +213,10 @@ namespace hardware {
 
                 if (robot_state_ != Hold) {
                     hold_state_(2) = -1;
+                }
+
+                if (robot_state_ != MPC) {
+                    in_mpc_ = false;
                 }
 
                 safe.PowerProtect(cmd, state, 1);
@@ -238,23 +261,27 @@ namespace hardware {
     }
 
     void HardwareRobot::OptiTrackMonitor() {
-        std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+        while (true) {
+            std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
-        optitrack_mut_.lock();
-        prev_opti_data_ = opti_data_;
-//        client_interface_.ReadOptiTrackData(opti_data_);
-        optitrack_mut_.unlock();
+            optitrack_mut_.lock();
+            prev_opti_data_ = opti_data_;
+            client_interface_.ReadOptiTrackData(opti_data_);
+            optitrack_mut_.unlock();
 
-        optitrack_log_file_ << opti_data_ << std::endl;
+            optitrack_log_file_ << std::chrono::duration_cast<std::chrono::milliseconds>(
+                    t1 - init_time_).count() << " " << opti_data_.transpose() << std::endl;
 
-        std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+            std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(
+                    t2 - t1);
 
-        const long time_left = 30000000 - std::ceil(time_span.count()*1e9);
+            const long time_left = 2000000 - std::ceil(time_span.count() * 1e9);
 
-        timespec* remaining;
-        const timespec request = {0, time_left};
-        nanosleep(&request, remaining);
+            timespec *remaining;
+            const timespec request = {0, time_left};
+            nanosleep(&request, remaining);
+        }
     }
 
     void HardwareRobot::ComputeCOMStateEstimate(hardware::vector_t& q, hardware::vector_t& v, hardware::vector_t& a,

@@ -69,6 +69,11 @@ srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
            0, 0, 0, 1, # 0.0505,   -0.1643,   -0.0572,    0.9835,
            0, 0, 0]
 
+srb_target: [2, 1, 0.3,
+             0, 0, 0,
+             0, 0, 0, 1,
+             0, 0, 0]
+
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
 control_rate: 1000  # Hz
@@ -101,8 +106,8 @@ force_tracking_weight: 1 #10
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
-num_nodes: 50 # 50, 20
-integrator_dt: 0.02 #0.02, 0.05  # 0.015
+num_nodes: 20 # 50, 20
+integrator_dt: 0.05 #0.02, 0.05  # 0.015
 num_qp: 1
 
 vel_bounds: [10, 10, 10,
@@ -127,12 +132,13 @@ swing_height: 0.075
 
 num_polys: 3
 
-x_des: 1
-y_des: 1
-xdot_des: 0
-ydot_des: 0
+# Adjust the srb_target config above instead
+#x_des: 1
+#y_des: 1
+#xdot_des: 0
+#ydot_des: 0
 
-gait_opt_freq: 10 #5
+gait_opt_freq: 100000 #5
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
 ee_box_size: [0.15, 0.15] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this

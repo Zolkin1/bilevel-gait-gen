@@ -306,17 +306,12 @@ namespace controller {
                     ls_timer.PrintElapsedTime();
                     prev_cost = mpc_.GetCost();
                     deriv_ready = false;
-
-                    PrintContactTimes();
-
                 } else if (!((run_num + 1) % gait_opt_freq_) && run_num > 0) {
                     // Run MPC and compute the derivative term (to be used for the line search in the next iteration)
                     mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
                     deriv_ready = GaitOpt(cost_red, time, ee_locations);
-
                 } else {
                     // Run MPC normally
-                    PrintContactTimes();
                     mpc_.GetRealTimeUpdate(state, time, ee_locations, false);
                     deriv_ready = false;
                 }
@@ -360,13 +355,14 @@ namespace controller {
                 traj_ = traj;
                 mpc_res_mut_.unlock();
 
+                // TODO: Put a hardware flag that prevents this from being calculated
                 UpdateTrajViz();
 
                 run_num++;
 //                sync_mut_.unlock();
 
                 mpc_.PrintStatLineToFile(log_file_);
-                std::cout << "Avg cost: " << mpc_.GetAvgCost() << std::endl;
+//                std::cout << "Avg cost: " << mpc_.GetAvgCost() << std::endl;
                 loop_timer.StopTimer();
                 loop_timer.PrintElapsedTime();
             }

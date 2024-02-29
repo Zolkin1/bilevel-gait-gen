@@ -69,6 +69,11 @@ srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
            0, 0, 0, 1, # 0.0505,   -0.1643,   -0.0572,    0.9835,
            0, 0, 0]
 
+srb_target: [2, 1, 0.3,
+             0, 0, 0,
+             0, 0, 0, 1,
+             0, 0, 0]
+
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
 control_rate: 1000  # Hz
@@ -127,10 +132,10 @@ swing_height: 0.075
 
 num_polys: 3
 
-x_des: 1
-y_des: 0
-xdot_des: 0
-ydot_des: 0
+#x_des: 1
+#y_des: 0
+#xdot_des: 0
+#ydot_des: 0
 
 gait_opt_freq: 100000000 #5
 

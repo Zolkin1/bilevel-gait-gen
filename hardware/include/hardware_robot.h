@@ -117,6 +117,12 @@ namespace hardware {
         vector_t standing_nominal_;
         double prev_time_;
         double optitrack_rate_;
+
+        double mpc_time_offset_;
+        Eigen::Vector3d mpc_offsets_;
+        bool in_mpc_;
+
+        std::chrono::high_resolution_clock::time_point init_time_;
     };
 } // hardware
 

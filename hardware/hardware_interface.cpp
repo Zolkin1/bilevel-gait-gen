@@ -57,9 +57,9 @@ int main() {
     const std::vector<vector_t> warm_start(info.num_nodes+1, init_state);
 
     // Create the goal state
-    vector_t mpc_des_state = init_state;
-    mpc_des_state.head<2>() << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
-    mpc_des_state.segment<2>(3) << config.ParseNumber<double>("xdot_des"), config.ParseNumber<double>("ydot_des");
+    vector_t mpc_des_state = config.ParseEigenVector("srb_target");
+//    mpc_des_state.head<2>() << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
+//    mpc_des_state.segment<2>(3) << config.ParseNumber<double>("xdot_des"), config.ParseNumber<double>("ydot_des");
 
     // TODO: Get this from hardware!
     // Inital guess end effector positions
@@ -120,6 +120,7 @@ int main() {
     udp_send.start();
     udp_recv.start();
     control_loop.start();
+
 
     while (true) {
         std::cout << "Enter the next robot state: [H] Hold, [S] Stand, [M] MPC, [T] Testing." << std::endl;
