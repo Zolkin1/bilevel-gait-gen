@@ -69,15 +69,9 @@ namespace hardware {
 
         using namespace UNITREE_LEGGED_SDK;
 
-//        std::cout << "quat val (for packet checking): " << state.imu.quaternion[2] << std::endl;
-
         const double time_s = static_cast<double>(state.tick) / 1e3;
 
         if (time_s >= prev_time_) {
-
-//            if (time_s == 0) {
-//                packet_recieved_ = 0;
-//            }
 
             log_file_ << "[Communication] udp packet received at time " << time_s << std::endl;
             log_file_ << "[Communication] " << packet_recieved_ << " packet received." << std::endl;
@@ -89,34 +83,6 @@ namespace hardware {
             v.resize(NUM_INPUTS + FLOATING_VEL_OFFSET);
             a.resize(NUM_INPUTS + FLOATING_VEL_OFFSET);
             RecoverStateFromMotors(q, v, a, state);
-
-//            if (packet_recieved_ <= ZEROING_SAMPLES && time_s > 0) {
-//                log_file_ << "[Robot] Running sensor zeroing at time " << time_s << "." << std::endl;
-//                acc_vec_offset_.push_back(a.head<3>());
-//                ang_vel_vec_offset_.push_back(v.segment<3>(3));
-//            } else if (packet_recieved_ == ZEROING_SAMPLES + 1 && time_s > 0) {
-//                log_file_ << "[Robot] Complete sensor zeroing at time " << time_s << "." << std::endl;
-//                if (acc_vec_offset_.size() != ZEROING_SAMPLES || ang_vel_vec_offset_.size() != ZEROING_SAMPLES) {
-//                    std::cerr << "Acceleration vector size: " <<  acc_vec_offset_.size() << std::endl;
-//                    std::cerr << "Velocity vector size: " <<  ang_vel_vec_offset_.size() << std::endl;
-//                    throw std::runtime_error("Bad sizes.");
-//                }
-//                acc_offset_.setZero();
-//                ang_vel_offset_.setZero();
-//                for (int i = 0; i < ZEROING_SAMPLES; i++) {
-//                    acc_offset_ += (1.0 / ZEROING_SAMPLES) * acc_vec_offset_.at(i);
-//                    ang_vel_offset_ += (1.0 / ZEROING_SAMPLES) * ang_vel_vec_offset_.at(i);
-//                }
-//
-//                acc_offset_(2) += 9.81;
-//
-//                log_file_ << "[Robot] Acceleration offset: " << acc_offset_.transpose()
-//                            << ", Angular velocity offset: " << ang_vel_offset_.transpose() << std::endl;
-//                std::cout << "Sensor zeroing complete." << std::endl;
-//            } else {
-
-//            a.head<3>() = acc_offset_;
-//            v.segment<3>(3) = ang_vel_offset_;
 
             // TODO: Joint acclerations are always 0
 
@@ -144,12 +110,8 @@ namespace hardware {
 
                 // Get to the mpc standing state -- won't move the feet. Might need to figure that one out.
                 double ratio = std::min(1.0, ((time_s - standing_start_) / standing_time_));
-//                    std::cout << "time_s: " << time_s << std::endl;
-//                    std::cout << "ratio: " << ratio << std::endl;
                 vector_t q_des =
                         ratio * (init_config_.tail<NUM_INPUTS>() - standing_start_config_) + standing_start_config_;
-
-//                    vector_t q_des = init_config_.tail<NUM_INPUTS>();
 
                 AssignConfigToMotors(q_des, cmd);
                 AssignVelToMotors(init_vel_.tail<NUM_INPUTS>(), cmd);
@@ -161,10 +123,6 @@ namespace hardware {
                 }
 
             } else if (robot_state_ == Hold) {
-
-//                    if (hold_state_(2) == -1 || packet_recieved_ == 0) {
-//                        hold_state_ = q;
-//                    }
 
                 AssignConfigToMotors(q.tail<NUM_INPUTS>(), cmd);
                 AssignVelToMotors(vector_t::Constant(NUM_INPUTS, 0), cmd);
