@@ -122,7 +122,14 @@ namespace hardware {
         Eigen::Vector3d mpc_offsets_;
         bool in_mpc_;
 
+        std::vector<Eigen::Vector3d> acc_vec_offset_;
+        Eigen::Vector3d acc_offset_;
+        std::vector<Eigen::Vector3d> ang_vel_vec_offset_;
+        Eigen::Vector3d ang_vel_offset_;
+
         std::chrono::high_resolution_clock::time_point init_time_;
+
+        static constexpr int ZEROING_SAMPLES = 20;
     };
 } // hardware
 
