@@ -1162,6 +1162,16 @@ namespace mpc {
         return times_.at(upper_node).GetTime() - times_.at(lower_node).GetTime();
     }
 
+    double EndEffectorSplines::GetFirstTDTime() const {
+        for (const auto& time : times_) {
+            if (time.GetType() == TouchDown) {
+                return time.GetTime();
+            }
+        }
+
+        return 1e30;
+    }
+
     inline void EndEffectorSplines::UnsupportedSpline() {
         throw std::runtime_error("The provided spline type is not supported.");
     }

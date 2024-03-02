@@ -1198,7 +1198,7 @@ namespace mpc {
     int MPC::GetNumTDConstraints() const {
         int num_constraints = 0;
         for (int ee = 0; ee < num_ee_; ee++) {
-            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < td_fraction_*prev_traj_.GetCurrentSwingTime(ee) ) {
+            if (prev_traj_.GetNextContactTime(ee, init_time_) - init_time_ < td_fraction_*prev_traj_.GetCurrentSwingTime(ee)) {
                 num_constraints += 2;
             }
         }

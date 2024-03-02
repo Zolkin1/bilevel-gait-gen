@@ -129,6 +129,8 @@ namespace mpc {
 
         double GetCurrentSwingTime(int ee) const;
 
+        double GetFirstTDTime(int ee) const;
+
     protected:
     private:
         void UpdateSplineVarsCount();

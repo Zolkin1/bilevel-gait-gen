@@ -834,6 +834,7 @@ namespace mpc {
         }
     }
 
+    // Note that if we have a late touch down then due to the start ee location constraint, the desired stance position will change to the current end effector location
     void MPCSingleRigidBody::AddTDPositionConstraints() {
         const int start_pos_idx = GetPosSplineStartIdx();
         int row_idx = 0;
@@ -853,6 +854,22 @@ namespace mpc {
                     row_idx++;
                 }
             }
+//            else if (prev_traj_.GetFirstTDTime(ee) < init_time_) { // there is a touch down in past time
+//                const double td_time = prev_traj_.GetFirstTDTime(ee);
+//                std::cout << "First TD for ee " << ee << " is at: " << td_time << std::endl;
+//                data_.td_pos_constants_.segment<2>(row_idx) = prev_traj_.GetEndEffectorLocation(ee, td_time).head<2>();
+//                for (int coord = 0; coord < 2; coord++) {
+//                    int vars_idx, vars_affecting;
+//                    std::tie(vars_idx, vars_affecting) =
+//                            prev_traj_.GetPositionSplineIndex(ee, td_time, coord);
+//
+//                    vector_t vars_lin = prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position,
+//                                                                ee, coord, td_time);
+//                    data_.constraint_mat_.SetMatrix(vars_lin.transpose(), constraint_idx_ + row_idx,
+//                                                    start_pos_idx + vars_idx);
+//                    row_idx++;
+//                }
+//            }
         }
         assert(row_idx == data_.num_td_pos_constraints_);
         constraint_idx_ += row_idx;
@@ -882,6 +899,20 @@ namespace mpc {
                 row_idx++;
             }
         }
+//        else if (prev_traj_.GetFirstTDTime(ee) < init_time_) { // there is a touch down in past time
+//            const double td_time = prev_traj_.GetFirstTDTime(ee);
+//            b.segment<2>( eq_idx +row_idx) = prev_traj_.GetPositionPartialWrtContactTime(ee, td_time, contact_idx).head<2>();
+//            for (int coord = 0; coord < 2; coord++) {
+//                int vars_idx, vars_affecting;
+//                std::tie(vars_idx, vars_affecting) =
+//                        prev_traj_.GetPositionSplineIndex(ee, td_time, coord);
+//
+//                vector_t vars_lin = prev_traj_.GetPositionCoefPartialsWrtContactTime(ee, coord, td_time, contact_idx);
+//                builder.SetMatrix(vars_lin.transpose(), eq_idx + row_idx,
+//                                  start_pos_idx + vars_idx);
+//                row_idx++;
+//            }
+//        }
     }
 
     void MPCSingleRigidBody::IncreaseEEBox() {

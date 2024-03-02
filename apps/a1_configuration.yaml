@@ -69,7 +69,7 @@ srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
            0, 0, 0, 1.0, # 0.0505,   -0.1643,   -0.0572,    0.9835,
            0, 0, 0]
 
-srb_target: [1, 1, 0.3,
+srb_target: [-1, 2, 0.3,
              0, 0, 0,
              0, 0, 0.0, 1.0,
              0, 0, 0]
@@ -93,14 +93,12 @@ torque_bounds: [30, 30, 30,
 #   100, 100, 100]
 friction_coef: 0.6 #0.3 - note problem can be sensitive to this with the gait opt
 
-# TODO: Tune
-# 1000, 5000
 base_pos_gains: [8000, 9000]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
 base_ang_gains: [600, 1000]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
 
-# The following are tuned for when vdes = 0
-# 5000, 300 works well for the QP controller
-kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
+# 5500, 300 works well for the QP controller
+# Note that these may need to re-tuned for different dt's/node counts
+kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500] # 5500
 kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300] # 300
 
 #kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
@@ -144,7 +142,7 @@ num_polys: 3
 #xdot_des: 0
 #ydot_des: 0
 
-gait_opt_freq: 50000000 #5
+gait_opt_freq: 500000 #5
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
 ee_box_size: [0.15, 0.15] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this

@@ -102,6 +102,8 @@ namespace mpc {
 
         double GetSwingTime(double time) const;
 
+        double GetFirstTDTime() const;
+
         // Function list:
         // - Spline Value
         // - Vars coefficients -- Compressed view

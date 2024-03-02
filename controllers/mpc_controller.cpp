@@ -106,7 +106,7 @@ namespace controller {
 
 //        traj_viz_mut_.lock();
         traj_ = mpc_.GetTrajectory();
-        FullBodyTrajUpdate(traj_);
+//        FullBodyTrajUpdate(traj_);
 //        traj_viz_mut_.unlock();
 
         time_ = 0;
@@ -391,32 +391,32 @@ namespace controller {
     }
 
     // TODO: Remove this function
-    void MPCController::FullBodyTrajUpdate(mpc::Trajectory& traj) {
-        vector_t state_guess = q_des_;
-        const int num_to_update = 10; // traj.GetStates().size();
-        for (int i = 0; i < num_to_update; i++) {
-            std::vector<mpc::vector_3t> traj_ee_locations(4);
-            for (int ee = 0; ee < 4; ee++) {
-                // Grab state and end effector locations at that time
-                traj_ee_locations.at(ee) = traj.GetEndEffectorLocation(ee, traj.GetTime(i));
-            }
-            traj.UpdateFullConfig(i, model_.InverseKinematics(traj.GetState(i),
-                                                              traj_ee_locations, state_guess,
-                                                              info_.joint_bounds_ub,
-                                                              info_.joint_bounds_lb));
-
-            state_guess = traj.GetFullConfig(i);
-
-            if (i >= 1) {
-                vector_t vel(model_.GetFullModelConfigSpace() - 1);
-                vel.head<6>() << traj.GetState(i).segment<3>(3)/model_.GetMass(), model_.GetIrInv()*traj.GetState(i).segment<3>(10); //model_.GetIr().inverse()*
-                vel.tail(num_inputs_) = (traj.GetFullConfig(i) - traj.GetFullConfig(i-1)).tail(num_inputs_)/info_.integrator_dt;
-
-                traj.UpdateFullVelocity(i, vel);
-            }
-        }
-        traj.UpdateFullVelocity(0, vector_t::Zero(pin_model_.nv));
-    }
+//    void MPCController::FullBodyTrajUpdate(mpc::Trajectory& traj) {
+//        vector_t state_guess = q_des_;
+//        const int num_to_update = 10; // traj.GetStates().size();
+//        for (int i = 0; i < num_to_update; i++) {
+//            std::vector<mpc::vector_3t> traj_ee_locations(4);
+//            for (int ee = 0; ee < 4; ee++) {
+//                // Grab state and end effector locations at that time
+//                traj_ee_locations.at(ee) = traj.GetEndEffectorLocation(ee, traj.GetTime(i));
+//            }
+//            traj.UpdateFullConfig(i, model_.InverseKinematics(traj.GetState(i),
+//                                                              traj_ee_locations, state_guess,
+//                                                              info_.joint_bounds_ub,
+//                                                              info_.joint_bounds_lb));
+//
+//            state_guess = traj.GetFullConfig(i);
+//
+//            if (i >= 1) {
+//                vector_t vel(model_.GetFullModelConfigSpace() - 1);
+//                vel.head<6>() << traj.GetState(i).segment<3>(3)/model_.GetMass(), model_.GetIrInv()*traj.GetState(i).segment<3>(10); //model_.GetIr().inverse()*
+//                vel.tail(num_inputs_) = (traj.GetFullConfig(i) - traj.GetFullConfig(i-1)).tail(num_inputs_)/info_.integrator_dt;
+//
+//                traj.UpdateFullVelocity(i, vel);
+//            }
+//        }
+//        traj.UpdateFullVelocity(0, vector_t::Zero(pin_model_.nv));
+//    }
 
     void MPCController::GetTargetsFromTraj(const mpc::Trajectory& traj, double time) {
         if (time < traj.GetTime(0)) {
@@ -442,11 +442,37 @@ namespace controller {
         v_des_.setZero();
         v_des_.head<6>() << traj.GetState(node).segment<3>(3)/model_.GetMass(), model_.GetIrInv()*traj.GetState(node).segment<3>(10); //model_.GetIr().inverse()*
         if (node != 0) {
-            v_des_.tail(num_inputs_) = (traj.GetFullConfig(node) - traj.GetFullConfig(node - 1)).tail(num_inputs_) /
-                                    info_.integrator_dt;
+            // TODO: Maybe find a better way to do this
+            std::vector<mpc::vector_3t> traj_ee_locations_prev(4);
+            for (int ee = 0; ee < 4; ee++) {
+                // Grab state and end effector locations at that time
+                traj_ee_locations_prev.at(ee) = traj.GetEndEffectorLocation(ee, traj.GetTime(node-1));
+            }
+
+            vector_t q_prev = model_.InverseKinematics(traj.GetState(node - 1),traj_ee_locations_prev, q_des_,
+                                              info_.joint_bounds_ub,
+                                              info_.joint_bounds_lb);
+
+            v_des_.tail(num_inputs_) = (q_des_ - q_prev).tail(num_inputs_) / info_.integrator_dt;
         } else {
-            v_des_.tail(num_inputs_) = (traj.GetFullConfig(node+1) - traj.GetFullConfig(node)).tail(num_inputs_) /
-                                    info_.integrator_dt;
+            // TODO: Maybe find a better way to do this
+            std::vector<mpc::vector_3t> traj_ee_locations_next(4);
+            for (int ee = 0; ee < 4; ee++) {
+                // Grab state and end effector locations at that time
+                traj_ee_locations_next.at(ee) = traj.GetEndEffectorLocation(ee, traj.GetTime(node+1));
+            }
+
+            vector_t q_next = model_.InverseKinematics(traj.GetState(node + 1),traj_ee_locations_next, q_des_,
+                                                       info_.joint_bounds_ub,
+                                                       info_.joint_bounds_lb);
+
+            v_des_.tail(num_inputs_) = (q_next - q_des_).tail(num_inputs_) / info_.integrator_dt;
+        }
+
+        for (int i = 0; i < v_des_.size(); i++) {
+            if (v_des_(i) > 100) {
+                std::cerr << "Desired velocity too high! joint: " << i << ", value: " << v_des_(i) << ", time: " << time << std::endl;
+            }
         }
 
         // TODO: Do I want to use the ZoH or the full spline force?

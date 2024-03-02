@@ -328,9 +328,9 @@ namespace mpc {
         return full_velocity_.at(node);
     }
 
-    vector_t Trajectory::GetFullConfig(int node) const {
-        return full_config_.at(node);
-    }
+//    vector_t Trajectory::GetFullConfig(int node) const {
+//        return full_config_.at(node);
+//    }
 
     int Trajectory::GetNumContactNodes(int ee) const {
         return ee_splines_.at(ee).GetNumContacts();
@@ -551,6 +551,10 @@ namespace mpc {
 
     double Trajectory::GetCurrentSwingTime(int ee) const {
         return ee_splines_.at(ee).GetSwingTime(init_time_);
+    }
+
+    double Trajectory::GetFirstTDTime(int ee) const {
+        return ee_splines_.at(ee).GetFirstTDTime();
     }
 
 } // mpc
