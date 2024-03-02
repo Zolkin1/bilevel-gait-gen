@@ -69,7 +69,7 @@ srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
            0, 0, 0, 1, # 0.0505,   -0.1643,   -0.0572,    0.9835,
            0, 0, 0]
 
-srb_target: [2, 1, 0.3,
+srb_target: [1, 0, 0.3,
              0, 0, 0,
              0, 0, 0, 1,
              0, 0, 0]
@@ -77,25 +77,33 @@ srb_target: [2, 1, 0.3,
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
 control_rate: 1000  # Hz
-torque_bounds: [30, 30, 30,
-                30, 30, 30,
-                30, 30, 30,
-                30, 30, 30] # 33.5, 100
+torque_bounds: [25, 25, 25,
+                25, 25, 25,
+                25, 25, 25,
+                25, 25, 25] # 33.5, 100
+
+#torque_bounds: [20, 20, 20,
+#                20, 20, 20,
+#                20, 20, 0,
+#                20, 20, 20]
+
 #  [100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100]
-friction_coef: 0.6 #0.3 - note problem can be sensitive to this with the gait opt
+friction_coef: 0.3 #0.3 - note problem can be sensitive to this with the gait opt
 
 # TODO: Tune
 # 1000, 5000
-base_pos_gains: [8000, 9000]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
-base_ang_gains: [600, 1000]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
+base_pos_gains: [300, 340]  # kd_pos, kp_pos  need the kd~300 and kp~340 looks ok for just qp
+base_ang_gains: [80, 150]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
 
-# The following are tuned for when vdes = 0
+
+
+# The following are tuned for when vdes = 0H
 # 5000, 300 works well for the QP controller
-kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
-kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300] # 300
+kp_joint_gains: [270, 270, 270, 270, 270, 270, 270, 270, 270, 270, 270, 270] # 100 looked ok for just qp
+kd_joint_gains: [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100] # 30 looked ok for just qp
 
 #kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
 #kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
@@ -126,7 +134,7 @@ joint_bounds_ub: [0.802851, 4.18879, -0.916298,
                   0.802851, 4.18879, -0.916298]
 
 num_switches: 2
-force_bound: 150 #2500000 #150
+force_bound: 125 #2500000 #150
 
 swing_height: 0.075
 
@@ -140,14 +148,14 @@ num_polys: 3
 gait_opt_freq: 100000000 #5
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
-ee_box_size: [0.15, 0.15] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this
+ee_box_size: [0.17, 0.15] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this
 # 0.15, 0.15 is good for diag
 
 run_time_iterations: 6000 # 150 works well
 
 foot_offset: 0.015  # 0.01 works well -- can be sensitive
 
-force_cost: 0.01 # Note: without this cost, the problem is much more poorly
+force_cost: 10000 # Note: without this cost, the problem is much more poorly
   # conditioned and can return infeasible, also the derivative computations are much worse
 # without this force cost, the QP cost is almost constant in steady state.
 

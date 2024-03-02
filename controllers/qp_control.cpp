@@ -26,11 +26,13 @@ namespace controller {
                          double leg_weight,
                          double torso_weight,
                          double force_weight,
-                         int num_contacts) :
+                         int num_contacts,
+                         double max_grf) :
                          Controller(control_rate, robot_urdf, foot_type), num_vel_(nv),
                          friction_coef_(friction_coef), des_contact_(num_contacts) {
 
         torque_bounds_ = torque_bounds;
+        max_grf_ = max_grf;
 
         torso_tracking_weight_ = torso_weight;
         leg_tracking_weight_ = leg_weight;
@@ -64,6 +66,7 @@ namespace controller {
                 << std::setw(15) << "q "
                 << std::setw(15) << "v "
                 << std::setw(15) << "a "
+                << std::setw(15) << "tau"
                 << std::setw(15) << "grf"
                 << std::endl;
     }
@@ -122,7 +125,8 @@ namespace controller {
         Eigen::Vector3d vcom = v.head<3>(); //pin_data_->vcom[0];
         Eigen::Vector3d acom = a.head<3>(); //pin_data_->acom[0];
 
-        LogInfo(time, config_target_, vel_target_, com, q.tail(q.size() - 3), vcom, v.tail(v.size() - 3), acom, a.tail(a.size()-3), grf);
+        LogInfo(time, config_target_, vel_target_, com, q.tail(q.size() - 3),
+                vcom, v.tail(v.size() - 3), acom, a.tail(a.size()-3), control_action.tail(num_inputs_), grf);
 
         timer.StopTimer();
 //        timer.PrintElapsedTime();
@@ -260,7 +264,7 @@ namespace controller {
         for (int i = 0; i < num_contacts; i++) {
             A_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i,
                      num_vel_ + 2 + 3*i) = 1;
-            ub_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i) = 200;
+            ub_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i) = max_grf_;
             lb_(FLOATING_VEL_OFFSET + CONSTRAINT_PER_FOOT*num_contacts + num_actuators_ + 4*num_contacts + i) = 0;
         }
     }
@@ -496,6 +500,7 @@ namespace controller {
                             const Eigen::VectorXd& v,
                             const Eigen::Vector3d& acom,
                             const Eigen::VectorXd& a,
+                            const Eigen::VectorXd& tau,
                             const Eigen::VectorXd& grf) {
         log_file_ << std::setw(15) << time
                 << std::setw(15) << q_des.transpose()
@@ -506,6 +511,7 @@ namespace controller {
                 << std::setw(15) << v.transpose()
                 << std::setw(15) << acom.transpose()
                 << std::setw(15) << a.transpose()
+                << std::setw(15) << tau.transpose()
                 << std::setw(15) << grf.transpose() << std::endl;
 
         log_file_ << std::endl;

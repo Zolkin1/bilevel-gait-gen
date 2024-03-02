@@ -19,6 +19,15 @@
 namespace hardware {
     using vector_t = Eigen::VectorXd;
 
+    struct LPFData {
+        vector_t current_sample;
+        vector_t prev_sample;
+        vector_t prev_output;
+
+        void SetSize(int size);
+        void SetZero();
+    };
+
     class HardwareRobot {
     public:
         enum State {
@@ -53,6 +62,8 @@ namespace hardware {
         vector_t ComputeControlAction(double time, const vector_t& q, const vector_t& v);
 
         bool VerifyControlAction(const vector_t& control);
+
+        vector_t LPF(const LPFData& data, double fpass, double fsample);
 
         static void AssignConfigToMotors(const vector_t& q, UNITREE_LEGGED_SDK::LowCmd& cmd);
         static void AssignVelToMotors(const vector_t& v, UNITREE_LEGGED_SDK::LowCmd& cmd);
@@ -106,7 +117,7 @@ namespace hardware {
         double motor_kp_; //20;
         double motor_kv_; //7;
 
-        const int state_record_pattern = 20;
+        const int state_record_pattern = 1;
 
         double standing_time_;
         double standing_start_;
@@ -119,12 +130,19 @@ namespace hardware {
         double optitrack_rate_;
 
         double mpc_time_offset_;
-        Eigen::Vector3d mpc_offsets_;
+        Eigen::Vector2d mpc_offsets_;
         bool in_mpc_;
+
+        LPFData v_com;
+        LPFData a_com;
+        LPFData v_joints;
+        LPFData grf_lpf;
 
         std::chrono::high_resolution_clock::time_point init_time_;
 
         static constexpr int ZEROING_SAMPLES = 20;
+
+        const double gravity_offset_;
     };
 } // hardware
 

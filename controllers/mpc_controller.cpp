@@ -35,7 +35,8 @@ namespace controller {
                                                leg_weight,
                                                torso_weight,
                                                force_weight,
-                                               4),
+                                               4,
+                                               info.force_bound),
                                  mpc_(info, robot_urdf),
                                  traj_(10, 24, 12, mpc_.CreateDefaultSwitchingTimes(2,4,1.0),
                                         0.015, 0.75, 0.0),
@@ -174,11 +175,18 @@ namespace controller {
                 j++;
             }
         }
-
-//        for (int ee = 0; ee < 4; ee++) {
-//            log_file_ << std::setw(15) << traj_.GetForce(ee, time).transpose();
-//        }
         mpc_res_mut_.unlock(); // -------- End Accessing MPC Result -------- //
+
+
+        // ---- For staying in place without MPC ---- //
+//        q_des_ = full_body_state_;
+//        v_des_.setZero();
+//        force_des.resize(12);
+//        for (int ee = 0; ee < contact1.in_contact_.size(); ee++) {
+//            contact1.in_contact_.at(ee) = true;
+//            force_des.segment<3>(3*ee) << 0, 0, model_.GetMass()*9.81/contact1.in_contact_.size();
+//        }
+        // ----------------------------------------- //
 
         vector_t control_action = vector_t::Zero(3*num_inputs_);    // joints, joint velocities, torques
 
@@ -287,7 +295,7 @@ namespace controller {
                 contact = contact_;
                 state_time_mut_.unlock();
 
-                std::cout << "time: " << time << std::endl;
+//                std::cout << "time: " << time << std::endl;
 
                 // Run MPC
                 mpc_.AdjustForCurrentContacts(time, contact);
@@ -364,7 +372,7 @@ namespace controller {
                 mpc_.PrintStatLineToFile(log_file_);
 //                std::cout << "Avg cost: " << mpc_.GetAvgCost() << std::endl;
                 loop_timer.StopTimer();
-                loop_timer.PrintElapsedTime();
+//                loop_timer.PrintElapsedTime(); // MPC Loop takes about 0.1 ms longer than the mpc computation
             }
         }
     }

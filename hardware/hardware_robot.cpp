@@ -6,6 +6,18 @@
 #include "unitree_lib/quadruped.h"
 
 namespace hardware {
+    void LPFData::SetZero() {
+        current_sample.setZero();
+        prev_sample.setZero();
+        prev_output.setZero();
+    }
+
+    void LPFData::SetSize(int size) {
+        current_sample.resize(size);
+        prev_sample.resize(size);
+        prev_output.resize(size);
+    }
+
     HardwareRobot::HardwareRobot(const hardware::vector_t& init_config, const hardware::vector_t& init_vel,
                                  const hardware::vector_t& init_mpc_state,
                                  std::unique_ptr<controller::MPCController>& controller, int robot_id,
@@ -15,11 +27,15 @@ namespace hardware {
 //                                 8080, UNITREE_LEGGED_SDK::UDP_SERVER_IP_BASIC,
 //                                     8007, sizeof(UNITREE_LEGGED_SDK::LowCmd),
 //                                     sizeof(UNITREE_LEGGED_SDK::LowState)),
-                                 controller_(std::move(controller)) {
+                                 controller_(std::move(controller)),
+                                 gravity_offset_(9.8536) { // TODO: make this offset not hard coded
         init_time_ = std::chrono::high_resolution_clock::now();
 
         log_file_.open("hardware_log.txt");
-        log_file_ << "Initializing hardware..." << std::endl;
+        auto time_now = std::chrono::system_clock::now();
+        std::time_t time1_now = std::chrono::system_clock::to_time_t(time_now);
+
+        log_file_ << "Initializing hardware... " << std::ctime(&time1_now) << std::endl;
 
         state_log_file_.open("hardware_state_log.txt");
         optitrack_log_file_.open("optitrack_client_data.txt");
@@ -47,6 +63,20 @@ namespace hardware {
         mpc_offsets_.setZero();
         in_mpc_ = false;
 
+        // Low pass filter data init
+        v_com.SetSize(FLOATING_VEL_OFFSET);
+        v_com.SetZero();
+
+        v_joints.SetSize(NUM_INPUTS);
+        v_joints.SetZero();
+
+        a_com.SetSize(FLOATING_VEL_OFFSET);
+        a_com.SetZero();
+
+        grf_lpf.SetSize(NUM_EE);
+        grf_lpf.SetZero();
+
+
         // Initialize the controller and MPC
         controller_->InitSolver(init_config, init_mpc_state);
 
@@ -72,8 +102,11 @@ namespace hardware {
         const double time_s = static_cast<double>(state.tick) / 1e3;
 
         if (time_s >= prev_time_) {
+            auto time_now = std::chrono::system_clock::now();
+            std::time_t time1_now = std::chrono::system_clock::to_time_t(time_now);
 
-            log_file_ << "[Communication] udp packet received at time " << time_s << std::endl;
+            log_file_ << "[Communication] udp packet received at quad time " << time_s << " and global time: " <<
+                               std::ctime(&time1_now) << std::endl;
             log_file_ << "[Communication] " << packet_recieved_ << " packet received." << std::endl;
 
             log_file_ << "[State] robot state is: " << StateToString(robot_state_) << std::endl;
@@ -88,15 +121,43 @@ namespace hardware {
 
             ComputeCOMStateEstimate(q, v, a, state);
 
-
             Eigen::Vector4d grf;
             grf(0) = state.footForce[FL_];
             grf(1) = state.footForce[FR_];
             grf(2) = state.footForce[RL_];
             grf(3) = state.footForce[RR_];
 
+            // ----- Low Pass Filter ----- //
+            a_com.prev_sample = a_com.current_sample;
+            a_com.current_sample = a.head<FLOATING_VEL_OFFSET>();
+
+            v_com.prev_sample = v_com.current_sample;
+            v_com.current_sample = v.head<FLOATING_VEL_OFFSET>(); //v.head<FLOATING_VEL_OFFSET>();
+
+            v_joints.prev_sample = v_joints.current_sample;
+            v_joints.current_sample = v.tail<NUM_INPUTS>();
+
+            grf_lpf.prev_sample = grf_lpf.current_sample;
+            grf_lpf.current_sample = grf;
+
+            a.head<FLOATING_VEL_OFFSET>() = LPF(a_com, 15, 500);
+            a_com.prev_output = a.head<FLOATING_VEL_OFFSET>();
+
+            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 1, 500); // todo: tune fpass. 1 is very smooth, 10 is tradeoff with jitter, 25 is pretty jittery
+            v_com.prev_output = v.head<FLOATING_VEL_OFFSET>(); //v.head<FLOATING_VEL_OFFSET>();
+
+            v.tail<NUM_INPUTS>() = LPF(v_joints, 1, 500);
+            v_joints.prev_output = v.tail<NUM_INPUTS>();
+
+            grf = LPF(grf_lpf, 1, 500);
+            grf_lpf.prev_output = grf;
+            // ---------------------------- //
+
+            a(2) = a(2) + gravity_offset_;
+
+
             if (!(packet_recieved_ % state_record_pattern)) {
-                state_log_file_ << time_s << " " << q.transpose() << " " << v.transpose() << " " << a.transpose()
+                state_log_file_ << std::setprecision(9) << time_s << " " << q.transpose() << " " << v.transpose() << " " << a.transpose()
                                 << " " << grf.transpose() << std::endl;
             }
 
@@ -137,14 +198,18 @@ namespace hardware {
 
                 if (!in_mpc_) {
                     // Gather initial offsets
-                    mpc_offsets_ = q.head<3>();
-                    mpc_offsets_(2) -= 0.3; // TODO: Check this
+                    mpc_offsets_ = q.head<2>(); // Making x and y at zero, but keeping whatever z offset we have
+//                    mpc_offsets_(2) -= 0.3; // TODO: Check this
                     mpc_time_offset_ = time_s;
                     in_mpc_ = true;
                     log_file_ << "[Robot] mpc offsets: " << mpc_offsets_.transpose() << std::endl;
                     log_file_ << "[Robot] time offset: " << time_s << std::endl;
 
-                    // TODO: Grab a short running avg of accelerations and use them as an offset
+                    // TODO: Will want to add Some form of MPC reset to handle the time if I ever want to enter
+                    //  MPC twice in the same run. But this only makes sense if I can:
+                    //   - Change the initial condition on MPC
+                    //   - Handle the new time
+                    //   - Adjust the target pose
                 }
 
                 // Assuming we are close the "init mpc state" value in the constructor
@@ -154,16 +219,16 @@ namespace hardware {
                 contact.contact_frames_.resize(NUM_EE);
 
                 // Get contact status -  hardcoded for a1 and pinocchio urdf
-                contact.in_contact_.at(0) = state.footForce[FL_] > 0;
+                contact.in_contact_.at(0) = grf(0) > 0;
                 contact.contact_frames_.at(0) = 14;
 
-                contact.in_contact_.at(1) = state.footForce[FR_] > 0;
+                contact.in_contact_.at(1) = grf(1) > 0;
                 contact.contact_frames_.at(1) = 24;
 
-                contact.in_contact_.at(2) = state.footForce[RL_] > 0;
+                contact.in_contact_.at(2) = grf(2) > 0;
                 contact.contact_frames_.at(2) = 34;
 
-                contact.in_contact_.at(3) = state.footForce[RR_] > 0;
+                contact.in_contact_.at(3) = grf(3) > 0;
                 contact.contact_frames_.at(3) = 44;
 
                 log_file_ << "[Control] q: " << q.transpose() << ", v: " << v.transpose() << ", a: "
@@ -171,11 +236,9 @@ namespace hardware {
                           << std::endl;
 
                 // Apply the offsets
-                q.head<3>() -= mpc_offsets_;
+                q.head<2>() -= mpc_offsets_;
                 vector_t control_action = controller_->ComputeControlAction(q, v, a, contact,
                                                                             time_s - mpc_time_offset_);
-
-                control_action.setZero();
 
                 if (VerifyControlAction(control_action)) {
                     AssignConfigToMotors(control_action.head<NUM_INPUTS>(), cmd);
@@ -183,11 +246,12 @@ namespace hardware {
                     AssignTorqueToMotors(control_action.tail<NUM_INPUTS>(), cmd);
 
                     for (int i = 0; i < NUM_INPUTS; i++) {
-                        cmd.motorCmd[i].Kp = motor_kp_; // TODO: tune
-                        cmd.motorCmd[i].Kd = motor_kv_; // TODO: tune
+                        cmd.motorCmd[i].Kp = 0; //motor_kp_; // TODO: tune
+                        cmd.motorCmd[i].Kd = 0; //motor_kv_; // TODO: tune
                     }
                 } else {
                     log_file_ << "[Control] Reverting to a default state." << std::endl;
+                    std::cerr << "[Control] [Robot] MPC Control action rejected. Returning to standing state." << std::endl;
                     AssignConfigToMotors(init_config_.tail<NUM_INPUTS>(), cmd);
                     AssignVelToMotors(init_vel_.tail<NUM_INPUTS>(), cmd);
                     AssignTorqueToMotors(vector_t::Constant(NUM_INPUTS, 0), cmd);
@@ -214,7 +278,7 @@ namespace hardware {
                 in_mpc_ = false;
             }
 
-            safe.PowerProtect(cmd, state, 1);
+            safe.PowerProtect(cmd, state, 5);
 
             udp.SetSend(cmd);       // Send the command
             log_file_ << "[Communication] command sent." << std::endl;
@@ -228,7 +292,7 @@ namespace hardware {
 
     bool HardwareRobot::VerifyControlAction(const vector_t& control) {
         for (int i = 0; i < control.size(); i++) {
-            if (std::abs(control(i)) > 20) {
+            if (std::abs(control(i)) > 27) {
                 log_file_ << "[Control] Control action at index " << i << " is too large." << std::endl;
                 return false;
             }
@@ -288,8 +352,7 @@ namespace hardware {
         v.head<3>() = (opti_data_.head<3>() - prev_opti_data_.head<3>())/optitrack_rate_;
         optitrack_mut_.unlock();
 
-        // TODO: Consider merging with the IMU data and filtering
-
+        q.segment<4>(3) = -q.segment<4>(3);
 
         // Get the quaternion
 //            q(POS_VARS) = state.imu.quaternion[1];
@@ -302,9 +365,9 @@ namespace hardware {
         v(POS_VARS + 1) = state.imu.gyroscope[1];
         v(POS_VARS + 2) = state.imu.gyroscope[2];
 
-        a(POS_VARS) = state.imu.accelerometer[0];
-        a(POS_VARS + 1) = state.imu.accelerometer[1];
-        a(POS_VARS + 2) = -state.imu.accelerometer[2]; // Nominally gives +9.81
+        a(0) = state.imu.accelerometer[0];
+        a(1) = state.imu.accelerometer[1];
+        a(2) = -state.imu.accelerometer[2]; // Nominally gives +9.81
 
         // Note: assuming angular acceleration is very small, so keeping it at 0
     }
@@ -453,6 +516,13 @@ namespace hardware {
         a(9 + FLOATING_VEL_OFFSET) = state.motorState[RR_0].ddq;
         a(10 + FLOATING_VEL_OFFSET) = state.motorState[RR_1].ddq;
         a(11 + FLOATING_VEL_OFFSET) = state.motorState[RR_2].ddq;
+    }
+
+    vector_t HardwareRobot::LPF(const LPFData& data, double fpass, double fsample) {
+        const double x = std::tan(3.14159*fpass/fsample);
+        vector_t output = (x*(data.current_sample + data.prev_sample) + (1-x)*data.prev_output)/(x+1);
+
+        return output;
     }
 
 } // hardware

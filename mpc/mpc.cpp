@@ -899,8 +899,12 @@ namespace mpc {
         const int table_width = 10*col_width;
 
         if (!used_log_file_) {
+            auto time_now = std::chrono::system_clock::now();
+            std::time_t time1_now = std::chrono::system_clock::to_time_t(time_now);
+
             log_file << setfill('-') << setw(table_width) << "" << std::endl;
             log_file << std::left << setfill(' ') << setw(table_width/2 - 7) << "" << "MPC Statistics" << std::endl;
+            log_file << std::left << "MPC started at: " << std::ctime(&time1_now);
             log_file << std::left << "Number of nodes: " << info_.num_nodes << std::endl;
             log_file << std::left << "MPC time step: " << info_.integrator_dt << std::endl;
             log_file << std::left << "Force bounds: " << info_.force_bound << std::endl;

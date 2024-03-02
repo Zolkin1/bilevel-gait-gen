@@ -151,7 +151,7 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
         viz.UpdateViz(viz_rate);
 
         // Gait optimization
-        if (!(i % 5)) {
+        if (!(i % 5)) { //5
             prev_cost = GaitOptLS(mpc, gait_opt, cost_red, time, info, config, mpc_des_state,
                                   ee_locations, warm_start, fixed_pos);
 
@@ -214,6 +214,7 @@ int main() {
     info.nom_state = config.ParseEigenVector("init_config");
     info.ee_box_size = config.ParseEigenVector("ee_box_size");
     info.real_time_iters = config.ParseNumber<int>("run_time_iterations");
+    info.force_cost = config.ParseNumber<double>("force_cost");
     switch (config.ParseNumber<int>("mpc_verbosity")) {
         case 0:
             info.verbose = mpc::Nothing;
@@ -238,10 +239,10 @@ int main() {
 //    init_state.tail(standing.size()) = standing;
 
     // Create the goal state
-    vector_t mpc_des_state = init_state;
-    mpc_des_state.head<2>() << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
-    mpc_des_state.segment<2>(3) << config.ParseNumber<double>("xdot_des"), config.ParseNumber<double>("ydot_des");
-    mpc_des_state.segment<4>(6) << 0, 0, 0, 1;
+    vector_t mpc_des_state = config.ParseEigenVector("srb_target"); //init_state;
+//    mpc_des_state.head<2>() << config.ParseNumber<double>("x_des"), config.ParseNumber<double>("y_des");
+//    mpc_des_state.segment<2>(3) << config.ParseNumber<double>("xdot_des"), config.ParseNumber<double>("ydot_des");
+//    mpc_des_state.segment<4>(6) << 0, 0, 0, 1;
 
     // Create the warm start
     std::vector<vector_t> warm_start(info.num_nodes+1); //, init_state);

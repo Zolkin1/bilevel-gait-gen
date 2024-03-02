@@ -59,7 +59,8 @@ namespace controller {
                   double leg_weight,
                   double torso_weight,
                   double force_weight,
-                  int num_contacts);
+                  int num_contacts,
+                  double max_grf);
 
         Eigen::VectorXd ComputeControlAction(const Eigen::VectorXd& q,
                                              const Eigen::VectorXd& v,
@@ -165,6 +166,7 @@ namespace controller {
                      const Eigen::VectorXd& v,
                      const Eigen::Vector3d& acom,
                      const Eigen::VectorXd& a,
+                     const Eigen::VectorXd& tau,
                      const Eigen::VectorXd& grf);
 
         // QP Solver
@@ -212,6 +214,8 @@ namespace controller {
         Contact des_contact_;
 
         std::ofstream log_file_;
+
+        double max_grf_;
     };
 }   // controller
 

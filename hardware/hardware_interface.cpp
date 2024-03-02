@@ -113,7 +113,7 @@ int main() {
 //    robot.StartControlLoop();
 
     const double dt = 0.002;
-    UNITREE_LEGGED_SDK::LoopFunc control_loop("control_loop", dt, boost::bind(&HardwareRobot::ControlCallback, &robot));
+    UNITREE_LEGGED_SDK::LoopFunc control_loop("control_loop", 0.001, boost::bind(&HardwareRobot::ControlCallback, &robot));
     UNITREE_LEGGED_SDK::LoopFunc udp_send("udp_send", dt, 3, boost::bind(&HardwareRobot::SendUDP, &robot));
     UNITREE_LEGGED_SDK::LoopFunc udp_recv("udp_recv", dt, 3, boost::bind(&HardwareRobot::RecieveUDP, &robot));
 
