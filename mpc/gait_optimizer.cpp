@@ -279,7 +279,7 @@ namespace mpc {
         // TODO: Consider building a sparse matrix in the first place
         sp_matrix_t P = Bk_.sparseView();
 
-        PrintConstraints(A, lb_, ub_);
+//        PrintConstraints(A, lb_, ub_);
 
         // ------------------- Run Solver ------------------- //
 //        PrintConstraints(A.toDense(), lb_, ub_);
@@ -346,7 +346,7 @@ namespace mpc {
         step_ = alpha*step_; // used for line-search/debugging
         xkp1_ = xk_ + step_;
 
-        std::cout << "gait opt step: " << step_.transpose() << std::endl;
+//        std::cout << "gait opt step: " << step_.transpose() << std::endl;
 
         contact_times_ = ConvertQPVecToContactTimes(xkp1_);
 

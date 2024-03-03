@@ -69,14 +69,14 @@ srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
            0, 0, 0, 1.0, # 0.0505,   -0.1643,   -0.0572,    0.9835,
            0, 0, 0]
 
-srb_target: [-1, 2, 0.3,
+srb_target: [1, 1, 0.3,
              0, 0, 0,
              0, 0, 0.0, 1.0,
              0, 0, 0]
 
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
-control_rate: 1000  # Hz
+control_rate: 1000  # Hz - 1000 is good
 #torque_bounds: [30, 30, 30,
 #                30, 30, 30,
 #                30, 30, 30,
@@ -97,12 +97,14 @@ base_pos_gains: [8000, 9000]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and 
 base_ang_gains: [600, 1000]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
 
 # 5500, 300 works well for the QP controller
-# Note that these may need to re-tuned for different dt's/node counts
-kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500] # 5500
-kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300] # 300
 
-#kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
-#kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
+# For 20 nodes (0.05 dt)
+#kp_joint_gains: [1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200] # 5500
+#kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300] # 300
+
+# For 50 nodes (0.02 dt)
+kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
+kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
 
 leg_tracking_weight: 10 #10
 torso_tracking_weight: 100 #10
@@ -142,7 +144,11 @@ num_polys: 3
 #xdot_des: 0
 #ydot_des: 0
 
-gait_opt_freq: 500000 #5
+# For 50 nodes (0.02 dt)
+gait_opt_freq: 5 #5
+
+# For 20 nodes (0.05 dt)
+#gait_opt_freq: 20
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
 ee_box_size: [0.15, 0.15] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this
@@ -165,11 +171,11 @@ Q_diag: [1, 1, 1,          # linear momentum
          60000, 500, 10,       # RL leg
          60000, 500, 10]       # RR leg
 
-# can try higher weight with less nodes
-Q_srbd_diag: [140.0, 140.0, 12000, .01500, .0150, 10, 3000, 3000, 3000, 1, 1, 1] # 80, 80 for diag walking or 180, 180
-# 640 for positions for 20 nodes, 140 for positions for 50 nodes
+# 20 nodes (0.05 dt)
+#Q_srbd_diag: [1140.0, 1140.0, 12000, .01500, .0150, 10, 3000, 3000, 3000, 1, 1, 1]
 
-# Q_srbd_diag: [80.0, 80.0, 800, .150, .50, 10, 700, 700, 700, 1, 1, 1]
+# 50 nodes (0.02 dt):
+Q_srbd_diag: [140.0, 140.0, 12000, .01500, .0150, 10, 3000, 3000, 3000, 1, 1, 1]
 
 # Walk to position weights:
 # Q_srbd_diag: [30.0, 30.0, 500, 0.1, 0.1, 0.1, 5000, 5000, 5000, 0.1, 0.1, 0.1]
@@ -194,7 +200,7 @@ Q_srbd_diag: [140.0, 140.0, 12000, .01500, .0150, 10, 3000, 3000, 3000, 1, 1, 1]
 # desired height 0.34
 # force weight 0.001
 
-log_file: "2-27-mpc-log-1.txt"
+log_file: "mpc-log-1.txt"
 
 mpc_verbosity: 0
 
