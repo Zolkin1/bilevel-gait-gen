@@ -159,8 +159,8 @@ run_time_iterations: 6000 # 150 works well
 foot_offset: 0.015  # 0.01 works well -- can be sensitive
 
 force_cost: 0.001 # Note: without this cost, the problem is much more poorly
-                  # conditioned and can return infeasible, also the derivative computations are much worse
-                  # without this force cost, the QP cost is almost constant in steady state.
+  # conditioned and can return infeasible, also the derivative computations are much worse
+# without this force cost, the QP cost is almost constant in steady state.
 
 Q_diag: [1, 1, 1,          # linear momentum
          1, 1, 1,           # angular momentum
