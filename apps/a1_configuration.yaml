@@ -33,7 +33,7 @@ init_config: [0., 0., 0.3, 0.0, 0.0, 0.0, 1.0, # -0.0004, 0.004, 0.0001,
 #              0.08, 0.45, -1.03]
 # initial joint velocity
 # xv, yv, zv, angle rates, v0, ..., v11
-init_vel: [0.375, 0., 0., 0., 0., 0.,
+init_vel: [0., 0., 0., 0., 0., 0.,
            0., 0., 0.,
            0., 0., 0.,
            0., 0., 0.,
@@ -65,7 +65,7 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
 #            0, 0, 0]
 
 srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
-           2.5, 0, 0, #4.404,   -0.001,    0.957, # 6, 6 for x, y vel give some cool results
+           0, 0, 0, #4.404,   -0.001,    0.957, # 6, 6 for x, y vel give some cool results
            0, 0, 0, 1.0, # 0.0505,   -0.1643,   -0.0572,    0.9835,
            0, 0, 0]
 
@@ -145,7 +145,7 @@ num_polys: 3
 #ydot_des: 0
 
 # For 50 nodes (0.02 dt)
-gait_opt_freq: 5 #5
+gait_opt_freq: 500000 #5
 
 # For 20 nodes (0.05 dt)
 #gait_opt_freq: 20

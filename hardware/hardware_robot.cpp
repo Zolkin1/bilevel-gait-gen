@@ -143,13 +143,13 @@ namespace hardware {
             a.head<FLOATING_VEL_OFFSET>() = LPF(a_com, 15, 500);
             a_com.prev_output = a.head<FLOATING_VEL_OFFSET>();
 
-            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 1, 500); // todo: tune fpass. 1 is very smooth, 10 is tradeoff with jitter, 25 is pretty jittery
+            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 2, 240); // todo: tune fpass. 1 is very smooth, 10 is tradeoff with jitter, 25 is pretty jittery
             v_com.prev_output = v.head<FLOATING_VEL_OFFSET>(); //v.head<FLOATING_VEL_OFFSET>();
 
-            v.tail<NUM_INPUTS>() = LPF(v_joints, 1, 500);
+            v.tail<NUM_INPUTS>() = LPF(v_joints, 2, 500);
             v_joints.prev_output = v.tail<NUM_INPUTS>();
 
-            grf = LPF(grf_lpf, 1, 500);
+            grf = LPF(grf_lpf, 50, 500);
             grf_lpf.prev_output = grf;
             // ---------------------------- //
 
@@ -246,8 +246,8 @@ namespace hardware {
                     AssignTorqueToMotors(control_action.tail<NUM_INPUTS>(), cmd);
 
                     for (int i = 0; i < NUM_INPUTS; i++) {
-                        cmd.motorCmd[i].Kp = 0; //motor_kp_; // TODO: tune
-                        cmd.motorCmd[i].Kd = 0; //motor_kv_; // TODO: tune
+                        cmd.motorCmd[i].Kp = 3.5; //motor_kp_; // TODO: tune
+                        cmd.motorCmd[i].Kd = 2.; //motor_kv_; // TODO: tune
                     }
                 } else {
                     log_file_ << "[Control] Reverting to a default state." << std::endl;

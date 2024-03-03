@@ -142,6 +142,10 @@ namespace controller {
         state_time_mut_.lock(); // -------- Setting MPC Variables -------- //
         state_ = state;
 
+//        if (time > 1) {
+//            time = 1;
+//        }
+
         if (time > time_) {
             time_ = time;
         }
@@ -180,6 +184,7 @@ namespace controller {
 
         // ---- For staying in place without MPC ---- //
 //        q_des_ = full_body_state_;
+////        q_des_(2) -= 0.10;
 //        v_des_.setZero();
 //        force_des.resize(12);
 //        for (int ee = 0; ee < contact1.in_contact_.size(); ee++) {
