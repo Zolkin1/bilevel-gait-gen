@@ -151,7 +151,7 @@ namespace hardware {
             v_com.prev_output = v.head<FLOATING_VEL_OFFSET>(); //v.head<FLOATING_VEL_OFFSET>();
 
             // Note: increased from 2 to 10!
-            v.tail<NUM_INPUTS>() = LPF(v_joints, 10, 500);
+            v.tail<NUM_INPUTS>() = LPF(v_joints, 100, 500);
             v_joints.prev_output = v.tail<NUM_INPUTS>();
 
             grf = LPF(grf_lpf, 50, 500);
@@ -286,7 +286,7 @@ namespace hardware {
                 in_mpc_ = false;
             }
 
-            safe.PowerProtect(cmd, state, 5);
+            safe.PowerProtect(cmd, state, 7);
 
             udp.SetSend(cmd);       // Send the command
             log_file_ << "[Communication] command sent." << std::endl;
@@ -360,7 +360,7 @@ namespace hardware {
         v.head<3>() = (opti_data_.head<3>() - prev_opti_data_.head<3>())/optitrack_rate_;
         optitrack_mut_.unlock();
 
-        q.segment<4>(3) = -q.segment<4>(3);
+//        q.segment<4>(3) = -q.segment<4>(3);
 
         // Get the quaternion
 //            q(POS_VARS) = state.imu.quaternion[1];
@@ -558,13 +558,24 @@ namespace hardware {
             calf_idx += 3;
         }
 
+//        std::cout << "calf gains: " << gains_.thigh_kp << ", " << gains_.thigh_kv << std::endl;
+
 //        std::cout << std::endl;
 
 //        std::cout << cmd.motorCmd[UNI].mode << std::endl;
 //        std::cout << cmd.motorCmd[5].mode << std::endl;
 
+        cmd.motorCmd[UNITREE_LEGGED_SDK::FL_2].Kp = 30;
+        cmd.motorCmd[UNITREE_LEGGED_SDK::FL_2].Kd = 20;
+
         cmd.motorCmd[UNITREE_LEGGED_SDK::FR_2].Kp = 30; //gains_.calf_kp;
         cmd.motorCmd[UNITREE_LEGGED_SDK::FR_2].Kd = 20; //gains_.calf_kv;
+
+        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_2].Kp = 30;
+        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_2].Kd = 20;
+
+        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_2].Kp = 15;
+        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_2].Kd = 5;
 //        cmd.motorCmd[7].Kp = 10;
 //        cmd.motorCmd[7].Kd = 5;
 

@@ -114,7 +114,7 @@ namespace controller {
         GetTargetsFromTraj(traj_, time_);
 
         UpdateTrajViz();
-//        mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
+        mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
     }
 
     vector_t MPCController::ComputeControlAction(const vector_t& q, const vector_t& v,
@@ -143,9 +143,9 @@ namespace controller {
         state_ = state;
 
         // TODO: Remove
-        if (time > 1) {
-            time = 1;
-        }
+//        if (time > 1) {
+//            time = 1;
+//        }
 
         if (time > time_) {
             time_ = time;
@@ -184,15 +184,15 @@ namespace controller {
 
 
         // ---- For staying in place without MPC ---- //
-        q_des_ = full_body_state_;
-//        q_des_(13) += 0.5;
-        q_des_(17) += 0.5; //14
-        v_des_.setZero();
-        force_des.resize(12);
-        for (int ee = 0; ee < contact1.in_contact_.size(); ee++) {
-            contact1.in_contact_.at(ee) = false;
-            force_des.segment<3>(3*ee) << 0, 0, model_.GetMass()*9.81/contact1.in_contact_.size();
-        }
+//        q_des_ = full_body_state_;
+// //        q_des_(13) += 0.5;
+//        q_des_(9) += 0.5; //14
+//        v_des_.setZero();
+//        force_des.resize(12);
+//        for (int ee = 0; ee < contact1.in_contact_.size(); ee++) {
+//            contact1.in_contact_.at(ee) = false;
+//            force_des.segment<3>(3*ee) << 0, 0, model_.GetMass()*9.81/contact1.in_contact_.size();
+//        }
         // ----------------------------------------- //
 
         vector_t control_action = vector_t::Zero(3*num_inputs_);    // joints, joint velocities, torques

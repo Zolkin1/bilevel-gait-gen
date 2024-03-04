@@ -110,8 +110,8 @@ int main() {
     gains.thigh_kp = config.ParseNumber<double>("thigh_joint_kp");
     gains.thigh_kv = config.ParseNumber<double>("thigh_joint_kv");
 
-    gains.thigh_kp = config.ParseNumber<double>("calf_joint_kp");
-    gains.thigh_kv = config.ParseNumber<double>("calf_joint_kv");
+    gains.calf_kp = config.ParseNumber<double>("calf_joint_kp");
+    gains.calf_kv = config.ParseNumber<double>("calf_joint_kv");
 
     HardwareRobot robot(standing, init_vel,
                         config.ParseEigenVector("srb_init"),

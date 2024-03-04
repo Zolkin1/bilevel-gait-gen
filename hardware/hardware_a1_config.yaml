@@ -103,16 +103,17 @@ base_ang_gains: [50, 90]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 10
 #kd_joint_gains: [10, 15, 35, 10, 15, 35, 10, 15, 35, 10, 15, 35] # 30 looked ok for just qp
 
 # Note that some joints requires different gains on hardware
-kp_joint_gains: [1200, 1000, 700, 1000, 1000, 3000, 1600, 1000, 500, 1000, 1000, 700] # 100 looked ok for just qp
-kd_joint_gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] # 30 looked ok for just qp
+# 700
+kp_joint_gains: [1200, 1000, 1000, 200, 1000, 3000, 1600, 1000, 200, 1000, 1000, 200] # 100 looked ok for just qp
+kd_joint_gains: [200, 100, 50, 200, 100, 50, 200, 100, 50, 200, 100, 50] # 30 looked ok for just qp
 
 # 5000, 300 works well for the QP controller in sim
 #kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
 #kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
 
 leg_tracking_weight: 10 #10
-torso_tracking_weight: 0 # 100
-force_tracking_weight: 0 # 1
+torso_tracking_weight: 50 # 100
+force_tracking_weight: 1 # 1
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
@@ -208,12 +209,12 @@ hip_joint_kp: 3.5
 hip_joint_kv: 2.0
 
 # thigh looks like it needs more kp
-thigh_joint_kp: 5.5
-thigh_joint_kv: 4.5
+thigh_joint_kp: 20 # 30
+thigh_joint_kv: 15 # 25
 
 # calf looks like it needs more kp
-calf_joint_kp: 2.5 # 5.5
-calf_joint_kv: 1.5 # 3.5
+calf_joint_kp: 30 # 5.5
+calf_joint_kv: 20 # 3.5
 
 ## --- Temp --- ##
 #viz_rate: 0.025

@@ -69,7 +69,7 @@ srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
            0, 0, 0, 1.0, # 0.0505,   -0.1643,   -0.0572,    0.9835,
            0, 0, 0]
 
-srb_target: [0, 0, 0.3,
+srb_target: [1, 0, 0.3,
              0, 0, 0,
              0, 0, 0.0, 1.0,
              0, 0, 0]
@@ -107,8 +107,8 @@ kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 550
 kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
 
 leg_tracking_weight: 10 #10
-torso_tracking_weight: 0 #100 #10
-force_tracking_weight: 0 #1 #10
+torso_tracking_weight: 100 #100 #10
+force_tracking_weight: 1 #1 #10
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
@@ -145,7 +145,7 @@ num_polys: 3
 #ydot_des: 0
 
 # For 50 nodes (0.02 dt)
-gait_opt_freq: 5 #5
+gait_opt_freq: 500000 #5
 
 # For 20 nodes (0.05 dt)
 #gait_opt_freq: 20
