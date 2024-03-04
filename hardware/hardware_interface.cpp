@@ -102,11 +102,21 @@ int main() {
                                                                  config.ParseString("log_file"));
 
     const vector_t init_vel = config.ParseEigenVector("init_vel");
+
+    JointGains gains{};
+    gains.hip_kp = config.ParseNumber<double>("hip_joint_kp");
+    gains.hip_kv = config.ParseNumber<double>("hip_joint_kv");
+
+    gains.thigh_kp = config.ParseNumber<double>("thigh_joint_kp");
+    gains.thigh_kv = config.ParseNumber<double>("thigh_joint_kv");
+
+    gains.thigh_kp = config.ParseNumber<double>("calf_joint_kp");
+    gains.thigh_kv = config.ParseNumber<double>("calf_joint_kv");
+
     HardwareRobot robot(standing, init_vel,
                         config.ParseEigenVector("srb_init"),
                         mpc_controller, 2,
-                        config.ParseNumber<double>("joint_kp"),
-                        config.ParseNumber<double>("joint_kd"), 1.0/300.0);
+                        gains,1.0/240.0);
 
     robot.ChangeState(hardware::HardwareRobot::Hold);
 

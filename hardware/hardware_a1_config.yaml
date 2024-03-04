@@ -95,22 +95,24 @@ friction_coef: 0.3 #0.3 - note problem can be sensitive to this with the gait op
 
 # TODO: Tune
 # 1000, 5000
-base_pos_gains: [120, 150]  # kd_pos, kp_pos  need the kd~300 and kp~340 looks ok for just qp
+base_pos_gains: [130, 160]  # kd_pos, kp_pos  need the kd~300 and kp~340 looks ok for just qp
 base_ang_gains: [50, 90]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
 
 
+#kp_joint_gains: [15, 25, 55, 15, 25, 55, 15, 25, 55, 15, 25, 55] # 100 looked ok for just qp
+#kd_joint_gains: [10, 15, 35, 10, 15, 35, 10, 15, 35, 10, 15, 35] # 30 looked ok for just qp
 
-# The following are tuned for when vdes = 0H
-# 5000, 300 works well for the QP controller
-kp_joint_gains: [15, 15, 35, 15, 15, 35, 15, 15, 35, 15, 15, 35] # 100 looked ok for just qp
-kd_joint_gains: [10, 10, 20, 10, 10, 20, 10, 10, 20, 10, 10, 20] # 30 looked ok for just qp
+# Note that some joints requires different gains on hardware
+kp_joint_gains: [1200, 1000, 700, 1000, 1000, 3000, 1600, 1000, 500, 1000, 1000, 700] # 100 looked ok for just qp
+kd_joint_gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] # 30 looked ok for just qp
 
+# 5000, 300 works well for the QP controller in sim
 #kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
 #kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
 
 leg_tracking_weight: 10 #10
-torso_tracking_weight: 100 #10
-force_tracking_weight: 1 #10
+torso_tracking_weight: 0 # 100
+force_tracking_weight: 0 # 1
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
@@ -153,7 +155,7 @@ ee_box_size: [0.12, 0.12] # 0.1, 0.12 is a good set of numbers -- how well it wo
 
 run_time_iterations: 6000 # 150 works well
 
-foot_offset: 0.015  # 0.01 works well -- can be sensitive
+foot_offset: 0.0175  # 0.01 works well -- can be sensitive
 
 force_cost: 10000 # Note: without this cost, the problem is much more poorly
   # conditioned and can return infeasible, also the derivative computations are much worse
@@ -201,8 +203,17 @@ log_file: "mpc-log-1.txt"
 mpc_verbosity: 0
 
 ## --- Hardware --- ##
-joint_kp: 30
-joint_kd: 7
+# Hip tracking was looking pretty good
+hip_joint_kp: 3.5
+hip_joint_kv: 2.0
+
+# thigh looks like it needs more kp
+thigh_joint_kp: 5.5
+thigh_joint_kv: 4.5
+
+# calf looks like it needs more kp
+calf_joint_kp: 2.5 # 5.5
+calf_joint_kv: 1.5 # 3.5
 
 ## --- Temp --- ##
 #viz_rate: 0.025

@@ -189,6 +189,7 @@ namespace controller {
                 pin_data_->M.topLeftCorner(FLOATING_VEL_OFFSET, num_vel_);
 
 //        A_.topRightCorner(FLOATING_VEL_OFFSET, CONSTRAINT_PER_FOOT*GetNumBothContacts(contact, des_contact_)) =
+
         A_.block(0, num_vel_, FLOATING_VEL_OFFSET,
                CONSTRAINT_PER_FOOT* GetNumBothContacts(contact, des_contact_)) =
             -Js_.transpose().topRows(FLOATING_VEL_OFFSET);
@@ -269,7 +270,6 @@ namespace controller {
         }
     }
 
-    // TODO: Make the leg tracking able to only track subset's of legs (i.e. swing legs)
     void QPControl::AddLegTrackingCost(const Eigen::VectorXd& q, const Eigen::VectorXd& v) {
         // For now, just make all the joint accelerations go to 0.
         P_.block(FLOATING_VEL_OFFSET, FLOATING_VEL_OFFSET, num_inputs_, num_inputs_) =
@@ -278,6 +278,8 @@ namespace controller {
         Eigen::VectorXd target = acc_target_.tail(num_inputs_) +
                                  kv_joint_.cwiseProduct(vel_target_.tail(num_inputs_) - v.tail(num_inputs_)) +
                                  kp_joint_.cwiseProduct(config_target_.tail(num_inputs_) - q.tail(num_inputs_));
+
+//        std::cout << "leg target: " << target.transpose() << std::endl;
 
         w_.segment(FLOATING_VEL_OFFSET, num_inputs_) = -2*target*leg_tracking_weight_;
     }
@@ -370,6 +372,8 @@ namespace controller {
         AddLegTrackingCost(q, v);
         AddTorsoCost(q, v); // TODO: Investigate/fix -- need to check the scaling on this constraint and check that the dynamics are good
         AddForceTrackingCost(contact);
+
+//        std::cout << "cost lin: \n" << w_ << std::endl;
 
         // Check if the sparsity pattern changed
         if (num_contacts != prev_num_contacts_) {

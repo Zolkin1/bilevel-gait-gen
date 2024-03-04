@@ -21,7 +21,7 @@ namespace hardware {
     HardwareRobot::HardwareRobot(const hardware::vector_t& init_config, const hardware::vector_t& init_vel,
                                  const hardware::vector_t& init_mpc_state,
                                  std::unique_ptr<controller::MPCController>& controller, int robot_id,
-                                 double joint_kp, double joint_kv, double optitrack_rate) :
+                                 const JointGains& gains, double optitrack_rate) :
                                  udp(UNITREE_LEGGED_SDK::LOWLEVEL),
                                  safe(UNITREE_LEGGED_SDK::LeggedType::A1),
 //                                 8080, UNITREE_LEGGED_SDK::UDP_SERVER_IP_BASIC,
@@ -56,8 +56,11 @@ namespace hardware {
 
         hold_state_.resize(NUM_INPUTS + FLOATING_BASE_OFFSET);
 
-        motor_kp_ = joint_kp;
-        motor_kv_ = joint_kv;
+        gains_ = gains;
+
+        // These are used when NOT using the MPC
+        motor_kp_ = 30;
+        motor_kv_ = 7;
 
         mpc_time_offset_ = 0;
         mpc_offsets_.setZero();
@@ -117,7 +120,7 @@ namespace hardware {
             a.resize(NUM_INPUTS + FLOATING_VEL_OFFSET);
             RecoverStateFromMotors(q, v, a, state);
 
-            // TODO: Joint acclerations are always 0
+            // TODO: Joint accelerations are always 0
 
             ComputeCOMStateEstimate(q, v, a, state);
 
@@ -143,10 +146,12 @@ namespace hardware {
             a.head<FLOATING_VEL_OFFSET>() = LPF(a_com, 15, 500);
             a_com.prev_output = a.head<FLOATING_VEL_OFFSET>();
 
-            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 2, 240); // todo: tune fpass. 1 is very smooth, 10 is tradeoff with jitter, 25 is pretty jittery
+            // Note: increased to 50!
+            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 50, 240); // todo: tune fpass. 1 is very smooth, 10 is tradeoff with jitter, 25 is pretty jittery
             v_com.prev_output = v.head<FLOATING_VEL_OFFSET>(); //v.head<FLOATING_VEL_OFFSET>();
 
-            v.tail<NUM_INPUTS>() = LPF(v_joints, 2, 500);
+            // Note: increased from 2 to 10!
+            v.tail<NUM_INPUTS>() = LPF(v_joints, 10, 500);
             v_joints.prev_output = v.tail<NUM_INPUTS>();
 
             grf = LPF(grf_lpf, 50, 500);
@@ -179,8 +184,8 @@ namespace hardware {
                 AssignTorqueToMotors(vector_t::Constant(NUM_INPUTS, 0), cmd);
 
                 for (int i = 0; i < NUM_INPUTS; i++) {
-                    cmd.motorCmd[i].Kp = motor_kp_; // TODO: tune
-                    cmd.motorCmd[i].Kd = motor_kv_; // TODO: tune
+                    cmd.motorCmd[i].Kp = motor_kp_;
+                    cmd.motorCmd[i].Kd = motor_kv_;
                 }
 
             } else if (robot_state_ == Hold) {
@@ -190,8 +195,8 @@ namespace hardware {
                 AssignTorqueToMotors(vector_t::Constant(NUM_INPUTS, 0), cmd);
 
                 for (int i = 0; i < NUM_INPUTS; i++) {
-                    cmd.motorCmd[i].Kp = motor_kp_; // TODO: tune
-                    cmd.motorCmd[i].Kd = motor_kv_; // TODO: tune
+                    cmd.motorCmd[i].Kp = motor_kp_;
+                    cmd.motorCmd[i].Kd = motor_kv_;
                 }
 
             } else if (robot_state_ == MPC) {
@@ -237,6 +242,10 @@ namespace hardware {
 
                 // Apply the offsets
                 q.head<2>() -= mpc_offsets_;
+
+//                v.setZero(); // TODO: Remove
+//                a.setZero(); // TODO: Remove
+
                 vector_t control_action = controller_->ComputeControlAction(q, v, a, contact,
                                                                             time_s - mpc_time_offset_);
 
@@ -244,11 +253,10 @@ namespace hardware {
                     AssignConfigToMotors(control_action.head<NUM_INPUTS>(), cmd);
                     AssignVelToMotors(control_action.segment<NUM_INPUTS>(NUM_INPUTS), cmd);
                     AssignTorqueToMotors(control_action.tail<NUM_INPUTS>(), cmd);
+//                    AssignTorqueToMotors(vector_t::Zero(NUM_INPUTS), cmd);
 
-                    for (int i = 0; i < NUM_INPUTS; i++) {
-                        cmd.motorCmd[i].Kp = 3.5; //motor_kp_; // TODO: tune
-                        cmd.motorCmd[i].Kd = 2.; //motor_kv_; // TODO: tune
-                    }
+                    // Assign joint kp and kv
+                    AssignMPCGains();
                 } else {
                     log_file_ << "[Control] Reverting to a default state." << std::endl;
                     std::cerr << "[Control] [Robot] MPC Control action rejected. Returning to standing state." << std::endl;
@@ -257,8 +265,8 @@ namespace hardware {
                     AssignTorqueToMotors(vector_t::Constant(NUM_INPUTS, 0), cmd);
 
                     for (int i = 0; i < NUM_INPUTS; i++) {
-                        cmd.motorCmd[i].Kp = motor_kp_; // TODO: tune
-                        cmd.motorCmd[i].Kd = motor_kv_; // TODO: tune
+                        cmd.motorCmd[i].Kp = motor_kp_;
+                        cmd.motorCmd[i].Kd = motor_kv_;
                     }
 
                     // To be safe, move back to standing
@@ -292,7 +300,7 @@ namespace hardware {
 
     bool HardwareRobot::VerifyControlAction(const vector_t& control) {
         for (int i = 0; i < control.size(); i++) {
-            if (std::abs(control(i)) > 27) {
+            if (std::abs(control(i)) > 200) {
                 log_file_ << "[Control] Control action at index " << i << " is too large." << std::endl;
                 return false;
             }
@@ -523,6 +531,62 @@ namespace hardware {
         vector_t output = (x*(data.current_sample + data.prev_sample) + (1-x)*data.prev_output)/(x+1);
 
         return output;
+    }
+
+    void HardwareRobot::AssignMPCGains() {
+        int thigh_idx = 1;
+        int calf_idx = 2;
+
+        for (int hip_idx = 0; hip_idx < NUM_INPUTS; hip_idx += 3) {
+            // TODO: Tune
+            cmd.motorCmd[hip_idx].Kp = gains_.hip_kp;
+            cmd.motorCmd[hip_idx].Kd = gains_.hip_kv;
+
+//            std::cout << calf_idx << ", ";
+
+            cmd.motorCmd[thigh_idx].Kp = gains_.thigh_kp;
+            cmd.motorCmd[thigh_idx].Kd = gains_.thigh_kv;
+
+            cmd.motorCmd[calf_idx].Kp = gains_.calf_kp;
+            cmd.motorCmd[calf_idx].Kd = gains_.calf_kv;
+
+            cmd.motorCmd[hip_idx].mode = 0x0A;
+            cmd.motorCmd[thigh_idx].mode = 0x0A;
+            cmd.motorCmd[calf_idx].mode = 0x0A;
+
+            thigh_idx += 3;
+            calf_idx += 3;
+        }
+
+//        std::cout << std::endl;
+
+//        std::cout << cmd.motorCmd[UNI].mode << std::endl;
+//        std::cout << cmd.motorCmd[5].mode << std::endl;
+
+        cmd.motorCmd[UNITREE_LEGGED_SDK::FR_2].Kp = 30; //gains_.calf_kp;
+        cmd.motorCmd[UNITREE_LEGGED_SDK::FR_2].Kd = 20; //gains_.calf_kv;
+//        cmd.motorCmd[7].Kp = 10;
+//        cmd.motorCmd[7].Kd = 5;
+
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_0].Kp = gains_.hip_kp;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_0].Kd = gains_.hip_kv;
+//
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_1].Kp = gains_.thigh_kp;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_1].Kd = gains_.thigh_kv;
+//
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_2].Kp = gains_.calf_kp;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_2].Kd = gains_.calf_kv;
+//
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_0].Kp = gains_.hip_kp;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_0].Kd = gains_.hip_kv;
+//
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_1].Kp = gains_.thigh_kp;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_1].Kd = gains_.thigh_kv;
+//
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_2].Kp = gains_.calf_kp;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_2].Kd = gains_.calf_kv;
+
+
     }
 
 } // hardware

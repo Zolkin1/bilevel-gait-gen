@@ -28,6 +28,17 @@ namespace hardware {
         void SetZero();
     };
 
+    struct JointGains {
+        double hip_kp;
+        double hip_kv;
+
+        double thigh_kp;
+        double thigh_kv;
+
+        double calf_kp;
+        double calf_kv;
+    };
+
     class HardwareRobot {
     public:
         enum State {
@@ -40,7 +51,7 @@ namespace hardware {
         HardwareRobot(const vector_t& init_config, const vector_t& init_vel,
                       const vector_t& init_mpc_state,
                       std::unique_ptr<controller::MPCController>& controller,
-                      int robot_id, double joint_kp, double joint_kv, double optitrack_rate);
+                      int robot_id, const JointGains& gains, double optitrack_rate);
 
         void ControlCallback();
 
@@ -70,6 +81,8 @@ namespace hardware {
         static void AssignTorqueToMotors(const vector_t& tau, UNITREE_LEGGED_SDK::LowCmd& cmd);
         static void RecoverStateFromMotors(vector_t& q, vector_t& v, vector_t& a,
                                            const UNITREE_LEGGED_SDK::LowState& state);
+
+        void AssignMPCGains();
 
         vector_t ConvertHardwareJointsToPinocchio(const vector_t& q);
         vector_t ConvertHardwareConfigToPinocchio(const vector_t& q);
@@ -137,6 +150,8 @@ namespace hardware {
         LPFData a_com;
         LPFData v_joints;
         LPFData grf_lpf;
+
+        JointGains gains_;
 
         std::chrono::high_resolution_clock::time_point init_time_;
 
