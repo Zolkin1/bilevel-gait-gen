@@ -770,7 +770,7 @@ namespace mpc {
                     AddTDPositionConstraintPartial(A_builder, partials.db, contact_time_idx, eq_idx, ee);
                     eq_idx += data_.num_td_pos_constraints_;
                 } else if (data_.constraints_.at(i) == Raibert) {
-                    AddRaibertPartials(A_builder, partials.db, contact_time_idx, eq_idx, ee);
+                    AddRaibertPartials(A_builder, contact_time_idx, eq_idx, ee);
                     eq_idx += data_.num_raibert_constraints_;
                 }
             }
@@ -972,8 +972,12 @@ namespace mpc {
                                                         pos_start_idx + vars_idx);
 
 //                                                    A(idx, (node) * num_states_ + coord) = 1;
-                        const int node = prev_traj_.GetNode(td_time);
-//                        std::cout << "node: " << node << std::endl;
+                        const int node = prev_traj_.GetNode(td_time - 0.01);
+
+//                        if (row_idx == 0) {
+//                            std::cout << "node: " << node << std::endl;
+//                        }
+
                         assert(node < info_.num_nodes + 1);
 
                         // COM in that coord
@@ -1012,9 +1016,45 @@ namespace mpc {
         assert(row_idx == data_.num_raibert_constraints_);
     }
 
-    void MPCSingleRigidBody::AddRaibertPartials(utils::SparseMatrixBuilder& builder, mpc::vector_t& b, int contact_idx,
+    void MPCSingleRigidBody::AddRaibertPartials(utils::SparseMatrixBuilder& builder, int contact_idx,
                                                 int eq_idx, int ee) {
-        throw std::runtime_error("Not implemented yet.");
+        int row_idx = 0;
+        int pos_start_idx = GetPosSplineStartIdx();
+
+        const auto contact_times = prev_traj_.GetContactTimes();
+
+        if (contact_times.at(ee).at(contact_idx).GetType() == TouchDown
+            && contact_times.at(ee).at(contact_idx).GetTime() > init_time_
+            && contact_times.at(ee).at(contact_idx).GetTime() < info_.num_nodes*info_.integrator_dt + init_time_) {
+            for (int coord = 0; coord < 2; coord++) { // Only need the heuristic in the x-y plane
+                const double td_time = contact_times.at(ee).at(contact_idx).GetTime(); //prev_traj_.GetNextContactTime(ee, contact_times.at(ee).at(j).GetTime());
+
+
+                const int node = prev_traj_.GetNode(td_time);
+
+               assert(node < info_.num_nodes + 1);
+
+                int i = contact_idx + 1;
+                while (i < contact_times.at(ee).size() && contact_times.at(ee).at(i).GetType() != LiftOff) {
+                    i++;
+                }
+
+                double contact_time;
+                if (i == contact_times.at(ee).size()) {
+                    contact_time = 1.0; // Setting to a reasonable value
+                } else {
+                    contact_time = contact_times.at(ee).at(i).GetTime() -
+                                   contact_times.at(ee).at(contact_idx).GetTime();
+                }
+
+                // TODO: Fix
+                // Velocity COM
+                builder.SetDiagonalMatrix(
+                        -0.00*contact_time/(model_.GetMass()*2), eq_idx + row_idx, node*num_states_ + 3 + coord, 1);
+
+                row_idx++;
+            }
+        }
     }
 
 } // mpc

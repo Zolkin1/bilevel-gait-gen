@@ -287,6 +287,10 @@ namespace controller {
         utils::Timer loop_timer("MPC loop");
 
         while(true) {
+
+            // TODO: Remove
+//            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
             state_time_mut_.lock(); // Get time
             double time_act = time_;
             state_time_mut_.unlock();

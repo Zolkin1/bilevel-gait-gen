@@ -47,7 +47,7 @@ namespace mpc {
 
         void AddRaibertHeuristic();
 
-        void AddRaibertPartials(utils::SparseMatrixBuilder& builder, vector_t& b, int contact_idx, int eq_idx, int ee);
+        void AddRaibertPartials(utils::SparseMatrixBuilder& builder, int contact_idx, int eq_idx, int ee);
 
         void AddEEStartConstraints(const std::vector<vector_3t>& ee_start_locations);
 

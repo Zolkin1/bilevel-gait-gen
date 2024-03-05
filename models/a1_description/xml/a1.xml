@@ -4,10 +4,14 @@
     <!-- -9.806 gravity term -->
     <option gravity='0 0 -9.81' iterations='50' solver='Newton' timestep='0.0005'/> <!-- 0.002, 0.0005 -->
     <option cone="elliptic" impratio="100"/>
+<!--    <option sensornoise="enable"/>-->
+    <option>
+        <flag sensornoise="enable" />
+    </option>
 
     <default>
-        <!-- solimp="0.05 1 0.02 0.9 6" solref="-0.005 -2500" 0.1 1  solref="-0.5 -500"-->
-        <geom contype="1" conaffinity="1" solimp="0.05 1 0.01 .9 1" solref="-50 -2000" condim="6"
+        <!-- solimp="0.05 1 0.01 .9 1" solref="-50 -2000" -->
+        <geom contype="1" conaffinity="1" solimp="0.05 1 0.01 .1 1" solref="-50 -2000" condim="6"
               friction="0.8 0.02 0.01" rgba="0.5 0.6 0.7 1" margin="0.001" group="0"/> <!-- 0.8 friction -->
 
         <light castshadow="false" diffuse="1 1 1"/>
@@ -47,7 +51,7 @@
         <body name="trunk" pos="0 0 .4" gravcomp="0">
 <!--            <inertial pos="0.0127283 0.00218554 0.000514891" quat="0.00186575 0.711506 0.000389649 0.702677" mass="4.714" diaginertia="0.0648213 0.0565803 0.0169323" />-->
             <inertial pos="0.0127283 0.00218554 0.000514891" quat="0.00186575 0.711506 0.000389649 0.702677" mass="6.001" diaginertia="0.0648213 0.0565803 0.0169323" />
-            <joint type="free" />
+            <joint name="body" type="free" />
             <geom type="mesh" contype="0" conaffinity="0" group="1" material="trunk" mesh="trunk" />
             <geom size="0.1335 0.066 0.057" type="box" material="trunk" />
             <geom size="0.0005 0.0005 0.0005" type="box" contype="0" conaffinity="0" group="1" material="body" />
@@ -211,32 +215,31 @@
     </actuator>
 
     <sensor>
+        <jointpos name="FR_hip_pos"     joint="FR_hip_joint" noise="0"/>
+        <jointpos name="FR_thigh_pos"   joint="FR_thigh_joint" noise="0"/>
+        <jointpos name="FR_calf_pos"    joint="FR_calf_joint" noise="0"/>
+        <jointpos name="FL_hip_pos"     joint="FL_hip_joint" noise="0"/>
+        <jointpos name="FL_thigh_pos"   joint="FL_thigh_joint" noise="0"/>
+        <jointpos name="FL_calf_pos"    joint="FL_calf_joint" noise="0"/>
+        <jointpos name="RR_hip_pos"     joint="RR_hip_joint" noise="0"/>
+        <jointpos name="RR_thigh_pos"   joint="RR_thigh_joint" noise="0"/>
+        <jointpos name="RR_calf_pos"    joint="RR_calf_joint" noise="0"/>
+        <jointpos name="RL_hip_pos"     joint="RL_hip_joint" noise="0"/>
+        <jointpos name="RL_thigh_pos"   joint="RL_thigh_joint" noise="0"/>
+        <jointpos name="RL_calf_pos"    joint="RL_calf_joint" noise="0"/>
 
-        <jointpos name="FR_hip_pos"     joint="FR_hip_joint"/>
-        <jointpos name="FR_thigh_pos"   joint="FR_thigh_joint"/>
-        <jointpos name="FR_calf_pos"    joint="FR_calf_joint"/>
-        <jointpos name="FL_hip_pos"     joint="FL_hip_joint"/>
-        <jointpos name="FL_thigh_pos"   joint="FL_thigh_joint"/>
-        <jointpos name="FL_calf_pos"    joint="FL_calf_joint"/>
-        <jointpos name="RR_hip_pos"     joint="RR_hip_joint"/>
-        <jointpos name="RR_thigh_pos"   joint="RR_thigh_joint"/>
-        <jointpos name="RR_calf_pos"    joint="RR_calf_joint" />
-        <jointpos name="RL_hip_pos"     joint="RL_hip_joint"/>
-        <jointpos name="RL_thigh_pos"   joint="RL_thigh_joint"/>
-        <jointpos name="RL_calf_pos"    joint="RL_calf_joint"/>
-
-        <jointvel name="FR_hip_vel"     joint="FR_hip_joint"/>
-        <jointvel name="FR_thigh_vel"   joint="FR_thigh_joint"/>
-        <jointvel name="FR_calf_vel"    joint="FR_calf_joint"/>
-        <jointvel name="FL_hip_vel"     joint="FL_hip_joint"/>
-        <jointvel name="FL_thigh_vel"   joint="FL_thigh_joint"/>
-        <jointvel name="FL_calf_vel"    joint="FL_calf_joint"/>
-        <jointvel name="RR_hip_vel"     joint="RR_hip_joint"/>
-        <jointvel name="RR_thigh_vel"   joint="RR_thigh_joint"/>
-        <jointvel name="RR_calf_vel"    joint="RR_calf_joint" />
-        <jointvel name="RL_hip_vel"     joint="RL_hip_joint"/>
-        <jointvel name="RL_thigh_vel"   joint="RL_thigh_joint"/>
-        <jointvel name="RL_calf_vel"    joint="RL_calf_joint"/>
+        <jointvel name="FR_hip_vel"     joint="FR_hip_joint" noise="0"/>
+        <jointvel name="FR_thigh_vel"   joint="FR_thigh_joint" noise="0"/>
+        <jointvel name="FR_calf_vel"    joint="FR_calf_joint" noise="0"/>
+        <jointvel name="FL_hip_vel"     joint="FL_hip_joint" noise="0"/>
+        <jointvel name="FL_thigh_vel"   joint="FL_thigh_joint" noise="0"/>
+        <jointvel name="FL_calf_vel"    joint="FL_calf_joint" noise="0"/>
+        <jointvel name="RR_hip_vel"     joint="RR_hip_joint" noise="0"/>
+        <jointvel name="RR_thigh_vel"   joint="RR_thigh_joint" noise="0"/>
+        <jointvel name="RR_calf_vel"    joint="RR_calf_joint" noise="0"/>
+        <jointvel name="RL_hip_vel"     joint="RL_hip_joint" noise="0"/>
+        <jointvel name="RL_thigh_vel"   joint="RL_thigh_joint" noise="0"/>
+        <jointvel name="RL_calf_vel"    joint="RL_calf_joint" noise="0"/>
 
         <accelerometer name="Body_Acc" site="imu"/>
 

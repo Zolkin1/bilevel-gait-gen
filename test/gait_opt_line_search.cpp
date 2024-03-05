@@ -162,7 +162,7 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
 //        }
 
         // Gait optimization
-        if (!(i % 50000) && i > 0) { //5
+        if (!(i % 5) && i > 0) { //5
             prev_cost = GaitOptLS(mpc, gait_opt, cost_red, time, info, config, mpc_des_state,
                                   ee_locations, warm_start, fixed_pos);
 

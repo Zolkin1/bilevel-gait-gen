@@ -95,8 +95,8 @@ friction_coef: 0.3 #0.3 - note problem can be sensitive to this with the gait op
 
 # TODO: Tune
 # 1000, 5000
-base_pos_gains: [130, 160]  # kd_pos, kp_pos  need the kd~300 and kp~340 looks ok for just qp
-base_ang_gains: [50, 90]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
+base_pos_gains: [5000, 20000]  # kd_pos, kp_pos  need the kd~300 and kp~340 looks ok for just qp
+base_ang_gains: [0, 500]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
 
 
 #kp_joint_gains: [15, 25, 55, 15, 25, 55, 15, 25, 55, 15, 25, 55] # 100 looked ok for just qp
@@ -112,7 +112,7 @@ kd_joint_gains: [75, 75, 50, 75, 75, 50, 75, 75, 50, 75, 75, 50] # 30 looked ok 
 #kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
 
 leg_tracking_weight: 10 #10
-torso_tracking_weight: 100 # 100 -- from 50
+torso_tracking_weight: 200 # 100 -- from 50
 force_tracking_weight: 1 # 1
 
 ## ----------------------- MPC ----------------------- ##
@@ -137,7 +137,7 @@ joint_bounds_ub: [0.802851, 4.18879, -0.916298,
                   0.802851, 4.18879, -0.916298]
 
 num_switches: 2
-force_bound: 125 #2500000 #150
+force_bound: 150 #2500000 #150
 
 swing_height: 0.075
 
@@ -156,7 +156,7 @@ ee_box_size: [0.11, 0.11] # 0.1, 0.12 is a good set of numbers -- how well it wo
 
 run_time_iterations: 6000 # 150 works well
 
-foot_offset: 0.0175  # 0.01 works well -- can be sensitive
+foot_offset: 0.025 #0.0175  # 0.01 works well -- can be sensitive
 
 force_cost: 10000 # Note: without this cost, the problem is much more poorly
   # conditioned and can return infeasible, also the derivative computations are much worse

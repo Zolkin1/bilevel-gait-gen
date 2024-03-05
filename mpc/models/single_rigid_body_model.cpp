@@ -286,8 +286,8 @@ namespace mpc {
 //        std::cout << "hip (wrt com): \n " << pin_data_->oMi[com_joint_id].translation()
 //                                            - pin_data_->oMi[hip_joint_id].translation();
 
-// TODO: This is adding an additional shift
         vector_3t temp = -pin_data_->oMi[com_joint_id].translation() + pin_data_->oMi[hip_joint_id].translation();
+
         if (temp(1) >= 0) {
             temp(1) += 0.1; //+= 0.1;
             com_hip_offsets.at(end_effector)(1) = temp(1);

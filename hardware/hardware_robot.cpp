@@ -152,7 +152,7 @@ namespace hardware {
             a_com.prev_output = a.head<FLOATING_VEL_OFFSET>();
 
             // Note: increased to 100 from 50!
-            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 100, 240);
+            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 10, 240);
             v_com.prev_output = v.head<FLOATING_VEL_OFFSET>(); //v.head<FLOATING_VEL_OFFSET>();
 
             // Note: increased from 2 to 10!
