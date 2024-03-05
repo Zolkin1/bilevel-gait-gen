@@ -150,6 +150,16 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
         viz.GetTrajViz(mpc.CreateVizData(), info.ee_box_size, mpc.GetEEBoxCenter());
         viz.UpdateViz(viz_rate);
 
+        // TODO: Remove if I don't want the state perturbation
+//        if (time == 1) {
+//            vector_t state_new = prev_traj.GetState(1);
+//            state_new(3) += 6;
+//            state_new(4) += 12;
+//            prev_traj.SetState(1, state_new);
+//            mpc.SetWarmStartTrajectory(prev_traj);
+//            std::cout << "State perturbation applied." << std::endl;
+//        }
+
         // Gait optimization
         if (!(i % 5)) { //5
             prev_cost = GaitOptLS(mpc, gait_opt, cost_red, time, info, config, mpc_des_state,

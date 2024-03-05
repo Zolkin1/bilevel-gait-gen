@@ -114,7 +114,7 @@ namespace controller {
         GetTargetsFromTraj(traj_, time_);
 
         UpdateTrajViz();
-        mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
+//        mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
     }
 
     vector_t MPCController::ComputeControlAction(const vector_t& q, const vector_t& v,
@@ -143,9 +143,9 @@ namespace controller {
         state_ = state;
 
         // TODO: Remove
-//        if (time > 1) {
-//            time = 1;
-//        }
+        if (time > 1) {
+            time = 1;
+        }
 
         if (time > time_) {
             time_ = time;

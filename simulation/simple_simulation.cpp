@@ -228,13 +228,15 @@ namespace simulation {
 //                    d->qvel[4] = 0;
 //                    d->qvel[5] = 0;
 
-//                    if (d->time >= 1.5 && d->time <= 1.52) {
-//                        d->qfrc_applied[0] = 0.0;
-//                        d->qfrc_applied[1] = 500.0;
+
+//                    if (d->time >= 1.5 && d->time <= 1.51) {
+//                        d->qvel[1] = 0.7;
+//                        d->xfrc_applied[7] = 0.0;
+//                        d->xfrc_applied[8] = 0.0;
 //                        std::cout << "--- Force Applied ---" << std::endl;
 //                    } else {
-//                        d->qfrc_applied[0] = 0.0;
-//                        d->qfrc_applied[1] = 0.0;
+//                        d->xfrc_applied[7] = 0.0;
+//                        d->xfrc_applied[8] = 0.0;
 //                    }
 
                     mj_step(m, d);

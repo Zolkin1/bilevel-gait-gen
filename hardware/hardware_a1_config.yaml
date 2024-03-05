@@ -77,10 +77,10 @@ srb_target: [0, 0, 0.3,
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
 control_rate: 500  # Hz
-torque_bounds: [20, 20, 20,
-                20, 20, 20,
-                20, 20, 20,
-                20, 20, 20] # 33.5, 100
+torque_bounds: [27, 27, 27,
+                27, 27, 27,
+                27, 27, 27,
+                27, 27, 27] # 33.5, 100
 
 #torque_bounds: [20, 20, 20,
 #                20, 20, 20,
@@ -104,15 +104,15 @@ base_ang_gains: [50, 90]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 10
 
 # Note that some joints requires different gains on hardware
 # 700
-kp_joint_gains: [1200, 1000, 1000, 200, 1000, 3000, 1600, 1000, 200, 1000, 1000, 200] # 100 looked ok for just qp
-kd_joint_gains: [200, 100, 50, 200, 100, 50, 200, 100, 50, 200, 100, 50] # 30 looked ok for just qp
+kp_joint_gains: [200, 200, 200, 200, 200, 3000, 200, 200, 200, 200, 200, 200] # 100 looked ok for just qp
+kd_joint_gains: [75, 75, 50, 75, 75, 50, 75, 75, 50, 75, 75, 50] # 30 looked ok for just qp
 
 # 5000, 300 works well for the QP controller in sim
 #kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
 #kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
 
 leg_tracking_weight: 10 #10
-torso_tracking_weight: 50 # 100
+torso_tracking_weight: 100 # 100 -- from 50
 force_tracking_weight: 1 # 1
 
 ## ----------------------- MPC ----------------------- ##
@@ -151,7 +151,7 @@ num_polys: 3
 gait_opt_freq: 100000000 #5
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
-ee_box_size: [0.12, 0.12] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this
+ee_box_size: [0.11, 0.11] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this
 # 0.15, 0.15 is good for diag
 
 run_time_iterations: 6000 # 150 works well
@@ -209,12 +209,12 @@ hip_joint_kp: 3.5
 hip_joint_kv: 2.0
 
 # thigh looks like it needs more kp
-thigh_joint_kp: 20 # 30
-thigh_joint_kv: 15 # 25
+thigh_joint_kp: 10 # 30
+thigh_joint_kv: 5 # 25
 
 # calf looks like it needs more kp
-calf_joint_kp: 30 # 5.5
-calf_joint_kv: 20 # 3.5
+calf_joint_kp: 25 # 5.5
+calf_joint_kv: 15 # 3.5
 
 ## --- Temp --- ##
 #viz_rate: 0.025

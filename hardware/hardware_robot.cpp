@@ -124,6 +124,11 @@ namespace hardware {
 
             ComputeCOMStateEstimate(q, v, a, state);
 
+            // Checking for un-updated optitrack packets
+            if (v.head<FLOATING_VEL_OFFSET>() == vector_t::Zero(FLOATING_VEL_OFFSET)) {
+                v.head<FLOATING_VEL_OFFSET>() = v_com.current_sample;
+            }
+
             Eigen::Vector4d grf;
             grf(0) = state.footForce[FL_];
             grf(1) = state.footForce[FR_];
@@ -143,18 +148,18 @@ namespace hardware {
             grf_lpf.prev_sample = grf_lpf.current_sample;
             grf_lpf.current_sample = grf;
 
-            a.head<FLOATING_VEL_OFFSET>() = LPF(a_com, 15, 500);
+            a.head<FLOATING_VEL_OFFSET>() = LPF(a_com, 15, 1000);
             a_com.prev_output = a.head<FLOATING_VEL_OFFSET>();
 
-            // Note: increased to 50!
-            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 50, 240); // todo: tune fpass. 1 is very smooth, 10 is tradeoff with jitter, 25 is pretty jittery
+            // Note: increased to 100 from 50!
+            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 100, 240);
             v_com.prev_output = v.head<FLOATING_VEL_OFFSET>(); //v.head<FLOATING_VEL_OFFSET>();
 
             // Note: increased from 2 to 10!
-            v.tail<NUM_INPUTS>() = LPF(v_joints, 100, 500);
+            v.tail<NUM_INPUTS>() = LPF(v_joints, 200, 1000);
             v_joints.prev_output = v.tail<NUM_INPUTS>();
 
-            grf = LPF(grf_lpf, 50, 500);
+            grf = LPF(grf_lpf, 50, 1000);
             grf_lpf.prev_output = grf;
             // ---------------------------- //
 
