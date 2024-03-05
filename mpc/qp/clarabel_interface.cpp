@@ -38,8 +38,6 @@ namespace mpc {
                     break;
                 case Constraints::EndEffectorLocation:
                     cones_.push_back(NonnegativeConeT<double>(data.num_ee_location_constraints_));
-
-                    cones_.push_back(ZeroConeT<double>(data.num_start_ee_constraints_));
                     break;
                 case Constraints::ForceBox:
                     cones_.push_back(NonnegativeConeT<double>(data.num_force_box_constraints_));
@@ -55,6 +53,13 @@ namespace mpc {
                     break;
                 case Constraints::TDPosition:
                     cones_.push_back(ZeroConeT<double>(data.num_td_pos_constraints_));
+                    break;
+                case Constraints::EndEffectorStart:
+                    cones_.push_back(ZeroConeT<double>(data.num_start_ee_constraints_));
+                    break;
+                case Constraints::Raibert:
+                    cones_.push_back(ZeroConeT<double>(data.num_raibert_constraints_));
+                    break;
             }
         }
 
@@ -352,9 +357,9 @@ namespace mpc {
 
                     ineq_idx += data.num_ee_location_constraints_;
                     gen_idx += data.num_ee_location_constraints_;
-
-
-//                    A.middleRows(eq_idx, data.num_start_ee_constraints_) =
+                    break;
+                case Constraints::EndEffectorStart:
+                    //                    A.middleRows(eq_idx, data.num_start_ee_constraints_) =
 //                            data.sparse_constraint_.middleRows(gen_idx, data.num_start_ee_constraints_);
 
                     // Put this in where all the equality constraints go
@@ -439,6 +444,20 @@ namespace mpc {
 
                     eq_idx += data.num_td_pos_constraints_;
                     gen_idx += data.num_td_pos_constraints_;
+                    break;
+
+                case Constraints::Raibert:
+                    mat_builder.SetMatrix(data.sparse_constraint_.middleRows(gen_idx, data.num_raibert_constraints_).transpose(),
+                                          0, data.num_decision_vars + data.num_inequality_ + eq_idx);
+                    mat_builder.SetMatrix(data.sparse_constraint_.middleRows(gen_idx, data.num_raibert_constraints_),
+                                          data.num_decision_vars + data.num_inequality_ + eq_idx,
+                                          0);
+
+                    nu_.segment(eq_idx, data.num_raibert_constraints_) =
+                            dual_.segment(gen_idx, data.num_raibert_constraints_);
+
+                    eq_idx += data.num_raibert_constraints_;
+                    gen_idx += data.num_raibert_constraints_;
                     break;
             }
         }

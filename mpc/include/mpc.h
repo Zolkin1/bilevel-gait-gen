@@ -242,6 +242,8 @@ namespace mpc {
 
         int GetNumTDConstraints() const;
 
+        int GetNumRaibertConstraints() const;
+
         // ---------------- Member Variables ---------------- //
         // model
         SingleRigidBodyModel model_;

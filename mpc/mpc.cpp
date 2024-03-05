@@ -611,12 +611,12 @@ namespace mpc {
         UpdateNumInputs();
         data_.num_decision_vars = (info_.num_nodes+1)*num_states_ + num_inputs_;
 
-
         // TODO: May want to put in a check for this, but it should always be active
         if (using_clarabel_) {
             data_.num_force_box_constraints_ = GetNumForceBoxConstraints();
             data_.num_cone_constraints_ = GetNumFricConeConstraints();
             data_.num_td_pos_constraints_ = GetNumTDConstraints();
+            data_.num_raibert_constraints_ = GetNumRaibertConstraints();
         } else {
             data_.num_force_box_constraints_ = GetNodeIntersectMutableForces(); // TODO: Change
             // TODO: Add other constraint
@@ -1220,5 +1220,23 @@ namespace mpc {
 
         UpdateQPSizes();
         data_.InitQPMats(); // Note: this zero's all the data matricies
+    }
+
+    int MPC::GetNumRaibertConstraints() const {
+        const auto contact_times = prev_traj_.GetContactTimes();
+
+        int constraints = 0;
+
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int j = 0; j < contact_times.at(ee).size(); j++) {
+                if (contact_times.at(ee).at(j).GetType() == TouchDown
+                    && contact_times.at(ee).at(j).GetTime() > init_time_
+                    && contact_times.at(ee).at(j).GetTime() < info_.num_nodes*info_.integrator_dt + init_time_) {
+                    constraints += 2;
+                }
+            }
+        }
+
+        return constraints;
     }
 } // mpc

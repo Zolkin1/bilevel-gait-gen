@@ -230,7 +230,7 @@ namespace simulation {
 
 
 //                    if (d->time >= 1.5 && d->time <= 1.51) {
-//                        d->qvel[1] = 0.7;
+//                        d->qvel[1] = 0.5;
 //                        d->xfrc_applied[7] = 0.0;
 //                        d->xfrc_applied[8] = 0.0;
 //                        std::cout << "--- Force Applied ---" << std::endl;

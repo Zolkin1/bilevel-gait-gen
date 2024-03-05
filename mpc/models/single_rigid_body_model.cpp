@@ -22,8 +22,10 @@ namespace mpc {
                   {Constraints::Dynamics,
                    Constraints::ForceBox, // TODO: Force box causes infeasibility issues (2/26 5:49pm)
                    Constraints::FrictionCone,
-                   Constraints::EndEffectorLocation,
-                   Constraints::TDPosition
+//                   Constraints::EndEffectorLocation,
+//                   Constraints::TDPosition,
+                   Constraints::Raibert,
+                   Constraints::EndEffectorStart
                   }), // TODO: In the sim we still get infeasibility w/o force constraints, although that might be due to getting a wacky traj
             num_tangent_states_(MOMENTUM_OFFSET + FLOATING_VEL_OFFSET),
             num_manifold_states_(MOMENTUM_OFFSET + FLOATING_BASE_OFFSET) {

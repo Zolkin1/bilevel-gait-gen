@@ -86,10 +86,16 @@ namespace mpc {
                     AddFrictionConeConstraints();
                     break;
                 case Constraints::EndEffectorLocation:
-                    AddEELocationConstraints(ee_start_locations);
+                    AddEELocationConstraints();
                     break;
                 case Constraints::TDPosition:
                     AddTDPositionConstraints();
+                    break;
+                case Constraints::Raibert:
+                    AddRaibertHeuristic();
+                    break;
+                case Constraints::EndEffectorStart:
+                    AddEEStartConstraints(ee_start_locations);
                     break;
                 default:
                     throw std::runtime_error("No such constraint exists.");
@@ -325,6 +331,7 @@ namespace mpc {
             data_.num_force_box_constraints_ = GetNumForceBoxConstraints(); //2*GetNodeIntersectMutableForces();
             data_.num_ee_location_constraints_ = 2*(info_.num_nodes-(EE_NODE_START-1))*2*num_ee_; // 2*(info_.num_nodes+1)*2*num_ee_
             data_.num_td_pos_constraints_ = GetNumTDConstraints();
+            data_.num_raibert_constraints_ = GetNumRaibertConstraints();
         } else {
             data_.num_force_box_constraints_ = GetNodeIntersectMutableForces(); // TODO: Change
             data_.num_ee_location_constraints_ = (info_.num_nodes+1)*2*num_ee_;
@@ -371,8 +378,7 @@ namespace mpc {
     }
 
 
-    // TODO: Investigate more
-    void MPCSingleRigidBody::AddEELocationConstraints(const std::vector<vector_3t>& ee_start_locations) {
+    void MPCSingleRigidBody::AddEELocationConstraints() {
         // TODO: Do I need a rotation matrix?
         const int pos_start_idx = GetPosSplineStartIdx();
 
@@ -434,9 +440,11 @@ namespace mpc {
         data_.constraint_mat_.SetMatrix(A, constraint_idx_, 0);
         assert(idx == data_.num_ee_location_constraints_);
         constraint_idx_ += idx;
+    }
 
+    void MPCSingleRigidBody::AddEEStartConstraints(const std::vector<vector_3t>& ee_start_locations) {
         // -------------- End Effector Start Constraints -------------- //
-        idx = 0;
+        int idx = 0;
 //         TODO: DMA
         matrix_t M(data_.num_start_ee_constraints_, prev_traj_.GetTotalPosSplineVars());
         M.setZero();
@@ -725,11 +733,11 @@ namespace mpc {
 
 //                    assert(idx  == data_.num_ee_location_constraints_);
 
-
+                } else if (data_.constraints_.at(i) == EndEffectorStart) {
                     // ----------- Equality contribution ----------- //
                     matrix_t M(data_.num_start_ee_constraints_, traj.GetTotalPosSplineVars()); // TODO: DMA
                     M.setZero();
-                    idx = 0;
+                    int idx = 0;
                     for (int coord = 0; coord < 2; coord++) {
                         int vars_idx, vars_affecting;
                         std::tie(vars_idx, vars_affecting) =
@@ -761,6 +769,9 @@ namespace mpc {
                 } else if (data_.constraints_.at(i) == TDPosition) {
                     AddTDPositionConstraintPartial(A_builder, partials.db, contact_time_idx, eq_idx, ee);
                     eq_idx += data_.num_td_pos_constraints_;
+                } else if (data_.constraints_.at(i) == Raibert) {
+                    AddRaibertPartials(A_builder, partials.db, contact_time_idx, eq_idx, ee);
+                    eq_idx += data_.num_raibert_constraints_;
                 }
             }
 
@@ -923,6 +934,87 @@ namespace mpc {
     void MPCSingleRigidBody::DecreaseEEBox() {
         info_.ee_box_size(0) = std::max(info_.ee_box_size(0) - 0.05, ee_bounds_(0));
         info_.ee_box_size(1) = std::max(info_.ee_box_size(1) - 0.05, ee_bounds_(1));
+    }
+
+    void MPCSingleRigidBody::AddRaibertHeuristic() {
+        // For each constant segment assign that foot position as the raibert heuristic (with no feedback term)
+        // The raibert heuristic can be used for the flight phase, but those dynamics don't enter the MPC (the foot flight phase dynamics)
+        // So we take the velocity measurements of the node closest to the beginning of the stance phase and assign that value
+        // r_des = r_ref + v_com*deltaT/2
+        // r_ref = COM + offset
+        // Note that in this scenario the effect of the ground contact times is directly in the equation and thus no spline parameterization is necessary
+
+        int row_idx = 0;
+        int pos_start_idx = GetPosSplineStartIdx();
+
+        const auto contact_times = prev_traj_.GetContactTimes();
+
+        for (int ee = 0; ee < num_ee_; ee++) {
+            for (int j = 0; j < contact_times.at(ee).size(); j++) {
+                if (contact_times.at(ee).at(j).GetType() == TouchDown
+                    && contact_times.at(ee).at(j).GetTime() > init_time_ && contact_times.at(ee).at(j).GetTime() < info_.num_nodes*info_.integrator_dt + init_time_) {
+                    for (int coord = 0; coord < 2; coord++) { // Only need the heuristic in the x-y plane
+                        const double td_time = contact_times.at(ee).at(j).GetTime(); //prev_traj_.GetNextContactTime(ee, contact_times.at(ee).at(j).GetTime());
+
+//                        std::cout << "touch down time: "<< td_time << std::endl;
+
+                        int vars_affecting, vars_idx;
+                        std::tie(vars_idx, vars_affecting) =
+                                prev_traj_.GetPositionSplineIndex(ee, td_time, coord);
+
+                        assert(vars_affecting == 1);
+
+                        vector_t vars_lin =  prev_traj_.GetSplineLin(Trajectory::SplineTypes::Position,
+                                                                     ee, coord, td_time);
+
+                        // Foot position
+                        data_.constraint_mat_.SetMatrix(vars_lin.transpose(), constraint_idx_ + row_idx,
+                                                        pos_start_idx + vars_idx);
+
+//                                                    A(idx, (node) * num_states_ + coord) = 1;
+                        const int node = prev_traj_.GetNode(td_time);
+//                        std::cout << "node: " << node << std::endl;
+                        assert(node < info_.num_nodes + 1);
+
+                        // COM in that coord
+                        data_.constraint_mat_.SetDiagonalMatrix(
+                                -1.0, constraint_idx_ + row_idx, node*num_states_ + coord, 1);
+
+                        int i = j + 1;
+                        while (i < contact_times.at(ee).size() && contact_times.at(ee).at(i).GetType() != LiftOff) {
+                            i++;
+                        }
+
+                        double contact_time;
+                        if (i == contact_times.at(ee).size()) {
+                                contact_time = 1.0; // Setting to a reasonable value
+                        } else {
+                            contact_time = contact_times.at(ee).at(i).GetTime() -
+                                                        contact_times.at(ee).at(j).GetTime();
+                        }
+
+                        // Velocity COM
+                        data_.constraint_mat_.SetDiagonalMatrix(
+                                -0.00*contact_time/(model_.GetMass()*2), constraint_idx_ + row_idx, node*num_states_ + 3 + coord, 1);
+
+                        // COM to hip offset
+//                        std::cout << model_.GetCOMToHip(ee)(coord) << std::endl;
+                        data_.raibert_constants_(row_idx) = model_.GetCOMToHip(ee)(coord);
+
+                        row_idx++;
+                    }
+                }
+            }
+        }
+
+        constraint_idx_ += row_idx;
+
+        assert(row_idx == data_.num_raibert_constraints_);
+    }
+
+    void MPCSingleRigidBody::AddRaibertPartials(utils::SparseMatrixBuilder& builder, mpc::vector_t& b, int contact_idx,
+                                                int eq_idx, int ee) {
+        throw std::runtime_error("Not implemented yet.");
     }
 
 } // mpc

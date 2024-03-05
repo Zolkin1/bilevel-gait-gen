@@ -69,7 +69,10 @@ namespace mpc {
                     num_constraints += num_fk_constraints_ + num_fk_ineq_constraints_;
                     break;
                 case Constraints::EndEffectorLocation:
-                    num_constraints += num_ee_location_constraints_ + num_start_ee_constraints_;
+                    num_constraints += num_ee_location_constraints_;
+                    break;
+                case Constraints::EndEffectorStart:
+                    num_constraints += num_start_ee_constraints_;
                     break;
                 case Constraints::ForceBox:
                     num_constraints += num_force_box_constraints_;
@@ -82,6 +85,9 @@ namespace mpc {
                     break;
                 case Constraints::TDPosition:
                     num_constraints += num_td_pos_constraints_;
+                    break;
+                case Constraints::Raibert:
+                    num_constraints += num_raibert_constraints_;
                     break;
             }
         }
@@ -121,6 +127,8 @@ namespace mpc {
                         ee_location_lb_ = vector_t::Zero(num_ee_location_constraints_/2);
                         ee_location_ub_ = vector_t::Zero(num_ee_location_constraints_/2);
                     }
+                    break;
+                case Constraints::EndEffectorStart:
                     start_ee_constants_ = vector_t::Zero(num_start_ee_constraints_);
                     break;
                 case Constraints::ForceBox:
@@ -142,6 +150,9 @@ namespace mpc {
                     break;
                 case Constraints::TDPosition:
                     td_pos_constants_ = vector_t::Zero(num_td_pos_constraints_);
+                    break;
+                case Constraints::Raibert:
+                    raibert_constants_ = vector_t::Zero(num_raibert_constraints_);
                     break;
             }
         }
@@ -228,10 +239,12 @@ namespace mpc {
                     } else {
                         ub_.segment(idx, num_ee_location_constraints_) << ee_location_ub_, -ee_location_lb_;
                         idx += num_ee_location_constraints_;
-                        ub_.segment(idx, num_start_ee_constraints_) = start_ee_constants_;
-                        idx += num_start_ee_constraints_;
                     }
                     num_inequality_ += num_ee_location_constraints_;
+                    break;
+                case Constraints::EndEffectorStart:
+                    ub_.segment(idx, num_start_ee_constraints_) = start_ee_constants_;
+                    idx += num_start_ee_constraints_;
                     num_equality_ += num_start_ee_constraints_;
                     break;
                 case Constraints::ForceBox:
@@ -265,6 +278,11 @@ namespace mpc {
                     ub_.segment(idx, num_td_pos_constraints_) = td_pos_constants_;
                     num_equality_ += num_td_pos_constraints_;
                     idx += num_td_pos_constraints_;
+                    break;
+                case Constraints::Raibert:
+                    ub_.segment(idx, num_raibert_constraints_) = raibert_constants_;
+                    num_equality_ += num_raibert_constraints_;
+                    idx += num_raibert_constraints_;
                     break;
             }
         }

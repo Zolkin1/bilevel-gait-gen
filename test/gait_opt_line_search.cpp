@@ -122,6 +122,7 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
                    bool fixed_pos) {
 
     mpc.CreateInitialRun(init_state, ee_locations);
+    mpc.PrintStats();
     mpc::Trajectory prev_traj = mpc.GetTrajectory();
 
     vector_t state = standing;
@@ -161,7 +162,7 @@ void MPCLineSearch(mpc::MPCSingleRigidBody& mpc, utils::ConfigParser& config, co
 //        }
 
         // Gait optimization
-        if (!(i % 5)) { //5
+        if (!(i % 50000) && i > 0) { //5
             prev_cost = GaitOptLS(mpc, gait_opt, cost_red, time, info, config, mpc_des_state,
                                   ee_locations, warm_start, fixed_pos);
 

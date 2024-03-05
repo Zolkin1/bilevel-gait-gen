@@ -237,24 +237,24 @@ namespace simulation {
                                   to);
                 }
 
-//                if (ee < 4) {
-//                    for (int i = 0; i < 2; i++) {
-//                        box_size[i] = box_sides_(i)/2;
-//                        box_pos[i] = traj_viz_.at(4).at(0)(i) + box_centers_.at(ee)(i);
-//                    }
-//                    box_pos[2] = 0.05;
-//                    box_size[2] = 0.05;
-//
-//                    const float box_color[4] = {0.5, 0, 0.5, 0.1};
-//
-//                    scn.ngeom += 1;
-//                    mjv_initGeom(&scn.geoms[scn.ngeom - 1],
-//                                 mjtGeom::mjGEOM_BOX,
-//                                 box_size,
-//                                 box_pos,
-//                                 nullptr,
-//                                 box_color);
-//                }
+                if (ee < 4) {
+                    for (int i = 0; i < 2; i++) {
+                        box_size[i] = box_sides_(i)/2;
+                        box_pos[i] = traj_viz_.at(4).at(0)(i) + box_centers_.at(ee)(i);
+                    }
+                    box_pos[2] = 0.05;
+                    box_size[2] = 0.05;
+
+                    const float box_color[4] = {0.5, 0, 0.5, 0.1};
+
+                    scn.ngeom += 1;
+                    mjv_initGeom(&scn.geoms[scn.ngeom - 1],
+                                 mjtGeom::mjGEOM_BOX,
+                                 box_size,
+                                 box_pos,
+                                 nullptr,
+                                 box_color);
+                }
             }
         }
     }
