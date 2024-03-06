@@ -229,7 +229,7 @@ namespace simulation {
 //                    d->qvel[5] = 0;
 
 
-//                    if (d->time >= 1.5 && d->time <= 1.51) {
+//                    if (d->time >= 1.5 && d->time <= 1.501) {
 //                        d->qvel[1] = 0.5;
 //                        d->xfrc_applied[7] = 0.0;
 //                        d->xfrc_applied[8] = 0.0;

@@ -2,8 +2,8 @@
     <compiler angle="radian" meshdir="meshes/" />
     <size njmax="500" nconmax="100" />
     <!-- -9.806 gravity term -->
-    <option gravity='0 0 -9.81' iterations='50' solver='Newton' timestep='0.0005'/> <!-- 0.002, 0.0005 -->
-    <option cone="elliptic" impratio="100"/>
+    <option gravity='0 0 -9.81' iterations='50' solver='Newton' timestep='0.0001'/> <!-- 0.002, 0.0005 -->
+    <option cone="elliptic" impratio="100" integrator="RK4"/>
 <!--    <option sensornoise="enable"/>-->
     <option>
         <flag sensornoise="enable" />
