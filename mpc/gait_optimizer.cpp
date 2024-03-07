@@ -40,7 +40,7 @@ namespace mpc {
 
         gamma_ = 0.5;
         eta_ = 0.75;
-        Delta_ = 1; // at 1e-8 I match predicted to actual perfectly!
+        Delta_ = 1; // at 1e-8 I match predicted to actual perfectly! // TODO: Can tune
 
         run_num_ = 0;
         past_decision_vars_ = 0;
