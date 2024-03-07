@@ -257,11 +257,11 @@ namespace hardware {
                 if (VerifyControlAction(control_action)) {
                     AssignConfigToMotors(control_action.head<NUM_INPUTS>(), cmd);
                     AssignVelToMotors(control_action.segment<NUM_INPUTS>(NUM_INPUTS), cmd);
-                    AssignTorqueToMotors(control_action.tail<NUM_INPUTS>(), cmd);
-//                    AssignTorqueToMotors(vector_t::Zero(NUM_INPUTS), cmd);
+//                    AssignTorqueToMotors(control_action.tail<NUM_INPUTS>(), cmd);
+                    AssignTorqueToMotors(vector_t::Zero(NUM_INPUTS), cmd);
 
                     // Assign joint kp and kv
-                    AssignMPCGains();
+                    AssignMPCGains(contact);
                 } else {
                     log_file_ << "[Control] Reverting to a default state." << std::endl;
                     std::cerr << "[Control] [Robot] MPC Control action rejected. Returning to standing state." << std::endl;
@@ -538,26 +538,43 @@ namespace hardware {
         return output;
     }
 
-    void HardwareRobot::AssignMPCGains() {
+    void HardwareRobot::AssignMPCGains(const controller::Contact& contact) {
         int thigh_idx = 1;
         int calf_idx = 2;
 
+        int ee = 0;
         for (int hip_idx = 0; hip_idx < NUM_INPUTS; hip_idx += 3) {
-            // TODO: Tune
-            cmd.motorCmd[hip_idx].Kp = gains_.hip_kp;
-            cmd.motorCmd[hip_idx].Kd = gains_.hip_kv;
+//            if (!contact.in_contact_.at(ee)) {
+
+                // TODO: Tune
+                cmd.motorCmd[hip_idx].Kp = gains_.hip_kp;
+                cmd.motorCmd[hip_idx].Kd = gains_.hip_kv;
 
 //            std::cout << calf_idx << ", ";
 
-            cmd.motorCmd[thigh_idx].Kp = gains_.thigh_kp;
-            cmd.motorCmd[thigh_idx].Kd = gains_.thigh_kv;
+                cmd.motorCmd[thigh_idx].Kp = gains_.thigh_kp;
+                cmd.motorCmd[thigh_idx].Kd = gains_.thigh_kv;
 
-            cmd.motorCmd[calf_idx].Kp = gains_.calf_kp;
-            cmd.motorCmd[calf_idx].Kd = gains_.calf_kv;
+                cmd.motorCmd[calf_idx].Kp = gains_.calf_kp;
+                cmd.motorCmd[calf_idx].Kd = gains_.calf_kv;
 
-            cmd.motorCmd[hip_idx].mode = 0x0A;
-            cmd.motorCmd[thigh_idx].mode = 0x0A;
-            cmd.motorCmd[calf_idx].mode = 0x0A;
+                cmd.motorCmd[hip_idx].mode = 0x0A;
+                cmd.motorCmd[thigh_idx].mode = 0x0A;
+                cmd.motorCmd[calf_idx].mode = 0x0A;
+//            } else {
+//                cmd.motorCmd[hip_idx].Kp = 0;
+//                cmd.motorCmd[hip_idx].Kd = 0;
+//
+//                cmd.motorCmd[thigh_idx].Kp = 0;
+//                cmd.motorCmd[thigh_idx].Kd = 0;
+//
+//                cmd.motorCmd[calf_idx].Kp = 0;
+//                cmd.motorCmd[calf_idx].Kd = 0;
+//
+//                cmd.motorCmd[hip_idx].mode = 0x0A;
+//                cmd.motorCmd[thigh_idx].mode = 0x0A;
+//                cmd.motorCmd[calf_idx].mode = 0x0A;
+//            }
 
             thigh_idx += 3;
             calf_idx += 3;
@@ -570,17 +587,19 @@ namespace hardware {
 //        std::cout << cmd.motorCmd[UNI].mode << std::endl;
 //        std::cout << cmd.motorCmd[5].mode << std::endl;
 
-        cmd.motorCmd[UNITREE_LEGGED_SDK::FL_2].Kp = 30;
-        cmd.motorCmd[UNITREE_LEGGED_SDK::FL_2].Kd = 20;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::FL_2].Kp = 30;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::FL_2].Kd = 20;
+//
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::FR_2].Kp = 30; //gains_.calf_kp;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::FR_2].Kd = 20; //gains_.calf_kv;
+//
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_2].Kp = 30;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_2].Kd = 20;
+//
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_2].Kp = 15;
+//        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_2].Kd = 5;
 
-        cmd.motorCmd[UNITREE_LEGGED_SDK::FR_2].Kp = 30; //gains_.calf_kp;
-        cmd.motorCmd[UNITREE_LEGGED_SDK::FR_2].Kd = 20; //gains_.calf_kv;
 
-        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_2].Kp = 30;
-        cmd.motorCmd[UNITREE_LEGGED_SDK::RL_2].Kd = 20;
-
-        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_2].Kp = 15;
-        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_2].Kd = 5;
 //        cmd.motorCmd[7].Kp = 10;
 //        cmd.motorCmd[7].Kd = 5;
 

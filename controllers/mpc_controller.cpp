@@ -226,6 +226,7 @@ namespace controller {
         state.head<POS_VARS>() = q.head<3>();
 
         // COM momentum
+        // TODO: Put back
         state.segment<POS_VARS>(mpc::SingleRigidBodyModel::LIN_MOM_START) = v.head<3>() * mpc_.GetModel()->GetMass(); // * mpc_.GetModel()->GetMass();
 
         // Orientation
@@ -289,7 +290,7 @@ namespace controller {
         while(true) {
 
             // TODO: Remove
-//            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+//            std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
             state_time_mut_.lock(); // Get time
             double time_act = time_;
@@ -313,7 +314,7 @@ namespace controller {
 
                 if (!(run_num % gait_opt_freq_) && run_num > 0 && deriv_ready) {
                     // Just run the line search and return that solution (and obviously keep the trajectory)
-                    PrintContactTimes();
+//                    PrintContactTimes();
 
                     // Apply the minimizing contact time
                     std::vector<mpc::time_v> contact_times_new;
@@ -381,7 +382,7 @@ namespace controller {
 //                sync_mut_.unlock();
 
                 mpc_.PrintStatLineToFile(log_file_);
-//                std::cout << "Avg cost: " << mpc_.GetAvgCost() << std::endl;
+                std::cout << "Avg cost: " << mpc_.GetAvgCost() << std::endl;
                 loop_timer.StopTimer();
 //                loop_timer.PrintElapsedTime(); // MPC Loop takes about 0.1 ms longer than the mpc computation
             }
@@ -434,7 +435,7 @@ namespace controller {
             time = traj.GetTime(0);
         }
 
-        const int nodes_ahead = 0; // TODO: Check value
+        const int nodes_ahead = 1; // TODO: Check value
         int node = traj.GetNode(time)+nodes_ahead;
 
         // Calc the IK here

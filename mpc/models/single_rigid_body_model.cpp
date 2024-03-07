@@ -413,6 +413,7 @@ namespace mpc {
 
             if (!success) {
                 std::cerr << "IK did not converge." << std::endl;
+                throw std::runtime_error("IK did not converge.");
             }
         }
 

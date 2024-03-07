@@ -95,7 +95,7 @@ friction_coef: 0.3 #0.3 - note problem can be sensitive to this with the gait op
 
 # TODO: Tune
 # 1000, 5000
-base_pos_gains: [5000, 20000]  # kd_pos, kp_pos  need the kd~300 and kp~340 looks ok for just qp
+base_pos_gains: [10000, 60000]  # kd_pos, kp_pos  need the kd~300 and kp~340 looks ok for just qp
 base_ang_gains: [0, 500]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
 
 
@@ -137,9 +137,9 @@ joint_bounds_ub: [0.802851, 4.18879, -0.916298,
                   0.802851, 4.18879, -0.916298]
 
 num_switches: 2
-force_bound: 150 #2500000 #150
+force_bound: 200 #2500000 #150
 
-swing_height: 0.075
+swing_height: 0.075 #TODO: Tune
 
 num_polys: 3
 
@@ -204,17 +204,19 @@ log_file: "mpc-log-1.txt"
 mpc_verbosity: 0
 
 ## --- Hardware --- ##
+# TODO: Try decreasing/removing these to see if that will help with the COM tracking. 
+#  Holding the leg in place might be making it hard to adjust the COM
 # Hip tracking was looking pretty good
-hip_joint_kp: 3.5
-hip_joint_kv: 2.0
+hip_joint_kp: 3 #10 # 3.5
+hip_joint_kv: 2 #5 # 2.0
 
 # thigh looks like it needs more kp
-thigh_joint_kp: 10 # 30
-thigh_joint_kv: 5 # 25
+thigh_joint_kp: 10 #20 # 10
+thigh_joint_kv: 5 #10 # 5
 
 # calf looks like it needs more kp
-calf_joint_kp: 25 # 5.5
-calf_joint_kv: 15 # 3.5
+calf_joint_kp: 25 #45 # 25
+calf_joint_kv: 15 #25 # 15
 
 ## --- Temp --- ##
 #viz_rate: 0.025

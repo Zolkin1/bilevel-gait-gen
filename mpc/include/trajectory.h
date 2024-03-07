@@ -162,8 +162,8 @@ namespace mpc {
 
 //        std::vector<std::vector<double>> contact_times_;
 
-        std::array<vector_t, 51> full_config_;
-        std::array<vector_t, 51> full_velocity_;
+        std::array<vector_t, 101> full_config_;
+        std::array<vector_t, 101> full_velocity_;
 
         double init_time_;
 

@@ -82,7 +82,7 @@ namespace hardware {
         static void RecoverStateFromMotors(vector_t& q, vector_t& v, vector_t& a,
                                            const UNITREE_LEGGED_SDK::LowState& state);
 
-        void AssignMPCGains();
+        void AssignMPCGains(const controller::Contact& contact);
 
         vector_t ConvertHardwareJointsToPinocchio(const vector_t& q);
         vector_t ConvertHardwareConfigToPinocchio(const vector_t& q);
