@@ -713,7 +713,8 @@ namespace mpc {
             mpc_ls_timer.StopTimer();
 //            mpc_ls_timer.PrintElapsedTime();
 
-            costs.at(i) = mpc_ls.GetCost();
+            // TODO: Try cost normailzed per decision vars
+            costs.at(i) = mpc_ls.GetCost()/mpc_ls.GetNumDecisionVars();
             idx.at(i) = i;
             trajectories.at(i) = mpc_ls.GetTrajectory();
             solve_quality.at(i) = mpc_ls.GetSolveQuality();

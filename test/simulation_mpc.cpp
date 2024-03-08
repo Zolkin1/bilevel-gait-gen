@@ -183,7 +183,7 @@ int main() {
 
     sim.PauseSim();
 
-    int constexpr N = 6500;
+    int constexpr N = 9500;
     utils::Timer timer("sim loop");
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < N; i++) {
