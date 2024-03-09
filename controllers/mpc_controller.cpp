@@ -114,7 +114,7 @@ namespace controller {
         GetTargetsFromTraj(traj_, time_);
 
         UpdateTrajViz();
-        mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
+//        mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
     }
 
     vector_t MPCController::ComputeControlAction(const vector_t& q, const vector_t& v,
@@ -143,9 +143,9 @@ namespace controller {
         state_ = state;
 
         // TODO: Remove
-//        if (time > 1) {
-//            time = 1;
-//        }
+        if (time > 1) {
+            time = 1;
+        }
 
         if (time > time_) {
             time_ = time;
@@ -171,6 +171,12 @@ namespace controller {
         GetTargetsFromTraj(traj_, time);
         Contact contact1 = traj_.GetDesiredContacts(time);
         contact1.contact_frames_ = contact.contact_frames_;
+
+        // TODO: Remove
+        contact1.in_contact_.at(0) = false;
+        contact1.in_contact_.at(1) = false;
+        contact1.in_contact_.at(2) = false;
+        contact1.in_contact_.at(3) = false;
 
         vector_t force_des(contact1.GetNumContacts()*3);
         int j = 0;
@@ -199,6 +205,9 @@ namespace controller {
 
         qp_controller_.UpdateTargetConfig(q_des_);
         qp_controller_.UpdateTargetVel(v_des_);
+
+        // TODO: Remove
+        force_des.setZero();
         qp_controller_.UpdateForceTargets(force_des);
 
         qp_controller_.UpdateDesiredContacts(contact1);
@@ -210,7 +219,7 @@ namespace controller {
 //        log_file_ << std::endl;
 
         timer.StopTimer();
-//        timer.PrintElapsedTime();
+        timer.PrintElapsedTime();
 
 //        sync_mut_.unlock();
 
@@ -437,6 +446,11 @@ namespace controller {
 
         const int nodes_ahead = 1; // TODO: Check value
         int node = traj.GetNode(time)+nodes_ahead;
+
+        // TODO: remove
+        if (node > 50) {
+            node = 50;
+        }
 
         // Calc the IK here
         std::vector<mpc::vector_3t> traj_ee_locations(4);

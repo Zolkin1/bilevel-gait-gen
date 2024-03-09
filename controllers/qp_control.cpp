@@ -279,8 +279,6 @@ namespace controller {
                                  kv_joint_.cwiseProduct(vel_target_.tail(num_inputs_) - v.tail(num_inputs_)) +
                                  kp_joint_.cwiseProduct(config_target_.tail(num_inputs_) - q.tail(num_inputs_));
 
-//        std::cout << "leg target: " << target.transpose() << std::endl;
-
         w_.segment(FLOATING_VEL_OFFSET, num_inputs_) = -2*target*leg_tracking_weight_;
     }
 

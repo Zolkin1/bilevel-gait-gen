@@ -85,6 +85,8 @@ namespace hardware {
 
         optitrack_rate_ = optitrack_rate;
 
+        loop_count_ = 0;
+
         // Start the optitrack monitor
         optitrack_client_ = std::thread(&HardwareRobot::OptiTrackMonitor, this);
     }
@@ -102,7 +104,11 @@ namespace hardware {
 
         using namespace UNITREE_LEGGED_SDK;
 
-        const double time_s = static_cast<double>(state.tick) / 1e3;
+        double time_s = static_cast<double>(state.tick) / 1e3;
+
+        if (!(loop_count_ % 2)) {
+            time_s += 0.0005;
+        }
 
         if (time_s >= prev_time_) {
             auto time_now = std::chrono::system_clock::now();
@@ -148,7 +154,7 @@ namespace hardware {
             grf_lpf.prev_sample = grf_lpf.current_sample;
             grf_lpf.current_sample = grf;
 
-            a.head<FLOATING_VEL_OFFSET>() = LPF(a_com, 15, 1000);
+            a.head<FLOATING_VEL_OFFSET>() = LPF(a_com, 15, 2000);
             a_com.prev_output = a.head<FLOATING_VEL_OFFSET>();
 
             // Note: increased to 100 from 50!
@@ -156,10 +162,10 @@ namespace hardware {
             v_com.prev_output = v.head<FLOATING_VEL_OFFSET>(); //v.head<FLOATING_VEL_OFFSET>();
 
             // Note: increased from 2 to 10!
-            v.tail<NUM_INPUTS>() = LPF(v_joints, 200, 1000);
+            v.tail<NUM_INPUTS>() = LPF(v_joints, 100, 2000);
             v_joints.prev_output = v.tail<NUM_INPUTS>();
 
-            grf = LPF(grf_lpf, 50, 1000);
+            grf = LPF(grf_lpf, 50, 2000);
             grf_lpf.prev_output = grf;
             // ---------------------------- //
 
@@ -257,8 +263,8 @@ namespace hardware {
                 if (VerifyControlAction(control_action)) {
                     AssignConfigToMotors(control_action.head<NUM_INPUTS>(), cmd);
                     AssignVelToMotors(control_action.segment<NUM_INPUTS>(NUM_INPUTS), cmd);
-//                    AssignTorqueToMotors(control_action.tail<NUM_INPUTS>(), cmd);
-                    AssignTorqueToMotors(vector_t::Zero(NUM_INPUTS), cmd);
+                    AssignTorqueToMotors(control_action.tail<NUM_INPUTS>(), cmd);
+//                    AssignTorqueToMotors(vector_t::Zero(NUM_INPUTS), cmd);
 
                     // Assign joint kp and kv
                     AssignMPCGains(contact);
@@ -301,6 +307,8 @@ namespace hardware {
 
             prev_time_ = time_s;
         }
+
+        loop_count_++;
     }
 
     bool HardwareRobot::VerifyControlAction(const vector_t& control) {

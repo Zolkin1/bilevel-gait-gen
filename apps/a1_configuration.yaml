@@ -69,7 +69,7 @@ srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
            0, 0, 0, 1.0, # 0.0505,   -0.1643,   -0.0572,    0.9835,
            0, 0, 0]
 
-srb_target: [1, 1, 0.3,
+srb_target: [0., 0, 0.3,
              0, 0, 0,
              0.0, 0, 0.0, 1.,
              0, 0, 0]
@@ -91,7 +91,7 @@ torque_bounds: [30, 30, 30,
 #   100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100]
-friction_coef: 1 #0.3 - note problem can be sensitive to this with the gait opt
+friction_coef: 0.6 #0.3 - note problem can be sensitive to this with the gait opt
 
 base_pos_gains: [3000, 7000]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
 base_ang_gains: [100, 1000]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
@@ -145,7 +145,7 @@ num_polys: 5
 #ydot_des: 0
 
 # For 50 nodes (0.02 dt)
-gait_opt_freq: 20 #5
+gait_opt_freq: 100000 #5
 
 # For 20 nodes (0.05 dt)
 #gait_opt_freq: 20

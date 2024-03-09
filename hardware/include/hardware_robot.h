@@ -158,6 +158,8 @@ namespace hardware {
         static constexpr int ZEROING_SAMPLES = 20;
 
         const double gravity_offset_;
+
+        unsigned long loop_count_;
     };
 } // hardware
 
