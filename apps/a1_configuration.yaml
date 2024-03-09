@@ -69,7 +69,7 @@ srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
            0, 0, 0, 1.0, # 0.0505,   -0.1643,   -0.0572,    0.9835,
            0, 0, 0]
 
-srb_target: [1., 0, 0.3,
+srb_target: [2, 1, 0.3,
              0, 0, 0,
              0.0, 0, 0.0, 1.,
              0, 0, 0]
@@ -176,7 +176,7 @@ Q_diag: [1, 1, 1,          # linear momentum
 
 # 50 nodes (0.02 dt):
 #Q_srbd_diag: [0.0740, 0.0740, 12000, 15.00, 15.00, 10, 3000, 3000, 3000, 1, 1, 1] # 740.0, 240.0
-Q_srbd_diag: [1440, 1140, 10000, 0.100, 0.100, 10, 3000, 3000, 3000, 1, 1, 1] # 740.0, 240.0
+Q_srbd_diag: [1440, 140, 10000, 0.100, 0.100, 10, 3000, 3000, 3000, 1, 1, 1] # 740.0, 240.0
 # Note: tuning this to have lower numbers tends to help with solve quality
 
 # Walk to position weights:
