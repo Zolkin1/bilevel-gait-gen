@@ -8,6 +8,8 @@
 #include <Eigen/Core>
 
 #include "mpc_controller.h"
+#include "models/single_rigid_body_model.h"
+#include "qp_control.h"
 
 #include "../unitree_lib/loop.h"
 #include "../unitree_lib/udp.h"
@@ -51,7 +53,9 @@ namespace hardware {
         HardwareRobot(const vector_t& init_config, const vector_t& init_vel,
                       const vector_t& init_mpc_state,
                       std::unique_ptr<controller::MPCController>& controller,
-                      int robot_id, const JointGains& gains, double optitrack_rate);
+                      int robot_id, const JointGains& gains, double optitrack_rate,
+                      const mpc::SingleRigidBodyModel& model,
+                      controller::QPControl& qp_controller);
 
         void ControlCallback();
 
@@ -83,6 +87,8 @@ namespace hardware {
                                            const UNITREE_LEGGED_SDK::LowState& state);
 
         void AssignMPCGains(const controller::Contact& contact);
+
+        vector_t GetStateInTestingTrajectory(double time);
 
         vector_t ConvertHardwareJointsToPinocchio(const vector_t& q);
         vector_t ConvertHardwareConfigToPinocchio(const vector_t& q);
@@ -160,6 +166,10 @@ namespace hardware {
         const double gravity_offset_;
 
         unsigned long loop_count_;
+
+        double testing_start_time_;
+        mpc::SingleRigidBodyModel testing_model_;
+        controller::QPControl qp_controller_;
     };
 } // hardware
 

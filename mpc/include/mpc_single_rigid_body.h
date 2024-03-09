@@ -36,6 +36,8 @@ namespace mpc {
 
         double GetModifiedCost(int num_nodes) const;
 
+        SingleRigidBodyModel GetModelCopy() const;
+
     protected:
         void AddDynamicsConstraints(const vector_t& state) override;
 

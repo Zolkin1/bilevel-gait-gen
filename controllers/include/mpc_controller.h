@@ -54,6 +54,8 @@ namespace controller {
 
         std::vector<Eigen::Vector2d> GetEEBoxCenter() override;
 
+        const mpc::MPCSingleRigidBody& GetMPC() const;
+
     protected:
     private:
         vector_t ReconstructState(const vector_t& q, const vector_t& v, const vector_t& a) const;

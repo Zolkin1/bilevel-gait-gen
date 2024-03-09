@@ -113,10 +113,28 @@ int main() {
     gains.calf_kp = config.ParseNumber<double>("calf_joint_kp");
     gains.calf_kv = config.ParseNumber<double>("calf_joint_kv");
 
+    const auto temp_model = mpc_controller->GetMPC().GetModelCopy();
+
+    controller::QPControl qp_controller(config.ParseNumber<double>("control_rate"),
+                                        config.ParseString("robot_urdf"),
+                                        config.ParseString("foot_type"),
+                                        config.ParseEigenVector("init_vel").size(),
+                                        config.ParseEigenVector("torque_bounds"),
+                                        config.ParseNumber<double>("friction_coef"),
+                                        config.ParseStdVector<double>("base_pos_gains"),
+                                        config.ParseStdVector<double>("base_ang_gains"),
+                                        config.ParseEigenVector("kp_joint_gains"),
+                                        config.ParseEigenVector("kd_joint_gains"),
+                                        config.ParseNumber<double>("leg_tracking_weight"),
+                                        config.ParseNumber<double>("torso_tracking_weight"),
+                                        config.ParseNumber<double>("force_tracking_weight"),
+                                        4,
+                                        info.force_bound);
+
     HardwareRobot robot(standing, init_vel,
                         config.ParseEigenVector("srb_init"),
                         mpc_controller, 2,
-                        gains,1.0/240.0);
+                        gains,1.0/240.0, temp_model, qp_controller);
 
     robot.ChangeState(hardware::HardwareRobot::Hold);
 

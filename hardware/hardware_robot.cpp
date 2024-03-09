@@ -2,6 +2,8 @@
 // Created by zolkin on 2/25/24.
 //
 
+#include <math.h>
+
 #include "include/hardware_robot.h"
 #include "unitree_lib/quadruped.h"
 
@@ -21,13 +23,17 @@ namespace hardware {
     HardwareRobot::HardwareRobot(const hardware::vector_t& init_config, const hardware::vector_t& init_vel,
                                  const hardware::vector_t& init_mpc_state,
                                  std::unique_ptr<controller::MPCController>& controller, int robot_id,
-                                 const JointGains& gains, double optitrack_rate) :
+                                 const JointGains& gains, double optitrack_rate,
+                                 const mpc::SingleRigidBodyModel& model,
+                                 controller::QPControl& qp_controller) :
                                  udp(UNITREE_LEGGED_SDK::LOWLEVEL),
                                  safe(UNITREE_LEGGED_SDK::LeggedType::A1),
 //                                 8080, UNITREE_LEGGED_SDK::UDP_SERVER_IP_BASIC,
 //                                     8007, sizeof(UNITREE_LEGGED_SDK::LowCmd),
 //                                     sizeof(UNITREE_LEGGED_SDK::LowState)),
                                  controller_(std::move(controller)),
+                                 testing_model_(model),
+                                 qp_controller_(std::move(qp_controller)),
                                  gravity_offset_(9.8536) { // TODO: make this offset not hard coded
         init_time_ = std::chrono::high_resolution_clock::now();
 
@@ -86,6 +92,8 @@ namespace hardware {
         optitrack_rate_ = optitrack_rate;
 
         loop_count_ = 0;
+
+        testing_start_time_ = -1;
 
         // Start the optitrack monitor
         optitrack_client_ = std::thread(&HardwareRobot::OptiTrackMonitor, this);
@@ -283,6 +291,125 @@ namespace hardware {
                     // To be safe, move back to standing
                     ChangeState(Stand);
                 }
+            } else if (robot_state_ == Testing) {
+                // We want to choose from a desired testing trajectory
+                // Then run IK to get the joints and joint velocities.
+                // Then run all of this through the QP controller.
+                // Send that to the robot
+
+                if (testing_start_time_ == -1) {
+                    testing_start_time_ = time_s;
+                }
+
+                const double traj_time = time_s - testing_start_time_;
+
+//                std::cout << traj_time << std::endl;
+
+                vector_t srb_state = GetStateInTestingTrajectory(traj_time);
+
+                std::cout << "srb state: " << srb_state.transpose() << std::endl;
+
+                // Using the nominal ee_locations
+                std::array<std::array<double, 3>, 4> ee_pos{};
+                ee_pos.at(0) = {0.1526, 0.12523, 0.011089};
+                ee_pos.at(1) = {0.1526, -0.12523, 0.011089};
+                ee_pos.at(2) = {-0.208321844, 0.1363286, 0.01444};
+                ee_pos.at(3) = {-0.208321844, -0.1363286, 0.01444};
+
+                std::vector<Eigen::Vector3d> ee_locations(4);
+                for (int i = 0; i < ee_locations.size(); i++) {
+                    for (int j = 0; j < 3; j++) {
+                        ee_locations.at(i)(j) = ee_pos.at(i).at(j);
+                    }
+                }
+
+                vector_t q_guess(FLOATING_BASE_OFFSET + NUM_INPUTS);
+                q_guess << 0., 0., 0.3, 0.0, 0.0, 0.0, 1.0, -0.02, 0.9,
+                            -1.6, 0.02, 0.9, -1.6, 0.02, 0.9, -1.6, -0.02, 0.9, -1.6;
+
+                vector_t ub(12);
+                ub.setZero();
+                vector_t lb(12);
+                lb.setZero();
+
+                //  Now for IK
+                vector_t q_des = testing_model_.InverseKinematics(srb_state,ee_locations,
+                                                                  q_guess, ub, lb);
+
+                // Get desired velocities
+                const double vel_dt = 1e-4;
+                vector_t srb_state2 = GetStateInTestingTrajectory(traj_time + vel_dt);
+                vector_t q_des_2 = testing_model_.InverseKinematics(srb_state2,ee_locations,
+                                                                    q_guess, ub, lb);
+
+                vector_t v_des(FLOATING_VEL_OFFSET + NUM_INPUTS);
+                v_des.setZero();
+                const double freq = 0.5; // TODO: make not hard coded
+                v_des.head<POS_VARS>() << 0, 0, 0.1*std::cos(freq*traj_time*(2*M_PI))*freq*2*M_PI;
+                v_des.tail<NUM_INPUTS>() = ((q_des_2 - q_des)/vel_dt).tail<NUM_INPUTS>();
+
+                vector_t force_des(12);
+                for (int i = 0; i < 4; i++) {
+                    force_des(3*i) = 0;
+                    force_des(3*i + 1) = 0;
+                    force_des(3*i + 2) = testing_model_.GetMass()*9.81/4;
+                }
+
+//                force_des.resize(0);
+
+
+                controller::Contact contact;
+                contact.in_contact_.resize(4);
+                contact.contact_frames_.resize(4);
+
+                contact.in_contact_.at(0) = true;
+                contact.in_contact_.at(1) = true;
+                contact.in_contact_.at(2) = true;
+                contact.in_contact_.at(3) = true;
+
+                contact.contact_frames_.at(0) = 14;
+                contact.contact_frames_.at(1) = 24;
+                contact.contact_frames_.at(2) = 34;
+                contact.contact_frames_.at(3) = 44;
+
+                qp_controller_.UpdateTargetConfig(q_des);
+                qp_controller_.UpdateTargetVel(v_des);
+                qp_controller_.UpdateForceTargets(force_des);
+                qp_controller_.UpdateDesiredContacts(contact);
+
+                Eigen::Quaterniond quat(static_cast<Eigen::Vector4d>(q.segment<4>(3)));
+                // Note the warning on the pinocchio function!
+                pinocchio::quaternion::firstOrderNormalize(quat);
+                q(POS_VARS) = quat.x();
+                q(POS_VARS + 1) = quat.y();
+                q(POS_VARS + 2) = quat.z();
+                q(POS_VARS + 3) = quat.w();
+
+                vector_t control_action = qp_controller_.ComputeControlAction(q, v, a, contact, traj_time);
+
+                // Verify control action for bad values
+                if (VerifyControlAction(control_action)) {
+                    AssignConfigToMotors(control_action.head<NUM_INPUTS>(), cmd);
+                    AssignVelToMotors(control_action.segment<NUM_INPUTS>(NUM_INPUTS), cmd);
+                    AssignTorqueToMotors(control_action.tail<NUM_INPUTS>(), cmd);
+
+                    // Assign joint kp and kv
+                    AssignMPCGains(contact);
+                } else {
+                    log_file_ << "[Control] Reverting to a default state." << std::endl;
+                    std::cerr << "[Control] [Robot] Testing Control action rejected. Returning to standing state." << std::endl;
+                    AssignConfigToMotors(init_config_.tail<NUM_INPUTS>(), cmd);
+                    AssignVelToMotors(init_vel_.tail<NUM_INPUTS>(), cmd);
+                    AssignTorqueToMotors(vector_t::Constant(NUM_INPUTS, 0), cmd);
+
+                    for (int i = 0; i < NUM_INPUTS; i++) {
+                        cmd.motorCmd[i].Kp = motor_kp_;
+                        cmd.motorCmd[i].Kd = motor_kv_;
+                    }
+
+                    // To be safe, move back to standing
+                    ChangeState(Stand);
+                }
             }
 
             if (robot_state_ != Stand) {
@@ -295,6 +422,10 @@ namespace hardware {
 
             if (robot_state_ != MPC) {
                 in_mpc_ = false;
+            }
+
+            if (robot_state_ != Testing) {
+                testing_start_time_ = -1;
             }
 
             safe.PowerProtect(cmd, state, 7);
@@ -629,7 +760,24 @@ namespace hardware {
 //        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_2].Kp = gains_.calf_kp;
 //        cmd.motorCmd[UNITREE_LEGGED_SDK::RR_2].Kd = gains_.calf_kv;
 
+    }
 
+    vector_t HardwareRobot::GetStateInTestingTrajectory(double time) {
+        // Sinusoidal trajectory just in z to start
+        const double freq = 0.5; // Hz
+        const double z = 0.1*std::sin(freq*time*(2*M_PI)) + 0.25;
+
+        // For now no x or y
+        const double x = 0;
+        const double y = 0;
+
+        // We want the torso to be in a constant, normal orientation.
+        // No angular velocity
+
+        vector_t srb_state(13);
+        srb_state << x, y, z, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0;
+
+        return srb_state;
     }
 
 } // hardware

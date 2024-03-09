@@ -1057,4 +1057,8 @@ namespace mpc {
         }
     }
 
+    SingleRigidBodyModel MPCSingleRigidBody::GetModelCopy() const {
+        return model_;
+    }
+
 } // mpc
