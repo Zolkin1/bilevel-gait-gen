@@ -76,7 +76,7 @@ srb_target: [0, 0, 0.3,
 
 ## ----------------------- Low Level Controller ----------------------- ##
 controller_type: "QP_CONTROL"   # or PD_GRAV_COMP
-control_rate: 2000  # Hz
+control_rate: 1000  # Hz
 torque_bounds: [27, 27, 27,
                 27, 27, 27,
                 27, 27, 27,
@@ -204,9 +204,9 @@ log_file: "mpc-log-1.txt"
 mpc_verbosity: 0
 
 ## --- Hardware --- ##
-# TODO: Try decreasing/removing these to see if that will help with the COM tracking. 
 #  Holding the leg in place might be making it hard to adjust the COM
 # Hip tracking was looking pretty good
+# todo: 8-3 at 6:08pm: increase hip gains slightly in p
 hip_joint_kp: 8 #3 #10 # 3.5
 hip_joint_kv: 6 #2 #5 # 2.0
 
@@ -215,8 +215,8 @@ thigh_joint_kp: 12 #10 #20 # 10
 thigh_joint_kv: 8 #5 #10 # 5
 
 # calf looks like it needs more kp
-calf_joint_kp: 8 #15 #45 # 25
-calf_joint_kv: 6 #5 #25 # 15
+calf_joint_kp: 10 #15 #45 # 25
+calf_joint_kv: 8 #5 #25 # 15
 
 ## --- Temp --- ##
 #viz_rate: 0.025

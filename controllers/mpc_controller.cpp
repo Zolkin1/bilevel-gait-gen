@@ -114,7 +114,7 @@ namespace controller {
         GetTargetsFromTraj(traj_, time_);
 
         UpdateTrajViz();
-//        mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
+        mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
     }
 
     vector_t MPCController::ComputeControlAction(const vector_t& q, const vector_t& v,
@@ -143,9 +143,9 @@ namespace controller {
         state_ = state;
 
         // TODO: Remove
-        if (time > 1) {
-            time = 1;
-        }
+//        if (time > 1) {
+//            time = 1;
+//        }
 
         if (time > time_) {
             time_ = time;
@@ -173,10 +173,10 @@ namespace controller {
         contact1.contact_frames_ = contact.contact_frames_;
 
         // TODO: Remove
-        contact1.in_contact_.at(0) = false;
-        contact1.in_contact_.at(1) = false;
-        contact1.in_contact_.at(2) = false;
-        contact1.in_contact_.at(3) = false;
+//        contact1.in_contact_.at(0) = false;
+//        contact1.in_contact_.at(1) = false;
+//        contact1.in_contact_.at(2) = false;
+//        contact1.in_contact_.at(3) = false;
 
         vector_t force_des(contact1.GetNumContacts()*3);
         int j = 0;
@@ -207,7 +207,7 @@ namespace controller {
         qp_controller_.UpdateTargetVel(v_des_);
 
         // TODO: Remove
-        force_des.setZero();
+//        force_des.setZero();
         qp_controller_.UpdateForceTargets(force_des);
 
         qp_controller_.UpdateDesiredContacts(contact1);
@@ -444,55 +444,86 @@ namespace controller {
             time = traj.GetTime(0);
         }
 
-        const int nodes_ahead = 1; // TODO: Check value
+        const int nodes_ahead = 0; // TODO: Check value
         int node = traj.GetNode(time)+nodes_ahead;
 
         // TODO: remove
-        if (node > 50) {
-            node = 50;
+//        if (node > 50) {
+//            node = 50;
+//        }
+
+        // Linearly interpolate
+        const double dt = 1e-4;
+        vector_t state_interp;
+        vector_t state_interp2;
+        if (node > 0) {
+            state_interp = (traj.GetState(node) - traj.GetState(node - 1))
+                                    * (1 - (traj.GetTime(node) - time) / (traj.GetTime(node) - traj.GetTime(node - 1)))
+                                    + traj.GetState(node - 1);
+
+            if (time + info_.integrator_dt < traj.GetTime(node)) {
+                throw std::runtime_error("bad interp.");
+            }
+
+//            state_interp2 = (traj.GetState(node) - traj.GetState(node - 1))
+//                           * (1 - (traj.GetTime(node) - time + dt) / (traj.GetTime(node) - traj.GetTime(node - 1)))
+//                           + traj.GetState(node - 1);
+
+            state_interp2 = (traj.GetState(node + 1) - traj.GetState(node))
+                            * (1 - (traj.GetTime(node + 1) - (time + info_.integrator_dt)) / (traj.GetTime(node + 1) - traj.GetTime(node)))
+                            + traj.GetState(node);
+        } else {
+            state_interp = (traj.GetState(node + 1) - traj.GetState(node))
+                                    * (1 - (traj.GetTime(node + 1) - time) / (traj.GetTime(node + 1) - traj.GetTime(node)))
+                                    + traj.GetState(node);
+
+            state_interp2 = (traj.GetState(node + 1) - traj.GetState(node))
+                           * (1 - (traj.GetTime(node + 1) - time + dt) / (traj.GetTime(node + 1) - traj.GetTime(node)))
+                           + traj.GetState(node);
         }
+
 
         // Calc the IK here
         std::vector<mpc::vector_3t> traj_ee_locations(4);
         for (int ee = 0; ee < 4; ee++) {
             // Grab state and end effector locations at that time
-            traj_ee_locations.at(ee) = traj.GetEndEffectorLocation(ee, traj.GetTime(node));
+            traj_ee_locations.at(ee) = traj.GetEndEffectorLocation(ee, time);
         }
 
-        q_des_ = model_.InverseKinematics(traj.GetState(node),traj_ee_locations, q_des_,
+        q_des_ = model_.InverseKinematics(state_interp,traj_ee_locations, q_des_,
                                           info_.joint_bounds_ub,
                                           info_.joint_bounds_lb);
 
 
         v_des_.resize(pin_model_.nv);
         v_des_.setZero();
-        v_des_.head<6>() << traj.GetState(node).segment<3>(3)/model_.GetMass(), model_.GetIrInv()*traj.GetState(node).segment<3>(10); //model_.GetIr().inverse()*
+        v_des_.head<6>() << state_interp.segment<3>(3)/model_.GetMass(), model_.GetIrInv()*state_interp.segment<3>(10);
         if (node != 0) {
             // TODO: Maybe find a better way to do this
             std::vector<mpc::vector_3t> traj_ee_locations_prev(4);
             for (int ee = 0; ee < 4; ee++) {
                 // Grab state and end effector locations at that time
-                traj_ee_locations_prev.at(ee) = traj.GetEndEffectorLocation(ee, traj.GetTime(node-1));
+                traj_ee_locations_prev.at(ee) = traj.GetEndEffectorLocation(ee, time + info_.integrator_dt);
             }
 
-            vector_t q_prev = model_.InverseKinematics(traj.GetState(node - 1),traj_ee_locations_prev, q_des_,
+            vector_t q_prev = model_.InverseKinematics(state_interp2,traj_ee_locations_prev, q_des_,
                                               info_.joint_bounds_ub,
                                               info_.joint_bounds_lb);
 
-            v_des_.tail(num_inputs_) = (q_des_ - q_prev).tail(num_inputs_) / info_.integrator_dt;
+            v_des_.tail(num_inputs_) = (-q_des_ + q_prev).tail(num_inputs_) / (info_.integrator_dt);
         } else {
             // TODO: Maybe find a better way to do this
             std::vector<mpc::vector_3t> traj_ee_locations_next(4);
             for (int ee = 0; ee < 4; ee++) {
                 // Grab state and end effector locations at that time
-                traj_ee_locations_next.at(ee) = traj.GetEndEffectorLocation(ee, traj.GetTime(node+1));
+                traj_ee_locations_next.at(ee) = traj.GetEndEffectorLocation(ee, time + dt);
             }
 
-            vector_t q_next = model_.InverseKinematics(traj.GetState(node + 1),traj_ee_locations_next, q_des_,
+            vector_t q_next = model_.InverseKinematics(state_interp2,traj_ee_locations_next, q_des_,
                                                        info_.joint_bounds_ub,
                                                        info_.joint_bounds_lb);
 
-            v_des_.tail(num_inputs_) = (q_next - q_des_).tail(num_inputs_) / info_.integrator_dt;
+            v_des_.tail(num_inputs_) = (q_next - q_des_).tail(num_inputs_) / dt;
         }
 
         for (int i = 0; i < v_des_.size(); i++) {

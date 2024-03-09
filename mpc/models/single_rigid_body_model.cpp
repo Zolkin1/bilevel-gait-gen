@@ -339,7 +339,7 @@ namespace mpc {
         q.segment<QUAT_SIZE>(POS_VARS) = state.segment<QUAT_SIZE>(QUAT_START);
         q.tail(pin_model_.njoints-2) = state_guess.tail(pin_model_.njoints-2);
 
-        const double eps  = 1e-4;
+        const double eps  = 5e-6;
         const int IT_MAX  = 1000;
         const double DT   = 1e-1;
         const double damp = 1e-6;
