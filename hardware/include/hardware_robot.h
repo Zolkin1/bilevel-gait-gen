@@ -170,6 +170,8 @@ namespace hardware {
         double testing_start_time_;
         mpc::SingleRigidBodyModel testing_model_;
         controller::QPControl qp_controller_;
+
+        Eigen::Vector2d testing_offsets_;
     };
 } // hardware
 

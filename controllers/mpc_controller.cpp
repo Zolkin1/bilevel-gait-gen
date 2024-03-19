@@ -114,7 +114,7 @@ namespace controller {
         GetTargetsFromTraj(traj_, time_);
 
         UpdateTrajViz();
-//        mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
+        mpc_computations_ = std::thread(&MPCController::MPCUpdate, this);
     }
 
     vector_t MPCController::ComputeControlAction(const vector_t& q, const vector_t& v,
@@ -143,9 +143,9 @@ namespace controller {
         state_ = state;
 
         // TODO: Remove
-        if (time > 1) {
-            time = 1;
-        }
+//        if (time > 1) {
+//            time = 1;
+//        }
 
         if (time > time_) {
             time_ = time;
@@ -173,10 +173,10 @@ namespace controller {
         contact1.contact_frames_ = contact.contact_frames_;
 
         // TODO: Remove
-        contact1.in_contact_.at(0) = false;
-        contact1.in_contact_.at(1) = false;
-        contact1.in_contact_.at(2) = false;
-        contact1.in_contact_.at(3) = false;
+//        contact1.in_contact_.at(0) = false;
+//        contact1.in_contact_.at(1) = false;
+//        contact1.in_contact_.at(2) = false;
+//        contact1.in_contact_.at(3) = false;
 
         vector_t force_des(contact1.GetNumContacts()*3);
         int j = 0;
@@ -219,7 +219,7 @@ namespace controller {
 //        log_file_ << std::endl;
 
         timer.StopTimer();
-        timer.PrintElapsedTime();
+//        timer.PrintElapsedTime();
 
 //        sync_mut_.unlock();
 
@@ -420,9 +420,9 @@ namespace controller {
         int node = traj.GetNode(time)+nodes_ahead;
 
         // TODO: remove
-        if (node > 50) {
-            node = 50;
-        }
+//        if (node > 50) {
+//            node = 50;
+//        }
 
         // Linearly interpolate
         const double dt = 1e-4;

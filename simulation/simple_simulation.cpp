@@ -229,16 +229,17 @@ namespace simulation {
 //                    d->qvel[5] = 0;
 
 
-//                    if (d->time >= 1.5 && d->time <= 1.501) {
+                    if (d->time >= 0.0 && d->time <= 0.3) {
 //                        d->qvel[1] = 0.5;
-//                        d->xfrc_applied[7] = 0.0;
-//                        d->xfrc_applied[8] = 0.0;
-//                        std::cout << "--- Force Applied ---" << std::endl;
-//                    } else {
-//                        d->xfrc_applied[7] = 0.0;
-//                        d->xfrc_applied[8] = 0.0;
-//                    }
-
+                        d->xfrc_applied[6 + 6] = 0.0;
+                        d->xfrc_applied[7 + 6] = 0.0;
+                        d->xfrc_applied[8 + 6] = 0.0;
+                        std::cout << "--- Force Applied ---" << std::endl;
+                    } else {
+                        d->xfrc_applied[6 + 6] = 0.0;
+                        d->xfrc_applied[7 + 6] = 0.0;
+                        d->xfrc_applied[8 + 6] = 0.0;
+                    }
                     mj_step(m, d);
                 }
                 timer.StopTimer();

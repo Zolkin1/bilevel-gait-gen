@@ -593,6 +593,12 @@ namespace mpc {
         timer.StopTimer();
 
         timer.PrintElapsedTime();
+//        static double comp_time_total = 0;
+//        static int gradient_comps = 0;
+//        gradient_comps++;
+//        comp_time_total += timer.GetElapsedTimeMilliseconds();
+//        std::cout << "total gradient comp time (ms): " << comp_time_total << std::endl;
+//        std::cout << "number of gradient comps: " << gradient_comps << std::endl;
     }
 
     vector_t ClarabelInterface::Computedx(const Eigen::SparseMatrix<double>& P, const mpc::vector_t& q,

@@ -33,7 +33,7 @@ init_config: [0., 0., 0.3, 0.0, 0.0, 0.0, 1.0, # -0.0004, 0.004, 0.0001,
 #              0.08, 0.45, -1.03]
 # initial joint velocity
 # xv, yv, zv, angle rates, v0, ..., v11
-init_vel: [0., 0., 0., 0., 0., 0.,
+init_vel: [0, 0., 0., 0., 0., 0.,
            0., 0., 0.,
            0., 0., 0.,
            0., 0., 0.,
@@ -69,7 +69,7 @@ srb_init: [0, 0, 0.3, # this 0.3 is kinda useful
            0, 0, 0, 1.0, # 0.0505,   -0.1643,   -0.0572,    0.9835,
            0, 0, 0]
 
-srb_target: [2, 1, 0.3,
+srb_target: [0, 0, 0.3,
              0, 0, 0,
              0.0, 0, 0.0, 1.,
              0, 0, 0]
@@ -91,9 +91,9 @@ torque_bounds: [30, 30, 30,
 #   100, 100, 100,
 #   100, 100, 100,
 #   100, 100, 100]
-friction_coef: 0.6 #0.3 - note problem can be sensitive to this with the gait opt
+friction_coef: 0.5 #0.3 - note problem can be sensitive to this with the gait opt
 
-base_pos_gains: [3000, 7000]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
+base_pos_gains: [3000, 9000]  # kd_pos, kp_pos  need the kd~100 and kp~1000 and the torso having higher weight to override the legs significantly
 base_ang_gains: [100, 1000]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
 
 # 5500, 300 works well for the QP controller
@@ -107,13 +107,13 @@ kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 550
 kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
 
 leg_tracking_weight: 10 #10
-torso_tracking_weight: 100 #100 #10
+torso_tracking_weight: 1000 #100 #10
 force_tracking_weight: 1 #1 #10
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
-num_nodes: 50 #30 # 50, 20
-integrator_dt: 0.02 #0.03333 #0.02, 0.05  # 0.015
+num_nodes: 20 #30 # 50, 20
+integrator_dt: 0.05 #0.03333 #0.02, 0.05  # 0.015
 num_qp: 1
 
 vel_bounds: [10, 10, 10,
@@ -132,7 +132,7 @@ joint_bounds_ub: [0.802851, 4.18879, -0.916298,
                   0.802851, 4.18879, -0.916298]
 
 num_switches: 2
-force_bound: 200 #2500000 #150
+force_bound: 150 #2500000 #150
 
 swing_height: 0.075
 
@@ -145,20 +145,20 @@ num_polys: 5
 #ydot_des: 0
 
 # For 50 nodes (0.02 dt)
-gait_opt_freq: 100000 #5
+gait_opt_freq: 1000 #5
 
 # For 20 nodes (0.05 dt)
 #gait_opt_freq: 20
 
 #ee_box_size: [.5, .5] #[0.12, 0.2], [0.15, 0.075], [0.15, 0.15]
-ee_box_size: [0.15, 0.1] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this
+ee_box_size: [0.15, 0.15] # 0.1, 0.12 is a good set of numbers -- how well it works is sensitive to this
 # 0.15, 0.15 is good for diag
 
 run_time_iterations: 6000 # 150 works well
 
 foot_offset: 0.015  # 0.01 works well -- can be sensitive
 
-force_cost: 0.001 # Note: without this cost, the problem is much more poorly
+force_cost: 0.000 # Note: without this cost, the problem is much more poorly
   # conditioned and can return infeasible, also the derivative computations are much worse
 # without this force cost, the QP cost is almost constant in steady state.
 
@@ -176,7 +176,7 @@ Q_diag: [1, 1, 1,          # linear momentum
 
 # 50 nodes (0.02 dt):
 #Q_srbd_diag: [0.0740, 0.0740, 12000, 15.00, 15.00, 10, 3000, 3000, 3000, 1, 1, 1] # 740.0, 240.0
-Q_srbd_diag: [1440, 140, 10000, 0.100, 0.100, 10, 3000, 3000, 3000, 1, 1, 1] # 740.0, 240.0
+Q_srbd_diag: [340, 340, 4000, 0.100, 0.100, 10, 3000, 3000, 3000, 1, 1, 1] # 740.0, 240.0
 # Note: tuning this to have lower numbers tends to help with solve quality
 
 # Walk to position weights:

@@ -95,8 +95,10 @@ friction_coef: 0.3 #0.3 - note problem can be sensitive to this with the gait op
 
 # TODO: Tune
 # 1000, 5000
-base_pos_gains: [10000, 60000]  # kd_pos, kp_pos  need the kd~300 and kp~340 looks ok for just qp
-base_ang_gains: [0, 500]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
+# 750 for kd
+# TODO: Up kd after I write KF for velocities
+base_pos_gains: [50, 1000]  # kd_pos, kp_pos  need the kd~300 and kp~340 looks ok for just qp
+base_ang_gains: [10, 500]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 100
 
 
 #kp_joint_gains: [15, 25, 55, 15, 25, 55, 15, 25, 55, 15, 25, 55] # 100 looked ok for just qp
@@ -105,15 +107,15 @@ base_ang_gains: [0, 500]  # kd_ang, kp_ang, on morning of 2/26 these were 60, 10
 # Note that some joints requires different gains on hardware
 # 700
 kp_joint_gains: [250, 250, 350, 250, 250, 350, 250, 250, 350, 250, 250, 350] # 200 looked ok for just qp, 6th at 3000
-kd_joint_gains: [7, 5, 14, 7, 5, 14, 7, 5, 14, 7, 5, 14] # 75 looked ok for just qp
+kd_joint_gains: [7, 5, 50, 7, 5, 50, 7, 5, 50, 7, 5, 50] # 75 looked ok for just qp
 
 # 5000, 300 works well for the QP controller in sim
 #kp_joint_gains: [5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500, 5500]
 #kd_joint_gains: [300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300, 300]
 
 leg_tracking_weight: 10 #10
-torso_tracking_weight: 0 # 100 -- from 50
-force_tracking_weight: 1 # 1
+torso_tracking_weight: 00 # 100 -- from 50, 2000
+force_tracking_weight: 3 # 1, 5
 
 ## ----------------------- MPC ----------------------- ##
 discretization_steps: 1
@@ -156,7 +158,7 @@ ee_box_size: [0.11, 0.11] # 0.1, 0.12 is a good set of numbers -- how well it wo
 
 run_time_iterations: 6000 # 150 works well
 
-foot_offset: 0.025 #0.0175  # 0.01 works well -- can be sensitive
+foot_offset: 0.01 #0.0175  # 0.01 works well -- can be sensitive
 
 force_cost: 10000 # Note: without this cost, the problem is much more poorly
   # conditioned and can return infeasible, also the derivative computations are much worse
@@ -206,17 +208,20 @@ mpc_verbosity: 0
 ## --- Hardware --- ##
 #  Holding the leg in place might be making it hard to adjust the COM
 # Hip tracking was looking pretty good
-hip_joint_kp: 12 #3 #10 # 3.5
-hip_joint_kv: 6 #2 #5 # 2.0
+hip_joint_kp: 35 #3 #10 # 3.5
+hip_joint_kv: 10 #2 #5 # 2.0
 
 # thigh looks like it needs more kp
-thigh_joint_kp: 12 #10 #20 # 10
-thigh_joint_kv: 6 #5 #10 # 5
+thigh_joint_kp: 65 #10 #20 # 10
+thigh_joint_kv: 10 #5 #10 # 5
 
 # calf looks like it needs more kp
-calf_joint_kp: 10 #15 #45 # 25
-calf_joint_kv: 7 #5 #25 # 15
+calf_joint_kp: 65 #15 #45 # 25
+calf_joint_kv: 10 #5 #25 # 15
 
 ## --- Temp --- ##
 #viz_rate: 0.025
 viz_rate: 0.001
+
+
+# Current optitrack z offset: -114mm

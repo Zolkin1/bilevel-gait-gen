@@ -166,7 +166,7 @@ namespace hardware {
             a_com.prev_output = a.head<FLOATING_VEL_OFFSET>();
 
             // Note: increased to 100 from 50!
-            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 10, 240);
+            v.head<FLOATING_VEL_OFFSET>() = LPF(v_com, 20, 240);
             v_com.prev_output = v.head<FLOATING_VEL_OFFSET>(); //v.head<FLOATING_VEL_OFFSET>();
 
             // Note: increased from 2 to 10!
@@ -299,6 +299,7 @@ namespace hardware {
 
                 if (testing_start_time_ == -1) {
                     testing_start_time_ = time_s;
+                    testing_offsets_ << q.head<2>();
                 }
 
                 const double traj_time = time_s - testing_start_time_;
@@ -345,7 +346,7 @@ namespace hardware {
                 vector_t v_des(FLOATING_VEL_OFFSET + NUM_INPUTS);
                 v_des.setZero();
                 const double freq = 0.5; // TODO: make not hard coded
-                v_des.head<POS_VARS>() << 0, 0, 0.1*std::cos(freq*traj_time*(2*M_PI))*freq*2*M_PI;
+                v_des.head<POS_VARS>() << 0.05*std::cos(freq*traj_time*(2*M_PI))*freq*2*M_PI, 0, 0.1*std::cos(freq*traj_time*(2*M_PI))*freq*2*M_PI;
                 v_des.tail<NUM_INPUTS>() = ((q_des_2 - q_des)/vel_dt).tail<NUM_INPUTS>();
 
                 vector_t force_des(12);
@@ -384,6 +385,8 @@ namespace hardware {
                 q(POS_VARS + 1) = quat.y();
                 q(POS_VARS + 2) = quat.z();
                 q(POS_VARS + 3) = quat.w();
+
+                q.head<2>() -= testing_offsets_;
 
                 vector_t control_action = qp_controller_.ComputeControlAction(q, v, a, contact, traj_time);
 
@@ -768,7 +771,7 @@ namespace hardware {
         const double z = 0.1*std::sin(freq*time*(2*M_PI)) + 0.25;
 
         // For now no x or y
-        const double x = 0;
+        const double x = 0.05*std::sin(freq*time*(2*M_PI));
         const double y = 0;
 
         // We want the torso to be in a constant, normal orientation.

@@ -839,6 +839,9 @@ namespace mpc {
                 << setw(col_width) << "QP Cost" << std::endl;
         std::cout << std::setfill('-') << setw(table_width) << "" << std::endl;
         std::cout << setfill(' ');
+
+        double avg_time = 0;
+
         for (int i = 0; i < alpha_.size(); i++) {
 
             for (int j = 0; j < contact_sched_change_.size(); j++) {
@@ -887,8 +890,12 @@ namespace mpc {
                       << setw(col_width) << merit_directional_deriv_.at(i)
                       << setw(col_width) << solve_type
                       << setw(col_width) << cost_.at(i) << std::endl;
+
+            avg_time += solve_time_.at(i);
         }
         std::cout << std::endl;
+        avg_time = avg_time/solve_time_.size();
+        std::cout << "Average compute time: " << avg_time << std::endl;
     }
 
     void MPC::PrintStatLineToFile(std::ofstream& log_file) {

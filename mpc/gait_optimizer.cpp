@@ -742,6 +742,12 @@ namespace mpc {
 
         ls_timer.StopTimer();
         ls_timer.PrintElapsedTime();
+        static double comp_time_total = 0;
+        static int ls_comps = 0;
+        ls_comps++;
+        comp_time_total += ls_timer.GetElapsedTimeMilliseconds();
+        std::cout << "total ls comp time (ms): " << comp_time_total << std::endl;
+        std::cout << "number of ls comps: " << ls_comps << std::endl;
 
         return std::make_pair(GetContactTimes(alpha), cost_min);
     }
