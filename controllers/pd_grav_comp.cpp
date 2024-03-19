@@ -28,7 +28,8 @@ namespace controller {
     Eigen::VectorXd PDGravComp::ComputeControlAction(const Eigen::VectorXd& q,
                                                          const Eigen::VectorXd& v,
                                                          const Eigen::VectorXd& a,
-                                                         const Contact& contact) {
+                                                         const Contact& contact,
+                                                         double time) {
 
         // Compute feedforward torque
         ComputeFeedForwardValue(q, v, contact);

@@ -2062,6 +2062,14 @@ void Simulate::Sync() {
   // update scene
   if (!is_passive_) {
     mjv_updateScene(m_, d_, &this->opt, &this->pert, &this->cam, mjCAT_ALL, &this->scn);
+    // Note these memcpy lines are custom!
+      int ngeom = user_scn->ngeom;
+      if (ngeom > 0) {
+          std::memcpy(scn.geoms + scn.ngeom,
+                      user_scn->geoms,
+                      sizeof(mjvGeom) * ngeom);
+          scn.ngeom += ngeom;
+      }
   } else {
     mjv_updateSceneState(m_, d_, &this->opt, &scnstate_);
 
@@ -2217,7 +2225,7 @@ void Simulate::LoadOnRenderThread() {
   std::memcpy(qvel_.data(), this->d_->qvel, sizeof(this->d_->qvel[0]) * this->m_->nv);
  qvel_prev_ = qvel_;
 
-  // allocate history buffer: smaller of {2000 states, 100 MB}
+  // allocate history buffer: smaller of {2000 states_, 100 MB}
   if (!this->is_passive_) {
     constexpr int kHistoryLength = 2000;
     constexpr int kMaxHistoryBytes = 1e8;

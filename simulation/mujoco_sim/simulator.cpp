@@ -46,10 +46,15 @@ namespace simulator {
         );
 
         sim->LoadMessage(robot->GetRobotXMLFile().c_str());
+        sim->user_scn = new mjvScene;
+        mjv_defaultScene(sim->user_scn);
+        mjv_makeScene(model_, sim->user_scn, 2000);
+
         data_ = mj_makeData(model_);
 
         // Set state to current initial condition
-        this->SetState(robot->GetInitConfig(), robot->GetInitVelocities());
+        this->SetState(robot->ConvertPinocchioConfigToMujoco(robot->GetInitConfig()),
+                       robot->ConvertPinocchioVelToMujoco(robot->GetInitVelocities()));
 
     }
 
@@ -144,6 +149,8 @@ namespace simulator {
                                 data_->time < last_control_time) {
 
                                 robot->GetControlAction(data_, data_->ctrl);
+                                std::vector<std::vector<Eigen::Vector3d>> viz_data = robot->GetTrajViz();
+                                UpdateVizGeoms(sim, viz_data);
 
                                 last_control_time = data_->time;
                             }
@@ -171,6 +178,8 @@ namespace simulator {
                                     data_->time < last_control_time) {
 
                                     robot->GetControlAction(data_, data_->ctrl);
+                                    std::vector<std::vector<Eigen::Vector3d>> viz_data = robot->GetTrajViz();
+                                    UpdateVizGeoms(sim, viz_data);
 
                                     last_control_time = data_->time;
                                 }
@@ -199,6 +208,43 @@ namespace simulator {
                     }
                 }
             }  // release std::lock_guard<std::mutex>
+        }
+    }
+
+    void Simulator::UpdateVizGeoms(mujoco::Simulate* sim, const std::vector<std::vector<Eigen::Vector3d>>& viz_data) {
+        if (!viz_data.empty()) {
+            sim->user_scn->ngeom = 0;
+            // TODO: Free other geoms?
+
+            const mjtNum mat[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+            const float rgba_va[4] = {1, 1, 0, 1};
+            const mjtNum size[3] = {1, 1, 1};
+            const mjtNum pos[3] = {1, 1, 1};
+            mjtNum from[3];
+            mjtNum to[3];
+
+            for (int ee = 0; ee < viz_data.size(); ee++) { // end effectors
+                for (int node = 0; node < viz_data.at(ee).size() - 1; node++) {   // node
+                    for (int coord = 0; coord < 3; coord++) {   // coordinate
+                        from[coord] = viz_data.at(ee).at(node)(coord);
+                        to[coord] = viz_data.at(ee).at(node+1)(coord);
+                    }
+
+                    sim->user_scn->ngeom += 1;
+                    mjv_initGeom(&sim->user_scn->geoms[sim->user_scn->ngeom - 1],
+                                 mjtGeom::mjGEOM_CAPSULE,
+                                 size,
+                                 pos,
+                                 nullptr,
+                                 rgba_va);
+
+                    mjv_connector(&sim->user_scn->geoms[sim->user_scn->ngeom - 1],
+                                  mjtGeom::mjGEOM_CAPSULE,
+                                  0.005,
+                                  from,
+                                  to);
+                }
+            }
         }
     }
 

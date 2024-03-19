@@ -16,7 +16,10 @@ namespace utils {
 
         Eigen::VectorXd ParseEigenVector(const std::string& element);
 
-        double ParseNumber(const std::string& element);
+        template<typename scalar>
+        scalar ParseNumber(const std::string& element) {
+            return config_[element].as<scalar>();
+        }
 
         std::string ParseString(const std::string& element);
 

@@ -16,6 +16,10 @@ namespace controller {
         std::vector<bool> in_contact_;          // if each frame is in contact
         std::vector<int> contact_frames_;       // frames potentially in contact
 
+        Contact();
+
+        Contact(int num_contacts);
+
         int GetNumContacts() const;
     };
 
@@ -39,11 +43,21 @@ namespace controller {
         virtual Eigen::VectorXd ComputeControlAction(const Eigen::VectorXd& q,
                                                      const Eigen::VectorXd& v,
                                                      const Eigen::VectorXd& a,
-                                                     const Contact& contact) = 0;
+                                                     const Contact& contact,
+                                                     double time) = 0;
 
         void UpdateTargetConfig(const Eigen::VectorXd& q);
         void UpdateTargetVel(const Eigen::VectorXd& v);
         void UpdateTargetAcc(const Eigen::VectorXd& a);
+
+        virtual void InitSolver(const Eigen::VectorXd& full_body_state,
+                                const Eigen::VectorXd & mpc_state);
+
+        virtual void UpdateDesiredContacts(const Contact& contact);
+
+        virtual std::vector<std::vector<Eigen::Vector3d>> GetTrajViz();
+
+        virtual std::vector<Eigen::Vector2d> GetEEBoxCenter();
 
     protected:
         /**

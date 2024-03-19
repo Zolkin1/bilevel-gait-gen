@@ -1,5 +1,5 @@
 # Setup Mujoco path
-set(MUJOCO_VERSION "mujoco-3.0.0" CACHE STRING "mujoco version")
+set(MUJOCO_VERSION "mujoco-3.0.1" CACHE STRING "mujoco version")
 set(MUJOCO_DIR "/home/$ENV{USER}/${MUJOCO_VERSION}" CACHE PATH "Path to Mujoco dir")
 message(STATUS "mujoco directory: ${MUJOCO_DIR}")
 
@@ -28,7 +28,9 @@ set(SIM_HEADER_LIST "include/simulator.h"
                     "include/glfw_dispatch.h"
                     "include/platform_ui_adapter.h"
                     "include/simulate.h"
-                    "../controllers/include/qp_control.h")
+                    "../controllers/include/qp_control.h"
+                    "include/visualization.h"
+                    "include/simple_simulation.h")
 
 add_library(simulator mujoco_sim/simulator.cpp
                       simulation_robot.cpp
@@ -36,6 +38,8 @@ add_library(simulator mujoco_sim/simulator.cpp
         mujoco_sim/glfw_dispatch.cc
         mujoco_sim/platform_ui_adapter.cc
         mujoco_sim/simulate.cc
+        visualization.cpp
+        simple_simulation.cpp
         ${SIM_HEADER_LIST})
 
 target_include_directories(simulator PUBLIC include)
@@ -58,4 +62,5 @@ find_package(pinocchio)
 target_link_libraries(simulator PRIVATE pinocchio)
 
 target_link_libraries(simulator PRIVATE controller)
+target_link_libraries(simulator PRIVATE utils)
 

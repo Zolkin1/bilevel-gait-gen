@@ -40,7 +40,7 @@ namespace mujoco {
 class SimulateMutex : public std::recursive_mutex {};
 using MutexLock = std::unique_lock<std::recursive_mutex>;
 
-// Simulate states not contained in MuJoCo structures
+// Simulate states_ not contained in MuJoCo structures
 class Simulate {
  public:
   using Clock = std::chrono::steady_clock;
@@ -103,7 +103,7 @@ class Simulate {
   int ncam_ = 0;
   int nkey_ = 0;
   int state_size_ = 0;      // number of mjtNums in a history buffer state
-  int nhistory_ = 0;        // number of states saved in history buffer
+  int nhistory_ = 0;        // number of states_ saved in history buffer
   int history_cursor_ = 0;  // cursor pointing at last saved state
 
   std::vector<int> body_parentid_;

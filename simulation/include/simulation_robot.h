@@ -29,6 +29,8 @@ namespace simulator {
 
         void InitController();
 
+        void InitController(const Eigen::VectorXd& full_body_state, const Eigen::VectorXd& mpc_state);
+
         void UpdateTargetConfig(const Eigen::VectorXd& q);
 
         void UpdateTargetVel(const Eigen::VectorXd& v);
@@ -51,7 +53,7 @@ namespace simulator {
          * Interface with Mujoco to provide the current control action.
          * Puts the controls into the control vector provided.
          */
-        void GetControlAction(const mjData* data, mjtNum* control);
+        void GetControlAction(mjData* data, mjtNum* control); // TODO: make the data constant again!
 
         /**
          * Creates the mapping of the joints from mujoco to pinocchio.
@@ -66,6 +68,9 @@ namespace simulator {
         int UpdateContacts(const mjData* data);
         int GetNumContacts() const;
 
+        std::vector<std::vector<Eigen::Vector3d>> GetTrajViz();
+        std::vector<Eigen::Vector2d> GetEEBoxCenter() const;
+
         Eigen::VectorXd ConvertMujocoConfigToPinocchio(const mjData* data) const;
         Eigen::VectorXd ConvertMujocoVelToPinocchio(const mjData* data) const;
         Eigen::VectorXd ConvertMujocoAccToPinocchio(const mjData* data) const;
@@ -73,9 +78,10 @@ namespace simulator {
         Eigen::VectorXd ConvertMujocoVecConfigToPinocchio(const Eigen::VectorXd& q) const;
         Eigen::VectorXd ConvertMujocoVecVelLikeToPinocchio(const Eigen::VectorXd& v) const;
 
-        Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints);
-        Eigen::VectorXd ConvertPinocchioVelToMujoco(const Eigen::VectorXd& v);
-        std::vector<mjtNum> ConvertControlToMujoco(const Eigen::VectorXd& control);
+        Eigen::VectorXd ConvertPinocchioJointToMujoco(const Eigen::VectorXd& joints) const;
+        Eigen::VectorXd ConvertPinocchioVelToMujoco(const Eigen::VectorXd& v) const;
+        std::vector<mjtNum> ConvertControlToMujoco(const Eigen::VectorXd& control) const;
+        Eigen::VectorXd ConvertPinocchioConfigToMujoco(const Eigen::VectorXd& q) const;
 
     private:
         std::string robot_xml_path_;

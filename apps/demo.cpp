@@ -32,31 +32,37 @@ int main(int argc, char* argv[]) {
 
     // Make the low level controller
     std::unique_ptr<controller::Controller> controller;
-    if(config.ParseString("controller_type") == "PD_GRAV_COMP") {
-        controller = std::make_unique<controller::PDGravComp>(config.ParseNumber("control_rate"),
-                                                            config.ParseString("robot_urdf"),
-                                                            config.ParseString("foot_type"),
-                                                            config.ParseEigenVector("standing_config"),
-                                                            config.ParseEigenVector("standing_vel"));
-    } else if (config.ParseString("controller_type") == "QP_CONTROL") {
-        controller = std::make_unique<controller::QPControl>(config.ParseNumber("control_rate"),
-                                                            config.ParseString("robot_urdf"),
-                                                            config.ParseString("foot_type"),
-                                                            config.ParseEigenVector("init_vel").size(),
-                                                            config.ParseEigenVector("torque_bounds"),
-                                                            config.ParseNumber("friction_coef"),
-                                                            config.ParseStdVector<double>("base_pos_gains"),
-                                                            config.ParseStdVector<double>("base_ang_gains"),
-                                                            config.ParseStdVector<double>("joint_gains"),
-                                                            config.ParseNumber("leg_tracking_weight"),
-                                                            config.ParseNumber("torso_tracking_weight"),
-                                                            config.ParseNumber("force_tracking_weight"));
+//    if(config.ParseString("controller_type") == "PD_GRAV_COMP") {
+//        controller = std::make_unique<controller::PDGravComp>(config.ParseNumber<double>("control_rate"),
+//                                                            config.ParseString("robot_urdf"),
+//                                                            config.ParseString("foot_type"),
+//                                                            config.ParseEigenVector("standing_config"),
+//                                                            config.ParseEigenVector("standing_vel"));
+//    } else if (config.ParseString("controller_type") == "QP_CONTROL") {
+    controller = std::make_unique<controller::QPControl>(config.ParseNumber<double>("control_rate"),
+                                                        config.ParseString("robot_urdf"),
+                                                        config.ParseString("foot_type"),
+                                                        config.ParseEigenVector("init_vel").size(),
+                                                        config.ParseEigenVector("torque_bounds"),
+                                                        config.ParseNumber<double>("friction_coef"),
+                                                        config.ParseStdVector<double>("base_pos_gains"),
+                                                        config.ParseStdVector<double>("base_ang_gains"),
+                                                        config.ParseStdVector<double>("joint_gains"),
+                                                        config.ParseNumber<double>("leg_tracking_weight"),
+                                                        config.ParseNumber<double>("torso_tracking_weight"),
+                                                        config.ParseNumber<double>("force_tracking_weight"),
+                                                        4);
 
-    } else {
-        throw std::runtime_error("Invalid controller type in the yaml file.");
-    }
+//    } else {
+//        throw std::runtime_error("Invalid controller type in the yaml file.");
+//    }
 
     controller->PrintConfigNames();
+
+    controller::Contact contact1;
+    contact1.in_contact_ = {false, true, true, true};       // FL, FR, RL, RR
+    contact1.contact_frames_ = {14, 24, 34, 44};
+    controller->UpdateDesiredContacts(contact1);
 
     // Make the robot for simulation
     auto robot_file = config.ParseString("robot_xml");
@@ -71,11 +77,12 @@ int main(int argc, char* argv[]) {
                            config.ParseStdVector<int>("collision_bodies"));
 
     // Set the robot's initial condition
+    // TODO: Get the base position changes to work
     // TODO: check the quaternion is normalized
     Eigen::VectorXd init_config = config.ParseEigenVector("init_config");
     Eigen::VectorXd init_vel = config.ParseEigenVector("init_vel");
     robot->SetInitialCondition(init_config, init_vel);
-    robot->UpdateTargetConfig(config.ParseEigenVector("standing_config"));
+    robot->UpdateTargetConfig(config.ParseEigenVector("target_config"));
     robot->UpdateTargetVel(config.ParseEigenVector("standing_vel"));
 
     // Setup sim

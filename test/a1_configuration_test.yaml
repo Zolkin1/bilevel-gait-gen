@@ -2,9 +2,9 @@
 # Configurations for the robot
 
 # XML file location
-robot_xml: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/xml/a1.xml"
+robot_xml: "/home/zolkin/AmberLab/bilevel-gait-gen/models/a1_description/xml/a1.xml"
 
-robot_urdf: "/home/zach/AmberLab/bilevel-gait-generation/bilevel-gait-gen/models/a1_description/urdf/a1.urdf"
+robot_urdf: "/home/zolkin/AmberLab/bilevel-gait-gen/models/a1_description/urdf/a1.urdf"
 
 collision_frames: ["FL_foot", "FR_foot", "RL_foot", "RR_foot"]    # for pinocchio
 collision_bodies: [4, 7, 10, 13]  # for mujoco
@@ -42,5 +42,35 @@ standing_vel: [0., 0., 0., 0., 0., 0.,
 
 ## ----------------------- Low Level Controller ----------------------- ##
 control_rate: 400  # Hz
+friction_coef: 0.3
 
+## ----------------------- MPC ----------------------- ##
+discretization_steps: 1
+num_nodes: 20
+integrator_dt: 0.01
+num_qp: 1
+#vel_bounds: [1, 1, 1,
+#             1, 1, 1,
+#             1, 1, 1,
+#             1, 1, 1]
+vel_bounds: [3, 3, 3,
+             3, 3, 3,
+             3, 3, 3,
+             3, 3, 3]
+joint_bounds_lb: [-0.802851, -1.0472, -2.69653,
+                  -0.802851, -1.0472, -2.69653,
+                  -0.802851, -1.0472, -2.69653,
+                  -0.802851, -1.0472, -2.69653]
+joint_bounds_ub: [0.802851, 4.18879, -0.916298,
+                  0.802851, 4.18879, -0.916298,
+                  0.802851, 4.18879, -0.916298,
+                  0.802851, 4.18879, -0.916298]
+
+num_switches: 2
+force_bound: 150
+
+swing_height: 0.1
+
+## --- Temp --- ##
+viz_rate: 0.4
 

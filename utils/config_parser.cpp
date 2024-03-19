@@ -19,10 +19,6 @@ namespace utils {
         return vec;
     }
 
-    double ConfigParser::ParseNumber(const std::string &element) {
-        return config_[element].as<double>();
-    }
-
     std::string ConfigParser::ParseString(const std::string &element) {
         return config_[element].as<std::string>();
     }

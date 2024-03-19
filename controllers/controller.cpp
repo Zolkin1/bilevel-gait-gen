@@ -47,6 +47,8 @@ namespace controller {
 
     void Controller::InitSolver() {}
 
+    void Controller::InitSolver(const Eigen::VectorXd& full_body_state, const Eigen::VectorXd& mpc_state) {}
+
     double Controller::GetRate() const {
         return rate_;
     }
@@ -66,14 +68,17 @@ namespace controller {
     }
 
     void Controller::UpdateTargetConfig(const Eigen::VectorXd& q) {
+        assert(q.size() == num_inputs_ + FLOATING_BASE_OFFSET);
         config_target_ = q;
     }
 
     void Controller::UpdateTargetVel(const Eigen::VectorXd& v) {
+        assert(v.size() == vel_target_.size());
         vel_target_ = v;
     }
 
     void Controller::UpdateTargetAcc(const Eigen::VectorXd& a) {
+        assert(a.size() == acc_target_.size());
         acc_target_ = a;
     }
 
@@ -88,4 +93,19 @@ namespace controller {
             control(i) = vel_target_(i - num_inputs_ + FLOATING_VEL_OFFSET);
         }
     }
+
+    void Controller::UpdateDesiredContacts(const controller::Contact& contact) {}
+
+    Contact::Contact() {}
+
+    Contact::Contact(int num_contacts) : in_contact_(num_contacts, true), contact_frames_(num_contacts, 0) {}
+
+    std::vector<std::vector<Eigen::Vector3d>> Controller::GetTrajViz() {
+        return {};
+    }
+
+    std::vector<Eigen::Vector2d> Controller::GetEEBoxCenter() {
+        return {};
+    }
+
 } // controller
